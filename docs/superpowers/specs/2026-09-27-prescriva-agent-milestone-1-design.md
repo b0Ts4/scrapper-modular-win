@@ -1,7 +1,7 @@
 # Prescriva Windows Agent — Design do primeiro milestone
 
 **Data:** 2026-09-27  
-**Status:** aprovado em conversa; aguardando revisão do documento  
+**Status:** aprovado
 **Plataformas:** Windows 10 e Windows 11, x64
 
 ## 1. Objetivo
