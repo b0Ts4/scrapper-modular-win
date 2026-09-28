@@ -122,10 +122,18 @@ public sealed class SessionEngineTests
     [Fact]
     public void Multiple_emits_in_one_trigger_have_distinct_ids_sequences_and_ordered_snapshots()
     {
-        var engine = Engine(new("batch", "entry", Selector(), "Invoked",
-            [new CaptureFieldsAction(["name"]), new EmitEventAction("first"),
-                new TransitionStageAction("review"), new ClearStateAction(), new EmitEventAction("second")]));
-        var result = engine.Apply(Start(), new("batch", [FirstId, SecondId]), Values("A"), Now);
+        // Uses a dedicated configuration with an optional field (rather than the shared Engine()'s
+        // required "name") because ClearStateAction removes the captured value before the second
+        // emit, and every emit now validates required fields across all configured stages.
+        var configuration = new IntegrationConfiguration(1, "batch-flow", "Batch", new("erp.exe", "Budget"),
+            [new FieldDefinition("name", "entry", "Item name", false, Selector())],
+            [new StageDefinition("entry", "Entry"), new StageDefinition("review", "Review")],
+            [new TriggerDefinition("batch", "entry", Selector(), "Invoked",
+                [new CaptureFieldsAction(["name"]), new EmitEventAction("first"),
+                    new TransitionStageAction("review"), new ClearStateAction(), new EmitEventAction("second")])]);
+        Assert.True(ConfigurationValidator.Validate(configuration).IsValid);
+        var engine = new SessionEngine(configuration);
+        var result = engine.Apply(CaptureSession.Start(SessionId, "entry"), new("batch", [FirstId, SecondId]), Values("A"), Now);
 
         Assert.Equal(2, result.Events.Length);
         Assert.Equal("first", result.Events[0].Type);
@@ -290,6 +298,62 @@ public sealed class SessionEngineTests
         };
         AssertRejected(Engine().Apply(original, new("add", [FirstId]), Values("A"), Now),
             original, SessionFailureCode.InvalidSession);
+    }
+
+    [Fact]
+    public void Finish_rejects_when_a_required_field_of_a_stage_left_earlier_was_never_captured()
+    {
+        var patientSelector = Selector();
+        var configuration = new IntegrationConfiguration(1, "header-items-flow", "Header Items", new("erp.exe", "Budget"),
+            [
+                new("patient", "header", "Patient", true, patientSelector),
+                new("item", "items", "Item", true, patientSelector)
+            ],
+            [new("header", "Header"), new("items", "Items")],
+            [
+                new("next", "header", Selector(), "Invoked", [new TransitionStageAction("items")]),
+                new("add", "items", Selector(), "Invoked", [new CaptureFieldsAction(["item"]), new EmitEventAction("item_added")]),
+                new("finish", "items", Selector(), "Invoked", [new FinishSessionAction()])
+            ]);
+        Assert.True(ConfigurationValidator.Validate(configuration).IsValid);
+        var engine = new SessionEngine(configuration);
+
+        var afterNext = engine.Apply(CaptureSession.Start(SessionId, "header"), new("next", []), Values(), Now).Session;
+        var afterAdd = engine.Apply(afterNext,
+            new("add", [FirstId]), new Dictionary<string, CapturedFieldValue> { ["item"] = new("Widget") }, Now);
+
+        var result = engine.Apply(afterAdd.Session, new("finish", [SecondId]), Values(), Now);
+
+        AssertRejected(result, afterAdd.Session, SessionFailureCode.MissingRequiredField);
+        Assert.Equal("patient", Assert.Single(result.Failures).FieldId);
+    }
+
+    [Fact]
+    public void Null_occurrence_is_a_typed_failure_instead_of_throwing()
+    {
+        var original = Start();
+        AssertRejected(Engine().Apply(original, null!, Values("A"), Now), original, SessionFailureCode.InvalidSession);
+    }
+
+    [Fact]
+    public void Null_values_dictionary_is_a_typed_failure_instead_of_throwing()
+    {
+        var original = Start();
+        AssertRejected(Engine().Apply(original, new("add", [FirstId]), null!, Now), original, SessionFailureCode.InvalidSession);
+    }
+
+    [Fact]
+    public void Session_with_null_values_map_is_a_typed_failure_instead_of_throwing()
+    {
+        var original = Start() with { Values = null! };
+        AssertRejected(Engine().Apply(original, new("add", [FirstId]), Values("A"), Now), original, SessionFailureCode.InvalidSession);
+    }
+
+    [Fact]
+    public void Session_with_default_confirmed_items_is_a_typed_failure_instead_of_throwing()
+    {
+        var original = Start() with { ConfirmedItems = default };
+        AssertRejected(Engine().Apply(original, new("add", [FirstId]), Values("A"), Now), original, SessionFailureCode.InvalidSession);
     }
 
     [Fact]

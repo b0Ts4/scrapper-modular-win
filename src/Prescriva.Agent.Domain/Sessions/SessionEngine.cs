@@ -29,6 +29,10 @@ public sealed class SessionEngine
     {
         SessionTransitionResult Reject(SessionFailure failure) => new(session, [], [failure], SessionTransitionStatus.Rejected);
 
+        if (session is null)
+            return new(session!, [], [new(SessionFailureCode.InvalidSession)], SessionTransitionStatus.Rejected);
+        if (occurrence is null || values is null || session.Values is null || session.ConfirmedItems.IsDefault)
+            return Reject(new(SessionFailureCode.InvalidSession));
         if (session.State != SessionState.Active)
             return Reject(new(SessionFailureCode.SessionEnded));
         if (session.Id == Guid.Empty || session.LastSequence < 0 ||
@@ -46,7 +50,7 @@ public sealed class SessionEngine
 
         SessionFailure? Emit(string type)
         {
-            foreach (var field in configuration.Fields.Where(field => field.StageId == current.CurrentStageId && field.Required))
+            foreach (var field in configuration.Fields.Where(field => field.Required))
                 if (!current.Values.TryGetValue(field.Id, out var value) || string.IsNullOrWhiteSpace(value))
                     return new(SessionFailureCode.MissingRequiredField, field.Id);
 
