@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Domain.Selectors;
@@ -79,6 +80,72 @@ public sealed class JsonConfigurationStoreTests : IDisposable
 
         Assert.Contains(error.Errors, item => item.Code == "UNSUPPORTED_SCHEMA_VERSION");
         Assert.Equal(before, await File.ReadAllTextAsync(path));
+    }
+
+    [Fact]
+    public async Task Successful_overwrite_replaces_the_existing_file_content()
+    {
+        var store = new JsonConfigurationStore(_directory);
+        await store.SaveAsync(ValidConfiguration(), CancellationToken.None);
+        var path = Path.Combine(_directory, "budget-flow.json");
+        var before = await File.ReadAllTextAsync(path);
+
+        var updated = ValidConfiguration() with { Name = "Budget flow (renamed)" };
+        await store.SaveAsync(updated, CancellationToken.None);
+
+        var after = await File.ReadAllTextAsync(path);
+        Assert.NotEqual(before, after);
+        Assert.Contains("Budget flow (renamed)", after, StringComparison.Ordinal);
+
+        var loaded = await store.LoadAsync(updated.Id, CancellationToken.None);
+        Assert.Equivalent(updated, loaded, strict: true);
+    }
+
+    [Fact]
+    public async Task Default_and_explicit_empty_selector_arrays_round_trip_equivalently()
+    {
+        var store = new JsonConfigurationStore(_directory);
+        var defaultSelector = new ElementFingerprint("erp.exe", "Budget", AutomationId: "item-name", ControlType: "Edit");
+        var explicitEmptySelector = defaultSelector with
+        {
+            Ancestors = ImmutableArray<AncestorFingerprint>.Empty,
+            NearbyLabels = ImmutableArray<string>.Empty
+        };
+
+        var withDefault = ValidConfiguration() with
+        {
+            Id = "default-selector-flow",
+            Fields = [new FieldDefinition("item_name", "entry", "Item name", true, defaultSelector)]
+        };
+        var withExplicitEmpty = ValidConfiguration() with
+        {
+            Id = "explicit-empty-selector-flow",
+            Fields = [new FieldDefinition("item_name", "entry", "Item name", true, explicitEmptySelector)]
+        };
+
+        await store.SaveAsync(withDefault, CancellationToken.None);
+        await store.SaveAsync(withExplicitEmpty, CancellationToken.None);
+
+        var loadedDefault = await store.LoadAsync(withDefault.Id, CancellationToken.None);
+        var loadedExplicitEmpty = await store.LoadAsync(withExplicitEmpty.Id, CancellationToken.None);
+
+        var defaultLoadedSelector = loadedDefault.Fields[0].Selector;
+        var explicitEmptyLoadedSelector = loadedExplicitEmpty.Fields[0].Selector;
+
+        Assert.True(defaultLoadedSelector.Ancestors.IsDefaultOrEmpty);
+        Assert.True(defaultLoadedSelector.NearbyLabels.IsDefaultOrEmpty);
+        Assert.True(explicitEmptyLoadedSelector.Ancestors.IsDefaultOrEmpty);
+        Assert.True(explicitEmptyLoadedSelector.NearbyLabels.IsDefaultOrEmpty);
+
+        var candidate = new ElementCandidate("target", defaultSelector with { AutomationId = "item-name", ControlType = "Edit" });
+        var weights = new SelectorWeights();
+        var matcher = new SelectorMatcher();
+
+        var defaultMatch = matcher.Match(defaultLoadedSelector, [candidate], weights);
+        var explicitEmptyMatch = matcher.Match(explicitEmptyLoadedSelector, [candidate], weights);
+
+        Assert.Equal(defaultMatch.Status, explicitEmptyMatch.Status);
+        Assert.Equal(defaultMatch.Score, explicitEmptyMatch.Score);
     }
 
     [Fact]
