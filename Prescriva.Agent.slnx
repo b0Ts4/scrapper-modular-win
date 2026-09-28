@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Prescriva.Agent.Application/Prescriva.Agent.Application.csproj" />
+    <Project Path="src/Prescriva.Agent.Domain/Prescriva.Agent.Domain.csproj" />
+    <Project Path="src/Prescriva.Agent.Infrastructure/Prescriva.Agent.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Prescriva.Agent.Application.Tests/Prescriva.Agent.Application.Tests.csproj" />
+    <Project Path="tests/Prescriva.Agent.Domain.Tests/Prescriva.Agent.Domain.Tests.csproj" />
+    <Project Path="tests/Prescriva.Agent.Infrastructure.Tests/Prescriva.Agent.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>
