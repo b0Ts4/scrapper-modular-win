@@ -194,4 +194,62 @@ public sealed class SelectorMatcherTests
         Assert.Equal("customer", result.CandidateId);
         Assert.Contains("name", result.Evidence.Keys);
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void NonpositiveMinimumLead_IsRejectedBeforeTiedCandidatesCanBeSelected(int minimumLead)
+    {
+        var selector = new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button");
+        var candidates = new[]
+        {
+            new ElementCandidate("first", new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button")),
+            new ElementCandidate("second", new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button"))
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            matcher.Match(selector, candidates, new SelectorWeights { MinimumLead = minimumLead }));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(101)]
+    public void MinimumScoreOutsideValidRange_IsRejected(int minimumScore)
+    {
+        var selector = new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button");
+        var candidates = new[]
+        {
+            new ElementCandidate("no-evidence", new ElementFingerprint("erp.exe", "Main", AutomationId: "other", ControlType: "Edit"))
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            matcher.Match(selector, candidates, new SelectorWeights { MinimumScore = minimumScore }));
+    }
+
+    [Fact]
+    public void NegativeSignalWeight_IsRejected()
+    {
+        var selector = new ElementFingerprint("erp.exe", "Main", AutomationId: "add");
+        var candidates = new[]
+        {
+            new ElementCandidate("add", new ElementFingerprint("erp.exe", "Main", AutomationId: "add"))
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            matcher.Match(selector, candidates, new SelectorWeights { AutomationId = -1 }));
+    }
+
+    [Fact]
+    public void SignalWeightTotalAbove100_IsRejected()
+    {
+        var selector = new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button");
+        var candidates = new[]
+        {
+            new ElementCandidate("add", new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button"))
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            matcher.Match(selector, candidates, new SelectorWeights { AutomationId = 101 }));
+    }
 }

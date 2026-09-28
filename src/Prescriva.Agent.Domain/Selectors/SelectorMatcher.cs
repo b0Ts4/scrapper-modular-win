@@ -13,6 +13,7 @@ public sealed class SelectorMatcher
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(weights);
+        weights.Validate();
 
         var scored = candidates
             .Where(candidate => Same(selector.ProcessIdentity, candidate.Fingerprint.ProcessIdentity)
