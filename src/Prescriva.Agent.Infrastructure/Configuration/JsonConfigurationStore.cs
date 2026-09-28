@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Collections.Immutable;
 using Prescriva.Agent.Application.Configuration;
 using Prescriva.Agent.Domain.Configuration;
@@ -74,11 +75,30 @@ public sealed class JsonConfigurationStore : IConfigurationStore
 
     private static JsonSerializerOptions CreateJsonOptions()
     {
+        var resolver = new DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(typeInfo =>
+        {
+            if (typeInfo.Type != typeof(TriggerActionDefinition)) return;
+            typeInfo.PolymorphismOptions = new JsonPolymorphismOptions
+            {
+                TypeDiscriminatorPropertyName = "kind",
+                DerivedTypes =
+                {
+                    new JsonDerivedType(typeof(CaptureFieldsAction), "captureFields"),
+                    new JsonDerivedType(typeof(TransitionStageAction), "transitionStage"),
+                    new JsonDerivedType(typeof(EmitEventAction), "emitEvent"),
+                    new JsonDerivedType(typeof(ClearStateAction), "clearState"),
+                    new JsonDerivedType(typeof(FinishSessionAction), "finishSession"),
+                    new JsonDerivedType(typeof(CancelSessionAction), "cancelSession")
+                }
+            };
+        });
         var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
-            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+            TypeInfoResolver = resolver
         };
         options.Converters.Add(new ImmutableArrayConverterFactory());
         return options;

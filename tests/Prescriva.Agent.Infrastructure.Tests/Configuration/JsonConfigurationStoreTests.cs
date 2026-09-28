@@ -10,6 +10,14 @@ public sealed class JsonConfigurationStoreTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "prescriva-config-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public void Action_discriminator_is_specific_to_the_configuration_store()
+    {
+        var defaultJson = JsonSerializer.Serialize<TriggerActionDefinition>(new CaptureFieldsAction(["item_name"]));
+
+        Assert.DoesNotContain("\"kind\"", defaultJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Save_and_load_preserve_all_action_kinds_and_configuration_values()
     {
         var store = new JsonConfigurationStore(_directory);
