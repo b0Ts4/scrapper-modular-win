@@ -6,5 +6,5 @@ The first milestone is split into three sequential, independently reviewable pla
 2. `docs/superpowers/plans/2026-09-27-windows-inspector-and-capture.md`
 3. `docs/superpowers/plans/2026-09-27-trigger-runtime-events-and-test-mode.md`
 
-Current work: plan 1 is approved and implementation is underway. Task 1 (solution and repository guidance) is complete; Task 2 (element fingerprints and selector scoring) is next. See `docs/handoffs/current-state.md` for the handoff. Execution method: subagent-driven development when the environment supports it.
+Current work: plan 1 Tasks 1–4 are implemented and awaiting final plan review/integration. The next implementation plan is plan 2, Windows Inspector and Capture. See `docs/handoffs/current-state.md` for exact capabilities, verification and limitations. Execution method: subagent-driven development when the environment supports it.
 
