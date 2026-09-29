@@ -112,6 +112,48 @@ public sealed class InspectionControllerTests
         Assert.Equal(secondSnapshot, controller.CurrentState.Snapshot);
     }
 
+    /// <summary>
+    /// Covers the same invariant as <see cref="Rapid_pointer_updates_cancel_the_stale_in_flight_inspection"/>
+    /// but for the case where the stale call's underlying inspection does not honor
+    /// cancellation and instead completes successfully (a real Found result), arriving
+    /// well after a newer call has already published its own state. A prior version of
+    /// InspectionController checked "am I still the current call?" and wrote the new
+    /// state as two separate steps (a check, then a later-acquired lock), which left a
+    /// narrow window in which a superseding call's CancellationTokenSource swap could
+    /// land between them - letting a stale result win the race and briefly clobber
+    /// CurrentState with old data. This test cannot force that exact nanosecond-scale
+    /// interleaving deterministically (nothing observable from the public API pins the
+    /// two steps apart at that granularity), but it does pin down the guarantee the fix
+    /// provides: regardless of how late a stale result arrives, it must never overwrite
+    /// state a newer call has already published.
+    /// </summary>
+    [Fact]
+    public async Task A_stale_result_that_completes_successfully_after_a_newer_call_already_won_is_dropped()
+    {
+        var inspector = new FakeElementInspector();
+        var firstCallResult = new TaskCompletionSource<InspectionResult>();
+        inspector.Enqueue(_ => firstCallResult.Task);
+
+        var secondSnapshot = Snapshot("SecondElement");
+        inspector.Enqueue(_ => Task.FromResult(InspectionResult.Found(secondSnapshot)));
+
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        var firstObservation = controller.ObservePointerAsync(new ScreenPoint(1, 1));
+        await controller.ObservePointerAsync(new ScreenPoint(2, 2));
+
+        // The second call has already run to completion and published its state. Now let
+        // the stale first call resolve successfully (not via cancellation) with a
+        // different element entirely.
+        Assert.Equal(secondSnapshot, controller.CurrentState.Snapshot);
+        var staleSnapshot = Snapshot("StaleFirstElement");
+        firstCallResult.TrySetResult(InspectionResult.Found(staleSnapshot));
+        await firstObservation;
+
+        Assert.Equal(secondSnapshot, controller.CurrentState.Snapshot);
+    }
+
     [Fact]
     public async Task StopAsync_removes_the_highlight()
     {

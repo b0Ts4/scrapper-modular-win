@@ -20,6 +20,12 @@ namespace Prescriva.Agent.Windows.IntegrationTests.Overlay;
 /// which of the two correct outcomes UI Automation will produce for a given Windows
 /// version - it asserts the one thing that must never happen: the overlay window itself
 /// being reported as the inspected element.
+///
+/// NOTE: on a machine with Windows Smart App Control enforced, running these tests can
+/// fail with a FileLoadException loading Prescriva.Agent.Desktop.dll (CodeIntegrity event
+/// IDs 3033/3077/3118). Release-configured usually fares better than Debug, but is not a
+/// guaranteed fix - Smart App Control can still block a freshly built, unsigned Release
+/// assembly identically. See docs/testing.md.
 /// </summary>
 public sealed class OverlayExclusionTests
 {

@@ -113,13 +113,10 @@ public sealed class InspectionController
 
         // Even if this call's own inspection completed normally, a newer call may have
         // started (and possibly already finished) while we were awaiting. Never let an
-        // older result clobber a newer one.
-        if (!ReferenceEquals(Volatile.Read(ref _pointerCts), cts))
-        {
-            return;
-        }
-
-        ApplyResult(result);
+        // older result clobber a newer one - ApplyResult re-checks this same "are we
+        // still current" condition, but atomically with the state write itself (see its
+        // remarks for why a separate check-then-write here would still be racy).
+        ApplyResult(result, cts);
     }
 
     /// <summary>Stops the session: removes any highlight and clears the current element.</summary>
@@ -158,34 +155,63 @@ public sealed class InspectionController
         return Task.FromResult(confirmed);
     }
 
-    private void ApplyResult(InspectionResult result)
+    /// <summary>
+    /// Computes the state <paramref name="result"/> maps to and, if <paramref name="ownCts"/>
+    /// is still the current in-flight pointer observation, publishes it.
+    /// </summary>
+    /// <remarks>
+    /// The "is this call still current" check and the write to <see cref="_state"/> must
+    /// happen as a single atomic step under <see cref="_gate"/> - not as a check followed
+    /// by a separate, later-acquired lock (as an earlier version of this method's caller
+    /// did). Between a check and a subsequent write that are two separate critical
+    /// sections, a superseding <see cref="ObservePointerAsync"/> call can swap in a new
+    /// <see cref="_pointerCts"/> in the gap between them, and this (now-stale) call would
+    /// still win the race to publish its state - a transient flicker back to stale data
+    /// that self-corrects only once the newer call's own result later arrives. Performing
+    /// the comparison and the write inside the same lock closes that gap: whichever call
+    /// acquires the lock last always sees the truly current <see cref="_pointerCts"/> and
+    /// no other call can slip a write in between the check and the write.
+    /// </remarks>
+    private void ApplyResult(InspectionResult result, CancellationTokenSource ownCts)
     {
+        InspectionState newState;
         if (result.Outcome == InspectionOutcome.Found && result.Snapshot is { } snapshot)
         {
-            if (_excludedProcessIds.Contains(snapshot.ProcessId))
-            {
-                SetState(InspectionState.Active(
+            newState = _excludedProcessIds.Contains(snapshot.ProcessId)
+                ? InspectionState.Active(
                     null,
                     null,
                     ImmutableArray.Create(
-                        "Ignored an element belonging to the Agent's own process (expected when the pointer is over the highlight overlay).")));
-                return;
-            }
+                        "Ignored an element belonging to the Agent's own process (expected when the pointer is over the highlight overlay)."))
+                : InspectionState.Active(snapshot, BuildFingerprint(snapshot), ImmutableArray<string>.Empty);
+        }
+        else
+        {
+            var warning = result.Outcome switch
+            {
+                InspectionOutcome.TimedOut => "The inspection timed out before an element could be resolved.",
+                InspectionOutcome.WindowMissing => result.FailureReason ?? "The target window is no longer available.",
+                InspectionOutcome.ElementUnavailable => result.FailureReason ?? "The element under the pointer is no longer available.",
+                _ => "No element was found at the given point.",
+            };
 
-            var fingerprint = BuildFingerprint(snapshot);
-            SetState(InspectionState.Active(snapshot, fingerprint, ImmutableArray<string>.Empty));
-            return;
+            newState = InspectionState.Active(null, null, ImmutableArray.Create(warning));
         }
 
-        var warning = result.Outcome switch
+        bool applied;
+        lock (_gate)
         {
-            InspectionOutcome.TimedOut => "The inspection timed out before an element could be resolved.",
-            InspectionOutcome.WindowMissing => result.FailureReason ?? "The target window is no longer available.",
-            InspectionOutcome.ElementUnavailable => result.FailureReason ?? "The element under the pointer is no longer available.",
-            _ => "No element was found at the given point.",
-        };
+            applied = ReferenceEquals(_pointerCts, ownCts);
+            if (applied)
+            {
+                _state = newState;
+            }
+        }
 
-        SetState(InspectionState.Active(null, null, ImmutableArray.Create(warning)));
+        if (applied)
+        {
+            StateChanged?.Invoke(this, newState);
+        }
     }
 
     private static ElementFingerprint BuildFingerprint(ElementSnapshot snapshot) =>
