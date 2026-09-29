@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Windows.Automation;
 using Prescriva.Agent.Application.Inspection;
 using Prescriva.Agent.Domain.Configuration;
@@ -93,18 +94,8 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
                             ElementInspectionFailureKind.WindowMissing,
                             $"No window found for process '{application.ProcessIdentity}' matching window rule '{application.WindowRule}'.");
 
-                    var snapshots = new List<ElementSnapshot>();
-                    try
-                    {
-                        foreach (AutomationElement descendant in window.FindAll(TreeScope.Descendants, Condition.TrueCondition))
-                        {
-                            snapshots.Add(CreateSnapshot(descendant));
-                        }
-                    }
-                    catch (ElementNotAvailableException ex)
-                    {
-                        throw new ElementInspectionFailure(ElementInspectionFailureKind.WindowMissing, "The target window closed while enumerating its elements.", ex);
-                    }
+                    var descendants = AutomationWindowLocator.FindDescendants(window);
+                    var snapshots = descendants.Select(CreateSnapshot).ToList();
 
                     return (IReadOnlyList<ElementSnapshot>)snapshots;
                 },

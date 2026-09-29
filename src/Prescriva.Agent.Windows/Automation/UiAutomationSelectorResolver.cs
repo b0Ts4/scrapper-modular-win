@@ -88,26 +88,16 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
                 ElementInspectionFailureKind.WindowMissing,
                 $"No window found for process '{fingerprint.ProcessIdentity}' matching window rule '{fingerprint.WindowRule}'.");
 
-        var elementsById = new Dictionary<string, AutomationElement>(StringComparer.Ordinal);
-        var candidates = new List<ElementCandidate>();
+        var descendants = AutomationWindowLocator.FindDescendants(window);
 
-        try
+        var elementsById = new Dictionary<string, AutomationElement>(StringComparer.Ordinal);
+        var candidates = new List<ElementCandidate>(descendants.Count);
+        for (var index = 0; index < descendants.Count; index++)
         {
-            var index = 0;
-            foreach (AutomationElement descendant in window.FindAll(TreeScope.Descendants, Condition.TrueCondition))
-            {
-                var id = index.ToString(CultureInfo.InvariantCulture);
-                index++;
-                elementsById[id] = descendant;
-                candidates.Add(new ElementCandidate(id, CreateCandidateFingerprint(fingerprint, descendant)));
-            }
-        }
-        catch (ElementNotAvailableException ex)
-        {
-            throw new ElementInspectionFailure(
-                ElementInspectionFailureKind.WindowMissing,
-                "The target window closed while enumerating its elements.",
-                ex);
+            var descendant = descendants[index];
+            var id = index.ToString(CultureInfo.InvariantCulture);
+            elementsById[id] = descendant;
+            candidates.Add(new ElementCandidate(id, CreateCandidateFingerprint(fingerprint, descendant)));
         }
 
         var match = _matcher.Match(fingerprint, candidates, _weights);

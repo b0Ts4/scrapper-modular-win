@@ -12,10 +12,15 @@ namespace Prescriva.Agent.Windows.Automation;
 /// </summary>
 internal sealed class UiaResolvedElementHandle : ResolvedElementHandle
 {
-    public UiaResolvedElementHandle(AutomationElement element)
+    internal UiaResolvedElementHandle(AutomationElement element)
     {
         Element = element;
     }
 
-    public AutomationElement Element { get; }
+    // Deliberately `internal`, not `public`: a `public` property on an `internal` type is
+    // still reachable via reflection with default (public) BindingFlags from any assembly
+    // - `Type.GetProperty` finds public *members* regardless of the declaring type's own
+    // accessibility. `internal` raises the bar to a deliberate BindingFlags.NonPublic
+    // reflection call, which is the level of opacity this boundary is meant to provide.
+    internal AutomationElement Element { get; }
 }
