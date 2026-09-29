@@ -1,12 +1,17 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Prescriva.Agent.Application/Prescriva.Agent.Application.csproj" />
+    <Project Path="src/Prescriva.Agent.Desktop/Prescriva.Agent.Desktop.csproj" />
     <Project Path="src/Prescriva.Agent.Domain/Prescriva.Agent.Domain.csproj" />
     <Project Path="src/Prescriva.Agent.Infrastructure/Prescriva.Agent.Infrastructure.csproj" />
+    <Project Path="src/Prescriva.Agent.TestTarget/Prescriva.Agent.TestTarget.csproj" />
+    <Project Path="src/Prescriva.Agent.Windows/Prescriva.Agent.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Prescriva.Agent.Application.Tests/Prescriva.Agent.Application.Tests.csproj" />
     <Project Path="tests/Prescriva.Agent.Domain.Tests/Prescriva.Agent.Domain.Tests.csproj" />
     <Project Path="tests/Prescriva.Agent.Infrastructure.Tests/Prescriva.Agent.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Prescriva.Agent.Windows.IntegrationTests/Prescriva.Agent.Windows.IntegrationTests.csproj" />
+    <Project Path="tests/Prescriva.Agent.Windows.Tests/Prescriva.Agent.Windows.Tests.csproj" />
   </Folder>
 </Solution>
