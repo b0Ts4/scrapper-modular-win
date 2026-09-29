@@ -61,6 +61,18 @@
 
             <Separator Margin="0,10,0,10" />
 
+            <TextBlock Text="4b. Add trigger from confirmed selection" FontWeight="Bold" Margin="0,0,0,4" />
+            <UniformGrid Columns="2" Rows="2">
+                <TextBlock Text="Trigger ID:" VerticalAlignment="Center" />
+                <TextBox x:Name="TriggerSemanticIdBox" Text="finish_trigger" Margin="2" />
+                <TextBlock Text="Observed event:" VerticalAlignment="Center" />
+                <TextBox x:Name="TriggerObservedEventBox" Text="Invoke" Margin="2" />
+            </UniformGrid>
+            <Button x:Name="AddTriggerButton" Content="Add Trigger From Confirmed Selection (captures field above)" Margin="0,6,0,0"
+                    Click="AddTriggerButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+
+            <Separator Margin="0,10,0,10" />
+
             <TextBlock Text="5. Save / reload" FontWeight="Bold" Margin="0,0,0,4" />
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="SaveButton" Content="Save" Click="SaveButton_Click" Padding="8,2" Margin="0,0,6,0" />

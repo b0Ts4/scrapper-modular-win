@@ -10,6 +10,7 @@ using Prescriva.Agent.Desktop.Inspection;
 using Prescriva.Agent.Desktop.Overlay;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Infrastructure.Configuration;
+// CaptureFieldsAction lives in Prescriva.Agent.Domain.Configuration (imported above).
 using Prescriva.Agent.Windows.Automation;
 
 namespace Prescriva.Agent.Desktop;
@@ -150,6 +151,35 @@ public partial class MainWindow : Window
         catch (InvalidOperationException ex)
         {
             SetStatus($"Cannot add field: {ex.Message}");
+        }
+    }
+
+    private void AddTriggerButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_confirmedSelection?.Fingerprint is not { } fingerprint)
+        {
+            SetStatus("Confirm a selection before adding a trigger.");
+            return;
+        }
+
+        try
+        {
+            var capturedFieldId = FieldSemanticIdBox.Text.Trim();
+            _editorViewModel.AddTrigger(
+                TriggerSemanticIdBox.Text.Trim(),
+                StageIdBox.Text.Trim(),
+                fingerprint,
+                TriggerObservedEventBox.Text.Trim(),
+                [new CaptureFieldsAction([capturedFieldId])]);
+            SetStatus($"Added trigger '{TriggerSemanticIdBox.Text.Trim()}'. Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
+        }
+        catch (ArgumentException ex)
+        {
+            SetStatus($"Invalid trigger ID: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            SetStatus($"Cannot add trigger: {ex.Message}");
         }
     }
 
