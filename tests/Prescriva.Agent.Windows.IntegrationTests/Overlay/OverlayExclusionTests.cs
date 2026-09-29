@@ -74,13 +74,24 @@ public sealed class OverlayExclusionTests
         try
         {
             // The overlay genuinely covers the target element's screen position - proven
-            // directly, not assumed, before it can matter to the assertions below. The
-            // Window instance has thread affinity to the STA thread OverlayHost created
-            // it on, so every read of its properties must be marshaled there too.
-            var (left, top, isVisible) = host.Invoke(w => (w.Left, w.Top, w.IsVisible));
-            Assert.Equal(bounds.X, left, precision: 0);
-            Assert.Equal(bounds.Y, top, precision: 0);
+            // directly, not assumed, before it can matter to the assertions below.
+            //
+            // Comparing Window.Left/Top (WPF device-independent units) directly against
+            // `bounds` (UI Automation's BoundingRectangle, in physical screen pixels) is
+            // circular on any scaled display - it can pass even when the overlay is
+            // actually mispositioned, because both sides were never in the same
+            // coordinate space to begin with. Instead, read the overlay's real HWND rect
+            // via GetWindowRect (physical pixels, same space as BoundingRectangle) and
+            // compare that against `bounds` directly - a meaningful, same-space check
+            // that only passes when the overlay physically covers the target.
+            var isVisible = host.Invoke(w => w.IsVisible);
             Assert.True(isVisible);
+
+            Assert.True(GetWindowRect(host.Handle, out var overlayRect), "GetWindowRect failed for the overlay HWND.");
+            Assert.Equal(bounds.X, overlayRect.Left, precision: 0);
+            Assert.Equal(bounds.Y, overlayRect.Top, precision: 0);
+            Assert.Equal(bounds.Width, overlayRect.Right - overlayRect.Left, precision: 0);
+            Assert.Equal(bounds.Height, overlayRect.Bottom - overlayRect.Top, precision: 0);
 
             var controller = new InspectionController(inspector);
             await controller.StartAsync();
@@ -149,6 +160,18 @@ public sealed class OverlayExclusionTests
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 
     /// <summary>
     /// Hosts a real <see cref="HighlightOverlayWindow"/> on its own dedicated STA thread

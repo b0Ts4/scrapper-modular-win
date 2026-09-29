@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Prescriva.Agent.Application.Inspection;
 
 namespace Prescriva.Agent.Desktop.Overlay;
@@ -53,15 +54,38 @@ public partial class HighlightOverlayWindow : Window
             return;
         }
 
-        Left = rect.X;
-        Top = rect.Y;
-        Width = Math.Max(rect.Width, 0);
-        Height = Math.Max(rect.Height, 0);
+        // `rect` comes from UI Automation's BoundingRectangle, which is in physical
+        // screen pixels. WPF's Window.Left/Top/Width/Height are device-independent units
+        // (96 DPI baseline) - on a scaled display (e.g. 125%, AppliedDPI 120) assigning
+        // the physical values directly both mispositions and mis-sizes the overlay.
+        // Convert physical -> DIU before assigning, using whichever DPI source is
+        // available: PresentationSource's CompositionTarget (present once the HWND
+        // exists, as it does for every call after the first Show()) gives the exact
+        // transform WPF itself uses; before that a window has no HWND yet, so fall back
+        // to VisualTreeHelper.GetDpi, which reports the DPI the Window will render at.
+        var (scaleX, scaleY) = GetDeviceToDiuScale();
+
+        Left = rect.X * scaleX;
+        Top = rect.Y * scaleY;
+        Width = Math.Max(rect.Width, 0) * scaleX;
+        Height = Math.Max(rect.Height, 0) * scaleY;
 
         if (!IsVisible)
         {
             Show();
         }
+    }
+
+    private (double ScaleX, double ScaleY) GetDeviceToDiuScale()
+    {
+        if (PresentationSource.FromVisual(this)?.CompositionTarget is { } compositionTarget)
+        {
+            var transform = compositionTarget.TransformFromDevice;
+            return (transform.M11, transform.M22);
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return (96.0 / dpi.PixelsPerInchX, 96.0 / dpi.PixelsPerInchY);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
