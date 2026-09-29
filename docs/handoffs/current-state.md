@@ -19,9 +19,36 @@ dotnet build Prescriva.Agent.slnx --configuration Release --no-restore
 
 If this environment's shell does not have `dotnet` on PATH, locate the SDK executable (commonly under `%LOCALAPPDATA%\Microsoft\dotnet\dotnet.exe` on Windows) and use its full path for the commands above. See [testing](../testing.md) and the [session contract](../sessions.md).
 
-Current plan: foundation implementation complete, pending final plan review/integration. Next plan: `docs/superpowers/plans/2026-09-27-windows-inspector-and-capture.md`, starting with Windows/Desktop/TestTarget projects and the application ports. Continue in the isolated worktree with the approved design and TDD workflow.
+Foundation plan is complete and merged into this branch (its own final whole-branch review passed, one fix wave applied and re-reviewed clean).
 
-Limitations: window rules currently use normalized exact equality. Only configuration schema version 1 is supported. Session values are normalized strings supplied by callers; callers bind sessions to process instances/configurations and allocate globally unique IDs. The engine checks ID reuse within a session, not across sessions, and has no durable state or replay deduplication. It does not detect triggers or capture desktop data. The Windows Inspector, UI Automation capture, trigger runtime, SQLite/DPAPI event persistence, WPF UI, TestTarget and interactive manual checks are not implemented. The first milestone is therefore not complete.
+## Windows Inspector and Capture plan
+
+Plan: `docs/superpowers/plans/2026-09-27-windows-inspector-and-capture.md`. Tasks 1–3 of 5 are complete (each task-reviewed, each with a fix round applied and re-reviewed clean):
+
+- **Task 1**: `Prescriva.Agent.TestTarget` — a real, deterministic `net10.0-windows` WPF exe with all 12 required `AutomationProperties.AutomationId`s (`MedicationTextBox`, `ConcentrationTextBox`, `QuantityTextBox`, `FormComboBox`, `ItemsGrid`, `NextButton`, `BackButton`, `AddButton`, `FinishButton`, `CancelButton`, `DynamicField`, `ToggleDynamicFieldButton`), a working `--layout-variant` argument (moves controls, keeps IDs stable), Add-appends-a-row and Finish-shows-completion-state. `Prescriva.Agent.Windows` and `Prescriva.Agent.Desktop` scaffolded as empty `net10.0-windows`/WPF projects (no logic yet). `TestTargetLauncher` (test helper) launches/waits/kills a real TestTarget process for integration tests.
+- **Task 2**: `AutomationDispatcher` — one dedicated background STA thread owns all real UI Automation access; every operation accepts cancellation and a timeout; queued work started after cancellation/timeout never runs its body. `UiAutomationElementInspector` implements `IElementInspector` (`FromPointAsync`, `FindCandidatesAsync`) against real UIA. `ElementSnapshot`/`ScreenPoint`/`InspectionResult` and the failure vocabulary `ElementInspectionFailure`/`ElementInspectionFailureKind` (`Cancelled`/`TimedOut`/`WindowMissing`/`ElementUnavailable`) live in `Prescriva.Agent.Application.Inspection` — plain, UIA-free data, so Application-layer code can branch on failure kind without a compile-time reference to `Prescriva.Agent.Windows`. Both `IElementInspector` methods map a `Cancelled` failure to `OperationCanceledException` identically.
+- **Task 3**: `UiAutomationSelectorResolver` implements `ISelectorResolver.ResolveAsync` by combining Task 2's real candidate enumeration with the foundation plan's pure `SelectorMatcher` scoring, producing a `SelectorResolution` (exact match / moved-layout match / `Ambiguous` / not found / window missing). `UiAutomationCaptureProvider` implements `ICaptureProvider.CaptureAsync`, trying `ValuePattern` → `TextPattern` → `SelectionPattern` in order and recording every attempt; a liveness probe (`element.Current.ControlType`) distinguishes a genuinely destroyed element from one that simply lacks a pattern (`TryGetCurrentPattern` silently reports "unsupported" for a dead provider instead of throwing). `ResolvedElementHandle` is a genuinely opaque token (its concrete `UiaResolvedElementHandle` and the live `AutomationElement` it wraps are both `internal` to `Prescriva.Agent.Windows`, closing even a reflection-based extraction attempt). `AutomationWindowLocator.FindDescendants` is the single shared helper both the inspector and the resolver use for window-descendant enumeration + `WindowMissing` mapping (no duplication).
+
+Verification commands (from the worktree root):
+
+```powershell
+dotnet build Prescriva.Agent.slnx --configuration Release
+dotnet test Prescriva.Agent.slnx --configuration Release
+```
+
+If `dotnet` isn't on PATH, locate the SDK executable (commonly `%LOCALAPPDATA%\Microsoft\dotnet\dotnet.exe` on Windows) and use its full path. As of Task 3's completion: Domain 58, Infrastructure 9, Windows.Tests 6, Windows.IntegrationTests 18 — all real tests (the integration tests launch and inspect a real `Prescriva.Agent.TestTarget.exe` process on an interactive desktop; they are not mocked and will not run headlessly). `Prescriva.Agent.Windows.IntegrationTests` disables test parallelization at the assembly level (`[assembly: CollectionBehavior(DisableTestParallelization = true)]`) because its tests drive real, visible desktop windows at fixed screen coordinates that would otherwise race each other.
+
+Next: Task 4 (click-through overlay and selection controller — `InspectionController`, `HighlightOverlayWindow`, `InspectorViewModel`), then Task 5 (minimal configurator vertical slice + manual verification). Continue in this same worktree/branch with subagent-driven development.
+
+Limitations (Windows Inspector plan, still open):
+- The "element destroyed during capture" test scenario (Task 3) kills the whole TestTarget process rather than removing a single element from a still-running app/window — a real WPF/UIA limitation (`AutomationPeer.InvalidatePeer()` doesn't reliably produce `ElementNotAvailableException` since the CLR peer object stays alive) made the narrower scenario impractical to construct; accepted as a documented trade-off, not fixed.
+- `FieldDefinition` is accepted by `ICaptureProvider.CaptureAsync` but not yet used for any per-field customization or selector/handle-consistency validation — capture behavior is currently identical regardless of the field passed in.
+- `CaptureResult.Confidence` is currently always a hardcoded `1.0` (success) or `0` (failure), carrying no signal beyond the outcome already present.
+- `FindApplicationWindow`/`AutomationWindowLocator.Find` enumerate every top-level desktop window and call `Process.GetProcessById` per window — O(all top-level windows) per call, unoptimized but not a correctness issue at current scale.
+
+Limitations (foundation plan, still open — carried forward, see the original list below for full detail): `DomainEvent.ConfigurationVersion` conflates schema version with content revision; `SessionEngine`'s field-lookup relies on an upstream validator invariant; `SessionFailure.CaptureFailure` naming clash with its enum; untyped `FileNotFoundException` on missing-file load; case-sensitive ID uniqueness in `ConfigurationValidator`; `SelectorWeights` not persisted alongside saved configurations.
+
+The Windows Inspector, UI Automation capture, trigger runtime, SQLite/DPAPI event persistence, WPF configurator UI and interactive manual checks are still incomplete overall — the first milestone is not yet complete (Tasks 4–5 of this plan, then the whole third plan, remain).
 
 Additional still-open items, tracked only in this session's (gitignored) `.superpowers/` task notes until now:
 
