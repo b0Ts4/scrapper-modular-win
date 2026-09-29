@@ -1,4 +1,5 @@
 using System.Threading;
+using Prescriva.Agent.Application.Inspection;
 using Prescriva.Agent.Windows.Automation;
 
 namespace Prescriva.Agent.Windows.Tests.Automation;
@@ -35,7 +36,7 @@ public sealed class AutomationDispatcherTests
     {
         using var dispatcher = new AutomationDispatcher();
 
-        var failure = await Assert.ThrowsAsync<AutomationFailure>(() => dispatcher.RunAsync(
+        var failure = await Assert.ThrowsAsync<ElementInspectionFailure>(() => dispatcher.RunAsync(
             _ =>
             {
                 Thread.Sleep(TimeSpan.FromSeconds(5));
@@ -44,7 +45,7 @@ public sealed class AutomationDispatcherTests
             TimeSpan.FromMilliseconds(100),
             CancellationToken.None));
 
-        Assert.Equal(AutomationFailureKind.TimedOut, failure.Kind);
+        Assert.Equal(ElementInspectionFailureKind.TimedOut, failure.Kind);
     }
 
     [Fact]
@@ -80,8 +81,8 @@ public sealed class AutomationDispatcherTests
 
         cts.Cancel();
 
-        var failure = await Assert.ThrowsAsync<AutomationFailure>(() => queuedTask);
-        Assert.Equal(AutomationFailureKind.Cancelled, failure.Kind);
+        var failure = await Assert.ThrowsAsync<ElementInspectionFailure>(() => queuedTask);
+        Assert.Equal(ElementInspectionFailureKind.Cancelled, failure.Kind);
 
         releaseBlocker.Set();
         Assert.True(await blockingTask);
@@ -94,12 +95,12 @@ public sealed class AutomationDispatcherTests
     {
         using var dispatcher = new AutomationDispatcher();
 
-        var failure = await Assert.ThrowsAsync<AutomationFailure>(() => dispatcher.RunAsync<bool>(
+        var failure = await Assert.ThrowsAsync<ElementInspectionFailure>(() => dispatcher.RunAsync<bool>(
             _ => throw new InvalidOperationException("boom"),
             TimeSpan.FromSeconds(5),
             CancellationToken.None));
 
-        Assert.Equal(AutomationFailureKind.ElementUnavailable, failure.Kind);
+        Assert.Equal(ElementInspectionFailureKind.ElementUnavailable, failure.Kind);
         Assert.IsType<InvalidOperationException>(failure.InnerException);
     }
 }

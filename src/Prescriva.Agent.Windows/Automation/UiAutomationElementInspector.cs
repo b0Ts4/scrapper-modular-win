@@ -46,12 +46,12 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
                     }
                     catch (ElementNotAvailableException ex)
                     {
-                        throw new AutomationFailure(AutomationFailureKind.WindowMissing, "No element is available at the given point.", ex);
+                        throw new ElementInspectionFailure(ElementInspectionFailureKind.WindowMissing, "No element is available at the given point.", ex);
                     }
 
                     if (element is null)
                     {
-                        throw new AutomationFailure(AutomationFailureKind.WindowMissing, "No element was found at the given point.");
+                        throw new ElementInspectionFailure(ElementInspectionFailureKind.WindowMissing, "No element was found at the given point.");
                     }
 
                     return CreateSnapshot(element);
@@ -62,9 +62,18 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
 
             return InspectionResult.Found(snapshot);
         }
-        catch (AutomationFailure failure)
+        catch (ElementInspectionFailure failure) when (failure.Kind == ElementInspectionFailureKind.Cancelled)
         {
-            return MapToInspectionResult(failure);
+            throw ToOperationCanceledException(failure, cancellationToken);
+        }
+        catch (ElementInspectionFailure failure)
+        {
+            return failure.Kind switch
+            {
+                ElementInspectionFailureKind.TimedOut => InspectionResult.TimedOut(),
+                ElementInspectionFailureKind.WindowMissing => InspectionResult.WindowMissing(failure.Message),
+                _ => InspectionResult.ElementUnavailable(failure.Message),
+            };
         }
     }
 
@@ -75,32 +84,42 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
     {
         ArgumentNullException.ThrowIfNull(application);
 
-        return await _dispatcher.RunAsync(
-            _ =>
-            {
-                var window = FindApplicationWindow(application)
-                    ?? throw new AutomationFailure(
-                        AutomationFailureKind.WindowMissing,
-                        $"No window found for process '{application.ProcessIdentity}' matching window rule '{application.WindowRule}'.");
-
-                var snapshots = new List<ElementSnapshot>();
-                try
+        try
+        {
+            return await _dispatcher.RunAsync(
+                _ =>
                 {
-                    foreach (AutomationElement descendant in window.FindAll(TreeScope.Descendants, Condition.TrueCondition))
+                    var window = FindApplicationWindow(application)
+                        ?? throw new ElementInspectionFailure(
+                            ElementInspectionFailureKind.WindowMissing,
+                            $"No window found for process '{application.ProcessIdentity}' matching window rule '{application.WindowRule}'.");
+
+                    var snapshots = new List<ElementSnapshot>();
+                    try
                     {
-                        snapshots.Add(CreateSnapshot(descendant));
+                        foreach (AutomationElement descendant in window.FindAll(TreeScope.Descendants, Condition.TrueCondition))
+                        {
+                            snapshots.Add(CreateSnapshot(descendant));
+                        }
                     }
-                }
-                catch (ElementNotAvailableException ex)
-                {
-                    throw new AutomationFailure(AutomationFailureKind.WindowMissing, "The target window closed while enumerating its elements.", ex);
-                }
+                    catch (ElementNotAvailableException ex)
+                    {
+                        throw new ElementInspectionFailure(ElementInspectionFailureKind.WindowMissing, "The target window closed while enumerating its elements.", ex);
+                    }
 
-                return (IReadOnlyList<ElementSnapshot>)snapshots;
-            },
-            timeout,
-            cancellationToken)
-            .ConfigureAwait(false);
+                    return (IReadOnlyList<ElementSnapshot>)snapshots;
+                },
+                timeout,
+                cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (ElementInspectionFailure failure) when (failure.Kind == ElementInspectionFailureKind.Cancelled)
+        {
+            // Mirror FromPointAsync: a caller following the normal .NET cancellation
+            // convention around this method must see OperationCanceledException, not a
+            // generic typed failure, when its own token caused the cancellation.
+            throw ToOperationCanceledException(failure, cancellationToken);
+        }
     }
 
     public void Dispose()
@@ -111,13 +130,8 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         }
     }
 
-    private static InspectionResult MapToInspectionResult(AutomationFailure failure) => failure.Kind switch
-    {
-        AutomationFailureKind.TimedOut => InspectionResult.TimedOut(),
-        AutomationFailureKind.WindowMissing => InspectionResult.WindowMissing(failure.Message),
-        AutomationFailureKind.Cancelled => throw new OperationCanceledException(failure.Message, failure),
-        _ => InspectionResult.ElementUnavailable(failure.Message),
-    };
+    private static OperationCanceledException ToOperationCanceledException(ElementInspectionFailure failure, CancellationToken cancellationToken) =>
+        new(failure.Message, failure, cancellationToken);
 
     private static AutomationElement? FindApplicationWindow(ApplicationDefinition application)
     {

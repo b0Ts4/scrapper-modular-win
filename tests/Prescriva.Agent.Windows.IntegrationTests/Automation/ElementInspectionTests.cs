@@ -28,7 +28,22 @@ public sealed class ElementInspectionTests
         var rect = WaitForLaidOutBoundingRectangle(medicationBox!);
         var point = new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
 
-        var result = await inspector.FromPointAsync(point, TimeSpan.FromSeconds(10), CancellationToken.None);
+        // This shared desktop can have other windows (from unrelated concurrent activity)
+        // transiently land on top of the same screen coordinates. Bring the target
+        // window forward and retry a few times rather than accepting a false failure
+        // caused by something else briefly occluding the point.
+        InspectionResult result = null!;
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            medicationBox!.SetFocus();
+            result = await inspector.FromPointAsync(point, TimeSpan.FromSeconds(10), CancellationToken.None);
+            if (result.Outcome == InspectionOutcome.Found && result.Snapshot?.AutomationId == "MedicationTextBox")
+            {
+                break;
+            }
+
+            await Task.Delay(200);
+        }
 
         Assert.Equal(InspectionOutcome.Found, result.Outcome);
         Assert.Equal("MedicationTextBox", result.Snapshot?.AutomationId);
@@ -82,10 +97,30 @@ public sealed class ElementInspectionTests
         var inspector = new UiAutomationElementInspector(dispatcher);
         var application = new ApplicationDefinition(processName, windowName);
 
-        var failure = await Assert.ThrowsAsync<AutomationFailure>(
+        var failure = await Assert.ThrowsAsync<ElementInspectionFailure>(
             () => inspector.FindCandidatesAsync(application, TimeSpan.FromSeconds(5), CancellationToken.None));
 
-        Assert.Equal(AutomationFailureKind.WindowMissing, failure.Kind);
+        Assert.Equal(ElementInspectionFailureKind.WindowMissing, failure.Kind);
+    }
+
+    [Fact]
+    public async Task FindCandidatesAsync_throws_OperationCanceledException_when_its_own_token_is_cancelled()
+    {
+        using var target = TestTargetLauncher.Launch();
+        using var dispatcher = new AutomationDispatcher();
+        var inspector = new UiAutomationElementInspector(dispatcher);
+
+        var processName = Process.GetProcessById(target.Window.Current.ProcessId).ProcessName;
+        var application = new ApplicationDefinition(processName, target.Window.Current.Name);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // A caller following the normal .NET cancellation convention catches
+        // OperationCanceledException, not a generic typed failure - FindCandidatesAsync
+        // must honor that the same way FromPointAsync does.
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => inspector.FindCandidatesAsync(application, TimeSpan.FromSeconds(5), cts.Token));
     }
 
     [Fact]

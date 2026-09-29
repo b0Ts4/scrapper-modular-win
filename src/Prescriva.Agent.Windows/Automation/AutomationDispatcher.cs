@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Prescriva.Agent.Application.Inspection;
 
 namespace Prescriva.Agent.Windows.Automation;
 
@@ -37,8 +38,8 @@ public sealed class AutomationDispatcher : IDisposable
 
     /// <summary>
     /// Runs <paramref name="operation"/> on the dispatcher's dedicated STA thread and
-    /// returns its result. Throws <see cref="AutomationFailure"/> if the operation is
-    /// cancelled, times out, or throws any other exception.
+    /// returns its result. Throws <see cref="ElementInspectionFailure"/> if the operation
+    /// is cancelled, times out, or throws any other exception.
     /// </summary>
     public Task<T> RunAsync<T>(Func<CancellationToken, T> operation, TimeSpan timeout, CancellationToken cancellationToken)
     {
@@ -55,12 +56,12 @@ public sealed class AutomationDispatcher : IDisposable
         var registration = deadline.Token.Register(() =>
         {
             var kind = cancellationToken.IsCancellationRequested
-                ? AutomationFailureKind.Cancelled
-                : AutomationFailureKind.TimedOut;
-            var message = kind == AutomationFailureKind.Cancelled
+                ? ElementInspectionFailureKind.Cancelled
+                : ElementInspectionFailureKind.TimedOut;
+            var message = kind == ElementInspectionFailureKind.Cancelled
                 ? "The operation was cancelled."
                 : "The operation did not complete within the allotted timeout.";
-            tcs.TrySetException(new AutomationFailure(kind, message));
+            tcs.TrySetException(new ElementInspectionFailure(kind, message));
         });
 
         _queue.Add(() =>
@@ -80,7 +81,7 @@ public sealed class AutomationDispatcher : IDisposable
                 var result = operation(deadline.Token);
                 tcs.TrySetResult(result);
             }
-            catch (AutomationFailure failure)
+            catch (ElementInspectionFailure failure)
             {
                 // The operation raised its own stable, typed failure (e.g. a missing
                 // window) - pass it through unchanged.
@@ -88,8 +89,8 @@ public sealed class AutomationDispatcher : IDisposable
             }
             catch (Exception ex)
             {
-                tcs.TrySetException(new AutomationFailure(
-                    AutomationFailureKind.ElementUnavailable,
+                tcs.TrySetException(new ElementInspectionFailure(
+                    ElementInspectionFailureKind.ElementUnavailable,
                     $"The UI Automation operation failed: {ex.Message}",
                     ex));
             }
