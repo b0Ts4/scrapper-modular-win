@@ -35,7 +35,9 @@ public sealed class SqliteEventOutbox : IEventOutbox
         var directory = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = fullPath }.ToString();
+        // A short busy timeout: under real writer contention, fail fast (SqliteException) rather
+        // than silently blocking the caller for SQLite's much longer default retry window.
+        _connectionString = new SqliteConnectionStringBuilder { DataSource = fullPath, DefaultTimeout = 2 }.ToString();
         _protector = protector;
 
         using var connection = OpenConnection();
@@ -67,7 +69,7 @@ public sealed class SqliteEventOutbox : IEventOutbox
             command.Parameters.AddWithValue("$configurationVersion", domainEvent.ConfigurationVersion);
             command.Parameters.AddWithValue("$sessionId", domainEvent.SessionId.ToString());
             command.Parameters.AddWithValue("$sequence", domainEvent.Sequence);
-            command.Parameters.AddWithValue("$timestamp", domainEvent.Timestamp.ToString("o", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$timestamp", domainEvent.Timestamp.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture));
             command.Parameters.AddWithValue("$type", domainEvent.Type);
             command.Parameters.AddWithValue("$payload", ciphertext);
             command.Parameters.AddWithValue("$status", StatusPending);
@@ -186,7 +188,7 @@ public sealed class SqliteEventOutbox : IEventOutbox
             WHERE status = $status AND timestamp < $threshold;
             """;
         command.Parameters.AddWithValue("$status", StatusConfirmed);
-        command.Parameters.AddWithValue("$threshold", thresholdUtc.ToString("o", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$threshold", thresholdUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

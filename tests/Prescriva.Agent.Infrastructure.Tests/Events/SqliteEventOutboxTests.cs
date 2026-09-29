@@ -142,17 +142,42 @@ public sealed class SqliteEventOutboxTests : IDisposable
     }
 
     [Fact]
-    public async Task An_append_that_is_cancelled_before_commit_leaves_no_partial_row()
+    public async Task A_failure_that_happens_after_the_insert_succeeds_but_before_commit_leaves_no_partial_row()
     {
+        // Force the underlying SQLite COMMIT itself to fail, so the insert genuinely happens
+        // (ExecuteNonQueryAsync completes against the transaction) but the transaction can never
+        // become durable. This exercises the real `catch { transaction.Rollback(); throw; }` path
+        // in SqliteEventOutbox.AppendAsync: a second connection holds an open read transaction
+        // (a SHARED lock) on the same database file for the whole test. SQLite's rollback-journal
+        // locking model allows our outbox's own write transaction to acquire a RESERVED lock and
+        // execute the INSERT while a SHARED lock is held elsewhere, but COMMIT must escalate to an
+        // EXCLUSIVE lock to flush pages back into the main database file — and that escalation is
+        // what the competing SHARED lock blocks, so Commit() itself throws.
+        var connectionString = new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString();
         var outbox = new SqliteEventOutbox(_dbPath, new DpapiPayloadProtector());
         var eventId = Guid.NewGuid();
-        using var cancelledSource = new CancellationTokenSource();
-        cancelledSource.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            outbox.AppendAsync(MakeEvent(Guid.NewGuid(), 1, "valor", eventId), cancelledSource.Token));
+        await using var blockingConnection = new SqliteConnection(connectionString);
+        await blockingConnection.OpenAsync();
+        await using var blockingTransaction = (SqliteTransaction)await blockingConnection.BeginTransactionAsync();
+        await using (var readCommand = blockingConnection.CreateCommand())
+        {
+            readCommand.Transaction = blockingTransaction;
+            readCommand.CommandText = "SELECT COUNT(*) FROM events;";
+            await readCommand.ExecuteScalarAsync();
+        }
 
-        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());
+        try
+        {
+            await Assert.ThrowsAnyAsync<SqliteException>(() =>
+                outbox.AppendAsync(MakeEvent(Guid.NewGuid(), 1, "valor", eventId), CancellationToken.None));
+        }
+        finally
+        {
+            await blockingTransaction.RollbackAsync();
+        }
+
+        await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM events WHERE id = $id;";
