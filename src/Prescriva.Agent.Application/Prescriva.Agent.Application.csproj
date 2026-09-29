@@ -17,6 +17,7 @@
       Application-layer code can hold and pass the type around but never build one itself.
     -->
     <InternalsVisibleTo Include="Prescriva.Agent.Windows" />
+    <InternalsVisibleTo Include="Prescriva.Agent.Application.Tests" />
   </ItemGroup>
 
 </Project>

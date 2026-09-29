@@ -1,0 +1,88 @@
+<Window x:Class="Prescriva.Agent.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Prescriva Agent Configurator"
+        Width="620" Height="640"
+        WindowStartupLocation="CenterScreen">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="12">
+
+            <TextBlock Text="1. Integration" FontWeight="Bold" Margin="0,0,0,4" />
+            <UniformGrid Columns="2" Rows="2">
+                <TextBlock Text="Integration ID:" VerticalAlignment="Center" />
+                <TextBox x:Name="IntegrationIdBox" Text="sample-integration" Margin="2" />
+                <TextBlock Text="Name:" VerticalAlignment="Center" />
+                <TextBox x:Name="IntegrationNameBox" Text="Sample Integration" Margin="2" />
+            </UniformGrid>
+            <UniformGrid Columns="2" Rows="2" Margin="0,4,0,0">
+                <TextBlock Text="Target process:" VerticalAlignment="Center" />
+                <TextBox x:Name="ProcessIdentityBox" Text="Prescriva.Agent.TestTarget.exe" Margin="2" />
+                <TextBlock Text="Window rule:" VerticalAlignment="Center" />
+                <TextBox x:Name="WindowRuleBox" Text="Prescriva Agent Test Target" Margin="2" />
+            </UniformGrid>
+            <Button x:Name="CreateIntegrationButton" Content="Create Integration" Margin="0,6,0,0"
+                    Click="CreateIntegrationButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+
+            <Separator Margin="0,10,0,10" />
+
+            <TextBlock Text="2. Stage" FontWeight="Bold" Margin="0,0,0,4" />
+            <UniformGrid Columns="2" Rows="2">
+                <TextBlock Text="Stage ID:" VerticalAlignment="Center" />
+                <TextBox x:Name="StageIdBox" Text="intake" Margin="2" />
+                <TextBlock Text="Stage name:" VerticalAlignment="Center" />
+                <TextBox x:Name="StageNameBox" Text="Intake" Margin="2" />
+            </UniformGrid>
+            <Button x:Name="AddStageButton" Content="Add Stage" Margin="0,6,0,0"
+                    Click="AddStageButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+
+            <Separator Margin="0,10,0,10" />
+
+            <TextBlock Text="3. Inspect an element" FontWeight="Bold" Margin="0,0,0,4" />
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="StartInspectionButton" Content="Start Inspection" Click="StartInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="StopInspectionButton" Content="Stop Inspection" Click="StopInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ConfirmSelectionButton" Content="Confirm Selection" Click="ConfirmSelectionButton_Click" Padding="8,2" />
+            </StackPanel>
+            <TextBlock x:Name="HoverStateText" Text="(inspection not started)" Margin="0,6,0,0" TextWrapping="Wrap" />
+            <TextBlock x:Name="ConfirmedSelectionText" Text="(no confirmed selection)" Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" />
+
+            <Separator Margin="0,10,0,10" />
+
+            <TextBlock Text="4. Assign semantic ID and add field" FontWeight="Bold" Margin="0,0,0,4" />
+            <UniformGrid Columns="2" Rows="2">
+                <TextBlock Text="Semantic ID:" VerticalAlignment="Center" />
+                <TextBox x:Name="FieldSemanticIdBox" Text="medication_name" Margin="2" />
+                <TextBlock Text="Meaning:" VerticalAlignment="Center" />
+                <TextBox x:Name="FieldMeaningBox" Text="Medication name" Margin="2" />
+            </UniformGrid>
+            <CheckBox x:Name="FieldRequiredBox" Content="Required" IsChecked="True" Margin="0,4,0,0" />
+            <Button x:Name="AddFieldButton" Content="Add Field From Confirmed Selection" Margin="0,6,0,0"
+                    Click="AddFieldButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+
+            <Separator Margin="0,10,0,10" />
+
+            <TextBlock Text="5. Save / reload" FontWeight="Bold" Margin="0,0,0,4" />
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="SaveButton" Content="Save" Click="SaveButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ReloadButton" Content="Reload From Disk" Click="ReloadButton_Click" Padding="8,2" />
+            </StackPanel>
+
+            <Separator Margin="0,10,0,10" />
+
+            <TextBlock Text="6. Resolve + read a saved field" FontWeight="Bold" Margin="0,0,0,4" />
+            <UniformGrid Columns="2" Rows="1">
+                <TextBlock Text="Field ID:" VerticalAlignment="Center" />
+                <TextBox x:Name="ResolveFieldIdBox" Text="medication_name" Margin="2" />
+            </UniformGrid>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Button x:Name="ResolveButton" Content="Resolve" Click="ResolveButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ReadValueButton" Content="Read Value" Click="ReadValueButton_Click" Padding="8,2" />
+            </StackPanel>
+
+            <Separator Margin="0,10,0,10" />
+
+            <TextBlock Text="Status" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock x:Name="StatusText" Text="Ready." TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

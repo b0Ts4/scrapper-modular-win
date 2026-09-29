@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\Prescriva.Agent.TestTarget\Prescriva.Agent.TestTarget.csproj" />
     <ProjectReference Include="..\..\src\Prescriva.Agent.Windows\Prescriva.Agent.Windows.csproj" />
     <ProjectReference Include="..\..\src\Prescriva.Agent.Desktop\Prescriva.Agent.Desktop.csproj" />
+    <ProjectReference Include="..\..\src\Prescriva.Agent.Infrastructure\Prescriva.Agent.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
