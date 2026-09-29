@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Windows.Automation;
 using Prescriva.Agent.Application.Inspection;
 using Prescriva.Agent.Domain.Configuration;
@@ -89,7 +88,7 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
             return await _dispatcher.RunAsync(
                 _ =>
                 {
-                    var window = FindApplicationWindow(application)
+                    var window = AutomationWindowLocator.Find(application.ProcessIdentity, application.WindowRule)
                         ?? throw new ElementInspectionFailure(
                             ElementInspectionFailureKind.WindowMissing,
                             $"No window found for process '{application.ProcessIdentity}' matching window rule '{application.WindowRule}'.");
@@ -132,39 +131,6 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
 
     private static OperationCanceledException ToOperationCanceledException(ElementInspectionFailure failure, CancellationToken cancellationToken) =>
         new(failure.Message, failure, cancellationToken);
-
-    private static AutomationElement? FindApplicationWindow(ApplicationDefinition application)
-    {
-        foreach (AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition))
-        {
-            string processName;
-            try
-            {
-                processName = Process.GetProcessById(window.Current.ProcessId).ProcessName;
-            }
-            catch (ArgumentException)
-            {
-                // The process behind this top-level window has already exited.
-                continue;
-            }
-            catch (ElementNotAvailableException)
-            {
-                continue;
-            }
-
-            if (!string.Equals(processName, application.ProcessIdentity, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (string.Equals(window.Current.Name, application.WindowRule, StringComparison.OrdinalIgnoreCase))
-            {
-                return window;
-            }
-        }
-
-        return null;
-    }
 
     private static ElementSnapshot CreateSnapshot(AutomationElement element)
     {

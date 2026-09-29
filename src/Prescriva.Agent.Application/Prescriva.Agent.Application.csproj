@@ -10,4 +10,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!--
+      ResolvedElementHandle's constructor is internal so only Prescriva.Agent.Windows can
+      construct (and therefore subclass, and dereference the contents of) a real handle -
+      Application-layer code can hold and pass the type around but never build one itself.
+    -->
+    <InternalsVisibleTo Include="Prescriva.Agent.Windows" />
+  </ItemGroup>
+
 </Project>

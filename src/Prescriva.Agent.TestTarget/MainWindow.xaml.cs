@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 
 namespace Prescriva.Agent.TestTarget;
@@ -36,6 +37,18 @@ public partial class MainWindow : Window
 
     private void ApplyLayoutVariant(string variant)
     {
+        if (string.Equals(variant, "duplicate-controls", StringComparison.OrdinalIgnoreCase))
+        {
+            // Deliberately reuses the AutomationId "MedicationTextBox" so tests can
+            // exercise a genuine, deterministic ambiguous-match scenario against a real
+            // UIA tree (two elements in the same window that score identically against
+            // a selector built from stable properties alone).
+            var duplicate = new TextBox();
+            AutomationProperties.SetAutomationId(duplicate, "MedicationTextBox");
+            DuplicateControlsPanel.Children.Add(duplicate);
+            return;
+        }
+
         if (!string.Equals(variant, "alternate", StringComparison.OrdinalIgnoreCase))
         {
             return;

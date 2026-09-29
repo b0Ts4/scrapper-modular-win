@@ -12,6 +12,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBox x:Name="MedicationTextBox"
@@ -48,6 +49,14 @@
                     Click="ToggleDynamicFieldButton_Click"
                     AutomationProperties.AutomationId="ToggleDynamicFieldButton" />
         </StackPanel>
+
+        <!--
+            Empty by default. Only populated (with a control that deliberately reuses the
+            AutomationId "MedicationTextBox") when launched with the
+            "duplicate-controls" layout variant, so tests can exercise a genuine,
+            deterministic ambiguous-match scenario against a real UIA tree.
+        -->
+        <StackPanel x:Name="DuplicateControlsPanel" Grid.Row="7" Orientation="Horizontal" Margin="0,4" />
 
         <DataGrid x:Name="ItemsGrid"
                   Grid.Row="5"
@@ -88,11 +97,30 @@
                     Content="Cancel"
                     Click="CancelButton_Click"
                     AutomationProperties.AutomationId="CancelButton" />
-            <TextBlock x:Name="CompletionStatusText"
-                       Text="Completed"
-                       Margin="16,0,0,0"
-                       VerticalAlignment="Center"
-                       Visibility="Collapsed" />
+            <!--
+                A RichTextBox rather than a TextBlock: WPF's TextBlockAutomationPeer
+                exposes no UI Automation pattern at all, so it could not stand in for a
+                "read-only control with TextPattern but no ValuePattern" scenario.
+                RichTextBoxAutomationPeer implements ITextProvider (TextPattern) without
+                implementing IValueProvider (ValuePattern), which is exactly the
+                compatible-pattern-fallback case this control exists to exercise.
+            -->
+            <RichTextBox x:Name="CompletionStatusText"
+                         IsReadOnly="True"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Width="120"
+                         Height="24"
+                         Margin="16,0,0,0"
+                         VerticalAlignment="Center"
+                         Visibility="Collapsed"
+                         AutomationProperties.AutomationId="CompletionStatusText">
+                <FlowDocument>
+                    <Paragraph>
+                        <Run Text="Completed" />
+                    </Paragraph>
+                </FlowDocument>
+            </RichTextBox>
         </StackPanel>
     </Grid>
 </Window>
