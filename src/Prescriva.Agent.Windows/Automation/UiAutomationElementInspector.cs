@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Linq;
 using System.Windows.Automation;
 using Prescriva.Agent.Application.Inspection;
@@ -128,12 +129,57 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         var current = element.Current;
         var rect = current.BoundingRectangle;
 
+        string processName;
+        try
+        {
+            processName = Process.GetProcessById(current.ProcessId).ProcessName;
+        }
+        catch (ArgumentException)
+        {
+            // The owning process has already exited between the hit-test and this call.
+            processName = string.Empty;
+        }
+
         return new ElementSnapshot(
             NullIfEmpty(current.AutomationId),
             NullIfEmpty(current.Name),
             current.ControlType?.ProgrammaticName ?? "ControlType.Unknown",
             NullIfEmpty(current.ClassName),
-            new BoundingRectangle(rect.X, rect.Y, rect.Width, rect.Height));
+            new BoundingRectangle(rect.X, rect.Y, rect.Width, rect.Height),
+            current.ProcessId,
+            processName,
+            NullIfEmpty(FindTopLevelWindowTitle(element)));
+    }
+
+    /// <summary>
+    /// Walks up the raw tree to the highest ancestor below the desktop root and returns
+    /// its name (i.e. the containing top-level window's title), used to populate
+    /// <see cref="ElementSnapshot.WindowTitle"/>. Best-effort: returns null rather than
+    /// throwing if the element disappears mid-walk.
+    /// </summary>
+    private static string? FindTopLevelWindowTitle(AutomationElement element)
+    {
+        try
+        {
+            var walker = TreeWalker.RawViewWalker;
+            var current = element;
+            var root = AutomationElement.RootElement;
+
+            while (true)
+            {
+                var parent = walker.GetParent(current);
+                if (parent is null || System.Windows.Automation.Automation.Compare(parent, root))
+                {
+                    return current.Current.Name;
+                }
+
+                current = parent;
+            }
+        }
+        catch (ElementNotAvailableException)
+        {
+            return null;
+        }
     }
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
