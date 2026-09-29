@@ -31,6 +31,15 @@ public sealed class InspectionController
     private InspectionState _state = InspectionState.NotStarted;
     private CancellationTokenSource? _pointerCts;
 
+    // The last snapshot/fingerprint from a genuine (non-excluded) Found result. Kept
+    // separately from `_state` so that a subsequent observation landing on the Agent's
+    // own excluded process - which happens whenever the pointer crosses the Agent's own
+    // window on its way to a Confirm click - can be displayed as a warning without
+    // discarding the real element the user was actually looking at. Reset whenever a new
+    // session starts or stops.
+    private ElementSnapshot? _lastRealSnapshot;
+    private ElementFingerprint? _lastRealFingerprint;
+
     public InspectionController(
         IElementInspector inspector,
         TimeSpan? timeout = null,
@@ -71,6 +80,8 @@ public sealed class InspectionController
     /// <summary>Begins a session: no element is highlighted yet until a pointer position is observed.</summary>
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
+        _lastRealSnapshot = null;
+        _lastRealFingerprint = null;
         SetState(InspectionState.Active(null, null, ImmutableArray<string>.Empty));
         return Task.CompletedTask;
     }
@@ -126,6 +137,8 @@ public sealed class InspectionController
         previous?.Cancel();
         previous?.Dispose();
 
+        _lastRealSnapshot = null;
+        _lastRealFingerprint = null;
         SetState(InspectionState.Stopped());
         return Task.CompletedTask;
     }
@@ -177,13 +190,25 @@ public sealed class InspectionController
         InspectionState newState;
         if (result.Outcome == InspectionOutcome.Found && result.Snapshot is { } snapshot)
         {
-            newState = _excludedProcessIds.Contains(snapshot.ProcessId)
-                ? InspectionState.Active(
-                    null,
-                    null,
+            if (_excludedProcessIds.Contains(snapshot.ProcessId))
+            {
+                // The pointer is over the Agent's own window (e.g. crossing over the
+                // Confirm button on its way there). This is an unsurprising, expected
+                // part of a confirm gesture - it must not wipe out the last real element
+                // the user was actually looking at, or Confirm would have nothing left
+                // to confirm by the time the pointer (and click) reach this window.
+                newState = InspectionState.Active(
+                    _lastRealSnapshot,
+                    _lastRealFingerprint,
                     ImmutableArray.Create(
-                        "Ignored an element belonging to the Agent's own process (expected when the pointer is over the highlight overlay)."))
-                : InspectionState.Active(snapshot, BuildFingerprint(snapshot), ImmutableArray<string>.Empty);
+                        "Ignored an element belonging to the Agent's own process (expected when the pointer is over the highlight overlay)."));
+            }
+            else
+            {
+                _lastRealSnapshot = snapshot;
+                _lastRealFingerprint = BuildFingerprint(snapshot);
+                newState = InspectionState.Active(snapshot, _lastRealFingerprint, ImmutableArray<string>.Empty);
+            }
         }
         else
         {

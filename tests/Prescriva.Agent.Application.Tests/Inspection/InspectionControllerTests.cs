@@ -235,6 +235,35 @@ public sealed class InspectionControllerTests
         Assert.Null(controller.CurrentState.Snapshot);
     }
 
+    [Fact]
+    public async Task ConfirmAsync_still_confirms_the_last_real_element_after_the_pointer_crosses_onto_the_agents_own_window()
+    {
+        // Reproduces the "Confirm Selection cannot work with a real mouse" bug: the user
+        // hovers a real target (seen and highlighted), then moves the pointer across the
+        // Agent's own window on the way to click "Confirm". That second observation
+        // resolves to an element owned by the Agent's own (excluded) process - it must
+        // not wipe out the real snapshot the user is trying to confirm.
+        var inspector = new FakeElementInspector();
+        var realSnapshot = Snapshot("MedicationTextBox");
+        var ownSnapshot = Snapshot("ConfirmSelectionButton", processId: Environment.ProcessId, processName: "Prescriva.Agent.Desktop");
+        inspector.Enqueue(_ => Task.FromResult(InspectionResult.Found(realSnapshot)));
+        inspector.Enqueue(_ => Task.FromResult(InspectionResult.Found(ownSnapshot)));
+
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        await controller.ObservePointerAsync(new ScreenPoint(1, 2));
+        Assert.Equal("MedicationTextBox", controller.CurrentState.Snapshot?.AutomationId);
+
+        await controller.ObservePointerAsync(new ScreenPoint(3, 4));
+        Assert.Contains(controller.CurrentState.Warnings, w => w.Contains("own process", StringComparison.OrdinalIgnoreCase));
+
+        var confirmed = await controller.ConfirmAsync();
+
+        Assert.Equal("MedicationTextBox", confirmed.Snapshot?.AutomationId);
+        Assert.Equal("MedicationTextBox", confirmed.Fingerprint?.AutomationId);
+    }
+
     private sealed class FakeElementInspector : IElementInspector
     {
         private readonly Queue<Func<CancellationToken, Task<InspectionResult>>> _responses = new();
