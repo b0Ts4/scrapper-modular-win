@@ -6,6 +6,7 @@ using Prescriva.Agent.Application.Diagnostics;
 using Prescriva.Agent.Application.Events;
 using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Application.Selection;
+using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Application.Triggers;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Domain.Events;
@@ -57,7 +58,8 @@ public sealed class AgentRuntimeTests
 
         using var activationCts = new CancellationTokenSource();
         var configuration = BuildConfiguration();
-        var activateTask = runtime.ActivateAsync(configuration, activationCts.Token);
+        var approval = new ConfigurationApproval(configuration.Id, ConfigurationFingerprint.Compute(configuration), DateTimeOffset.UtcNow);
+        var activateTask = runtime.ActivateAsync(configuration, approval, activationCts.Token);
 
         try
         {
@@ -124,6 +126,53 @@ public sealed class AgentRuntimeTests
         }
     }
 
+    [Fact]
+    public async Task ActivateAsync_returns_NotTested_and_never_watches_instances_when_approval_is_missing()
+    {
+        var source = new NeverWatchedApplicationInstanceSource();
+        var runtime = new AgentRuntime(
+            source,
+            triggerProviderFactory: (_, sessionId) => new FakeTriggerProvider(sessionId),
+            selectorResolverFactory: _ => new UnusedSelectorResolver(),
+            captureProviderFactory: _ => new UnusedCaptureProvider(),
+            new FakeEventOutbox(),
+            new FakeTechnicalLog());
+
+        var result = await runtime.ActivateAsync(BuildConfiguration(), approval: null, CancellationToken.None);
+
+        Assert.Equal(ActivationStatus.NotTested, result.Status);
+        Assert.False(source.WasWatched);
+        Assert.Empty(runtime.ActiveSessions);
+    }
+
+    [Fact]
+    public async Task ActivateAsync_returns_NotTested_when_the_approval_no_longer_matches_the_configurations_current_fingerprint()
+    {
+        var configuration = BuildConfiguration();
+
+        // An approval genuinely granted for this same configuration ID, but for different
+        // content (a stale approval left over from before an edit) - must not be confused
+        // with "no approval at all", but must still refuse activation.
+        var staleApproval = new ConfigurationApproval(
+            configuration.Id,
+            Fingerprint: "not-the-real-fingerprint",
+            DateTimeOffset.UtcNow);
+
+        var source = new NeverWatchedApplicationInstanceSource();
+        var runtime = new AgentRuntime(
+            source,
+            triggerProviderFactory: (_, sessionId) => new FakeTriggerProvider(sessionId),
+            selectorResolverFactory: _ => new UnusedSelectorResolver(),
+            captureProviderFactory: _ => new UnusedCaptureProvider(),
+            new FakeEventOutbox(),
+            new FakeTechnicalLog());
+
+        var result = await runtime.ActivateAsync(configuration, staleApproval, CancellationToken.None);
+
+        Assert.Equal(ActivationStatus.NotTested, result.Status);
+        Assert.False(source.WasWatched);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
@@ -177,6 +226,25 @@ public sealed class AgentRuntimeTests
 
         public IAsyncEnumerable<ApplicationInstanceChange> WatchAsync(ApplicationDefinition application, CancellationToken cancellationToken) =>
             _channel.Reader.ReadAllAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Asserts <see cref="AgentRuntime.ActivateAsync"/> refuses activation before ever
+    /// watching for application instances - <see cref="WasWatched"/> only ever becomes
+    /// true if the gate check is bypassed (a regression this test exists to catch).
+    /// </summary>
+    private sealed class NeverWatchedApplicationInstanceSource : IApplicationInstanceSource
+    {
+        public bool WasWatched { get; private set; }
+
+        public async IAsyncEnumerable<ApplicationInstanceChange> WatchAsync(
+            ApplicationDefinition application,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            WasWatched = true;
+            await Task.CompletedTask;
+            yield break;
+        }
     }
 
     private sealed class FakeTriggerProvider(Guid sessionId) : ITriggerProvider

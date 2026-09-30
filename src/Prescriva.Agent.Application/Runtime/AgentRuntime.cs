@@ -2,6 +2,7 @@ using Prescriva.Agent.Application.Capture;
 using Prescriva.Agent.Application.Diagnostics;
 using Prescriva.Agent.Application.Events;
 using Prescriva.Agent.Application.Selection;
+using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Application.Triggers;
 using Prescriva.Agent.Domain.Configuration;
 
@@ -22,6 +23,28 @@ public delegate ISelectorResolver SelectorResolverFactory(ApplicationInstance in
 /// <summary>Builds the <see cref="ICaptureProvider"/> that serves one application instance.</summary>
 public delegate ICaptureProvider CaptureProviderFactory(ApplicationInstance instance);
 
+/// <summary>The outcome of a single <see cref="AgentRuntime.ActivateAsync"/> call.</summary>
+public enum ActivationStatus
+{
+    /// <summary>The configuration was approved for its exact current content; activation ran (and, on normal return, ran until cancelled).</summary>
+    Activated,
+
+    /// <summary>
+    /// Activation was refused: either the configuration has never been approved, or a
+    /// previous approval exists but no longer matches the configuration's current content
+    /// hash (it was edited after being tested). No application instances were watched and
+    /// no session was started.
+    /// </summary>
+    NotTested,
+}
+
+/// <summary>The result of a single <see cref="AgentRuntime.ActivateAsync"/> call.</summary>
+public sealed record ActivationResult(ActivationStatus Status)
+{
+    public static readonly ActivationResult NotTested = new(ActivationStatus.NotTested);
+    public static readonly ActivationResult Activated = new(ActivationStatus.Activated);
+}
+
 /// <summary>
 /// The top-level orchestrator that wires the trigger provider, selector resolver, capture
 /// provider, session engine and event outbox together into one running agent. Watches
@@ -36,9 +59,14 @@ public delegate ICaptureProvider CaptureProviderFactory(ApplicationInstance inst
 /// settle, which is what keeps two running copies of the same configured application fully
 /// independent (per this task's review focus).
 ///
-/// <see cref="ActivateAsync"/> is deliberately unconditional: it starts watching and
-/// coordinating the moment it is called, with no approval/test-mode gate. That gate is a
-/// later task's responsibility to add on top of this runtime, not this one's.
+/// <see cref="ActivateAsync"/> gates on a <see cref="ConfigurationApproval"/> bound to the
+/// configuration's exact current content: only when the supplied approval's
+/// <see cref="ConfigurationApproval.IsValidFor"/> matches the configuration's current
+/// <see cref="ConfigurationFingerprint"/> does activation actually start watching for
+/// application instances - "Somente configurações testadas podem ser ativadas". Any other
+/// case (no approval, or one that no longer matches because the configuration was edited
+/// after it was tested) returns <see cref="ActivationResult.NotTested"/> immediately,
+/// without watching anything or starting a single session.
 /// </summary>
 public sealed class AgentRuntime
 {
@@ -100,17 +128,40 @@ public sealed class AgentRuntime
     }
 
     /// <summary>
-    /// Activates <paramref name="configuration"/>: watches for its application's instances
-    /// and coordinates a capture session for each one until <paramref name="cancellationToken"/>
-    /// is cancelled, at which point every still-active session is closed and awaited before
-    /// this method returns.
+    /// Activates <paramref name="configuration"/>: if, and only if, <paramref name="approval"/>
+    /// is valid for the configuration's exact current content, watches for its application's
+    /// instances and coordinates a capture session for each one until
+    /// <paramref name="cancellationToken"/> is cancelled, at which point every still-active
+    /// session is closed and awaited before this method returns
+    /// <see cref="ActivationResult.Activated"/>.
+    ///
+    /// When <paramref name="approval"/> is null, or is non-null but
+    /// <see cref="ConfigurationApproval.IsValidFor"/> the configuration's current
+    /// <see cref="ConfigurationFingerprint"/> returns false (no approval was ever recorded
+    /// for this exact content, or the configuration was edited after it was tested),
+    /// returns <see cref="ActivationResult.NotTested"/> immediately - no application
+    /// instances are watched and no session is ever started.
     /// </summary>
-    public async Task ActivateAsync(IntegrationConfiguration configuration, CancellationToken cancellationToken)
+    public async Task<ActivationResult> ActivateAsync(
+        IntegrationConfiguration configuration,
+        ConfigurationApproval? approval,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         if (configuration.Stages.IsDefaultOrEmpty)
         {
             throw new ArgumentException("Configuration must declare at least one stage.", nameof(configuration));
+        }
+
+        var fingerprint = ConfigurationFingerprint.Compute(configuration);
+        if (approval is null || !approval.IsValidFor(fingerprint))
+        {
+            _log.Log(new TechnicalLogEntry(
+                TechnicalLogLevel.Warning,
+                "activation_not_tested",
+                "Activation refused: the configuration has no approval matching its current content (never tested, or edited since it was last tested).",
+                _clock()));
+            return ActivationResult.NotTested;
         }
 
         var initialStageId = configuration.Stages[0].Id;
@@ -134,6 +185,8 @@ public sealed class AgentRuntime
         {
             await CloseAllAsync().ConfigureAwait(false);
         }
+
+        return ActivationResult.Activated;
     }
 
     private void StartInstance(

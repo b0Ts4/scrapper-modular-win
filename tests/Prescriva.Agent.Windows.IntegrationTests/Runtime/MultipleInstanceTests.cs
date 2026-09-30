@@ -6,6 +6,7 @@ using Prescriva.Agent.Application.Diagnostics;
 using Prescriva.Agent.Application.Events;
 using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Application.Selection;
+using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Application.Triggers;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Domain.Events;
@@ -109,7 +110,8 @@ public sealed class MultipleInstanceTests
             log);
 
         using var activationCts = new CancellationTokenSource();
-        var activateTask = runtime.ActivateAsync(configuration, activationCts.Token);
+        var approval = new ConfigurationApproval(configuration.Id, ConfigurationFingerprint.Compute(configuration), DateTimeOffset.UtcNow);
+        var activateTask = runtime.ActivateAsync(configuration, approval, activationCts.Token);
 
         try
         {
