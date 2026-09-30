@@ -41,14 +41,30 @@ internal static class AutomationWindowLocator
         }
     }
 
-    public static AutomationElement? Find(string processIdentity, string windowRule)
+    /// <summary>
+    /// Finds the single top-level window matching <paramref name="processIdentity"/> (by
+    /// process name) and <paramref name="windowRule"/> (by window title).
+    /// </summary>
+    /// <param name="processId">
+    /// When supplied, additionally requires the window's owning process ID to match
+    /// exactly - the only way to tell apart two running instances of the same configured
+    /// application (identical process name, identical/matching window title), where a
+    /// name+title match alone cannot determine which physical window is the right one.
+    /// Left <see langword="null"/> (the default), behavior is unchanged from before this
+    /// parameter existed: the first window whose process name and title match is returned,
+    /// in whatever order <see cref="AutomationElement.RootElement"/> enumerates its
+    /// children - existing single-instance callers keep working exactly as today.
+    /// </param>
+    public static AutomationElement? Find(string processIdentity, string windowRule, int? processId = null)
     {
         foreach (AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition))
         {
             string processName;
+            int windowProcessId;
             try
             {
-                processName = Process.GetProcessById(window.Current.ProcessId).ProcessName;
+                windowProcessId = window.Current.ProcessId;
+                processName = Process.GetProcessById(windowProcessId).ProcessName;
             }
             catch (ArgumentException)
             {
@@ -61,6 +77,11 @@ internal static class AutomationWindowLocator
             }
 
             if (!string.Equals(processName, processIdentity, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (processId.HasValue && windowProcessId != processId.Value)
             {
                 continue;
             }

@@ -23,14 +23,19 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
     private readonly SelectorMatcher _matcher = new();
     private readonly SelectorWeights _weights;
     private readonly TimeSpan _timeout;
+    private readonly int? _processId;
 
-    public UiAutomationSelectorResolver(SelectorWeights? weights = null, TimeSpan? timeout = null)
-        : this(new AutomationDispatcher(), ownsDispatcher: true, weights, timeout)
+    public UiAutomationSelectorResolver(SelectorWeights? weights = null, TimeSpan? timeout = null, int? processId = null)
+        : this(new AutomationDispatcher(), ownsDispatcher: true, weights, timeout, processId)
     {
     }
 
-    public UiAutomationSelectorResolver(AutomationDispatcher dispatcher, SelectorWeights? weights = null, TimeSpan? timeout = null)
-        : this(dispatcher, ownsDispatcher: false, weights, timeout)
+    public UiAutomationSelectorResolver(
+        AutomationDispatcher dispatcher,
+        SelectorWeights? weights = null,
+        TimeSpan? timeout = null,
+        int? processId = null)
+        : this(dispatcher, ownsDispatcher: false, weights, timeout, processId)
     {
     }
 
@@ -38,12 +43,14 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
         AutomationDispatcher dispatcher,
         bool ownsDispatcher,
         SelectorWeights? weights,
-        TimeSpan? timeout)
+        TimeSpan? timeout,
+        int? processId)
     {
         _dispatcher = dispatcher;
         _ownsDispatcher = ownsDispatcher;
         _weights = weights ?? new SelectorWeights();
         _timeout = timeout ?? DefaultTimeout;
+        _processId = processId;
     }
 
     public async Task<SelectorResolution> ResolveAsync(ElementFingerprint fingerprint, CancellationToken cancellationToken)
@@ -83,7 +90,7 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
 
     private SelectorResolution ResolveOnDispatcherThread(ElementFingerprint fingerprint)
     {
-        var window = AutomationWindowLocator.Find(fingerprint.ProcessIdentity, fingerprint.WindowRule)
+        var window = AutomationWindowLocator.Find(fingerprint.ProcessIdentity, fingerprint.WindowRule, _processId)
             ?? throw new ElementInspectionFailure(
                 ElementInspectionFailureKind.WindowMissing,
                 $"No window found for process '{fingerprint.ProcessIdentity}' matching window rule '{fingerprint.WindowRule}'.");

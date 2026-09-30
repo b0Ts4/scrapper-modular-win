@@ -33,8 +33,9 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
     public UiAutomationTriggerProvider(
         Guid sessionId,
         TimeSpan? timeout = null,
-        TimeSpan? livenessPollInterval = null)
-        : this(new AutomationDispatcher(), ownsDispatcher: true, sessionId, timeout, livenessPollInterval)
+        TimeSpan? livenessPollInterval = null,
+        int? processId = null)
+        : this(new AutomationDispatcher(), ownsDispatcher: true, sessionId, timeout, livenessPollInterval, processId)
     {
     }
 
@@ -42,8 +43,9 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
         AutomationDispatcher dispatcher,
         Guid sessionId,
         TimeSpan? timeout = null,
-        TimeSpan? livenessPollInterval = null)
-        : this(dispatcher, ownsDispatcher: false, sessionId, timeout, livenessPollInterval)
+        TimeSpan? livenessPollInterval = null,
+        int? processId = null)
+        : this(dispatcher, ownsDispatcher: false, sessionId, timeout, livenessPollInterval, processId)
     {
     }
 
@@ -52,14 +54,15 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
         bool ownsDispatcher,
         Guid sessionId,
         TimeSpan? timeout,
-        TimeSpan? livenessPollInterval)
+        TimeSpan? livenessPollInterval,
+        int? processId)
     {
         _dispatcher = dispatcher;
         _ownsDispatcher = ownsDispatcher;
         _sessionId = sessionId;
         _timeout = timeout ?? DefaultTimeout;
         _livenessPollInterval = livenessPollInterval ?? DefaultLivenessPollInterval;
-        _resolver = new UiAutomationSelectorResolver(dispatcher);
+        _resolver = new UiAutomationSelectorResolver(dispatcher, processId: processId);
     }
 
     public async IAsyncEnumerable<TriggerSignal> WatchAsync(
