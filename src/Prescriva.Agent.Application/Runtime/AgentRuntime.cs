@@ -220,3 +220,4 @@ public sealed class AgentRuntime
 
     private sealed record ActiveInstance(SessionCoordinator Coordinator, Task RunTask, CancellationTokenSource Cts);
 }
+
