@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows.Automation;
 using Prescriva.Agent.Application.Inspection;
+using Prescriva.Agent.Windows.Processes;
 
 namespace Prescriva.Agent.Windows.Automation;
 
@@ -76,7 +77,7 @@ internal static class AutomationWindowLocator
                 continue;
             }
 
-            if (!string.Equals(processName, processIdentity, StringComparison.OrdinalIgnoreCase))
+            if (!ProcessIdentity.Matches(processIdentity, processName))
             {
                 continue;
             }
