@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private readonly UiAutomationRuntimeFactories _runtimeFactories;
     private readonly StructuredTechnicalLog _technicalLog;
     private readonly RuntimeMonitorViewModel _monitorViewModel;
+    private readonly ApprovalService _approvalService;
 
     private InspectionState? _confirmedSelection;
     private TestModeViewModel? _testModeViewModel;
@@ -70,6 +71,7 @@ public partial class MainWindow : Window
         var resolver = new UiAutomationSelectorResolver(_automationDispatcher);
         var captureProvider = new UiAutomationCaptureProvider(_automationDispatcher);
         var store = new JsonConfigurationStore(Path.Combine(DataDirectory, "configurations"));
+        _approvalService = new ApprovalService(new JsonApprovalStore(Path.Combine(DataDirectory, "approvals")));
         _editorViewModel = new IntegrationEditorViewModel(store, resolver, captureProvider);
 
         _runtimeFactories = new UiAutomationRuntimeFactories(_automationDispatcher);
@@ -243,6 +245,74 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RemoveStageButton_Click(object sender, RoutedEventArgs e) =>
+        Edit(() => _editorViewModel.RemoveStage(StageIdBox.Text.Trim()), $"Removed stage '{StageIdBox.Text.Trim()}'.");
+
+    private void UpdateFieldButton_Click(object sender, RoutedEventArgs e) =>
+        Edit(
+            () => _editorViewModel.UpdateField(FieldSemanticIdBox.Text.Trim(), FieldMeaningBox.Text.Trim(), FieldRequiredBox.IsChecked == true),
+            $"Updated field '{FieldSemanticIdBox.Text.Trim()}'.");
+
+    private void RemoveFieldButton_Click(object sender, RoutedEventArgs e) =>
+        Edit(() => _editorViewModel.RemoveField(FieldSemanticIdBox.Text.Trim()), $"Removed field '{FieldSemanticIdBox.Text.Trim()}'.");
+
+    private void ReplaceTriggerActionsButton_Click(object sender, RoutedEventArgs e) =>
+        Edit(
+            () => _editorViewModel.ReplaceTriggerActions(
+                TriggerSemanticIdBox.Text.Trim(),
+                TriggerActionsBuilder.Build(
+                    TriggerCaptureFieldsBox.Text,
+                    TriggerEmitEventBox.Text,
+                    TriggerTransitionStageBox.Text,
+                    TriggerClearStateBox.IsChecked == true,
+                    (TriggerTerminalAction)Math.Max(0, TriggerTerminalBox.SelectedIndex))),
+            $"Replaced the actions of trigger '{TriggerSemanticIdBox.Text.Trim()}'.");
+
+    private void RemoveTriggerButton_Click(object sender, RoutedEventArgs e) =>
+        Edit(() => _editorViewModel.RemoveTrigger(TriggerSemanticIdBox.Text.Trim()), $"Removed trigger '{TriggerSemanticIdBox.Text.Trim()}'.");
+
+    /// <summary>Applies one editor operation, reporting a refusal instead of applying part of it.</summary>
+    private void Edit(Action edit, string success)
+    {
+        try
+        {
+            edit();
+            SetStatus($"{success} Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            SetStatus($"Edit refused: {ex.Message}");
+        }
+    }
+
+    /// <summary>Shows whether the current configuration content may be activated.</summary>
+    private async Task RefreshApprovalStateAsync()
+    {
+        if (_editorViewModel.Configuration is not { } configuration)
+        {
+            ApprovalStateText.Text = "(no integration)";
+            return;
+        }
+
+        try
+        {
+            var status = await _approvalService.GetStatusAsync(configuration);
+            ApprovalStateText.Text = status.State switch
+            {
+                ApprovalState.Approved => $"Aprovada em {status.LastApprovedAtUtc!.Value.ToLocalTime():g}: pode ser ativada.",
+                ApprovalState.ChangedSinceTest => $"Alterada desde o último teste aprovado ({status.LastApprovedAtUtc!.Value.ToLocalTime():g}): teste e aprove novamente para ativar.",
+                _ => "Não testada: execute o modo de teste e aprove antes de ativar.",
+            };
+            ApprovalStateText.Foreground = status.State == ApprovalState.Approved
+                ? System.Windows.Media.Brushes.DarkGreen
+                : System.Windows.Media.Brushes.DarkOrange;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            ApprovalStateText.Text = $"Estado de aprovação indisponível ({ex.GetType().Name}).";
+        }
+    }
+
     private async void SaveButton_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -320,8 +390,10 @@ public partial class MainWindow : Window
             _runtimeFactories.CreateCaptureProvider(instance),
             _runtimeFactories.CreateTriggerProvider(instance, Guid.NewGuid()),
             triggerTimeout: TimeSpan.FromSeconds(15));
-        _testModeViewModel = new TestModeViewModel(runner, Dispatcher);
+        _testModeViewModel = new TestModeViewModel(runner, Dispatcher, approvals: _approvalService);
         TestModeHost.Attach(_testModeViewModel, configuration);
+        TestModeHost.Approved -= OnTestApproved;
+        TestModeHost.Approved += OnTestApproved;
         TestModeHost.Visibility = Visibility.Visible;
         SetStatus($"Test prepared for process {processId}. Click 'Executar teste', then press each configured button in the application, in order, within 15 seconds each.");
     }
@@ -336,7 +408,9 @@ public partial class MainWindow : Window
 
         try
         {
-            var status = await _monitorViewModel.StartAsync(configuration, _testModeViewModel?.LastApproval);
+            // The stored approval for exactly this content, if any; AgentRuntime enforces the gate.
+            var approval = (await _approvalService.GetStatusAsync(configuration)).Approval;
+            var status = await _monitorViewModel.StartAsync(configuration, approval);
             if (status == ActivationStatus.NotTested && _testModeViewModel is not null)
             {
                 _testModeViewModel.GateMessage = _monitorViewModel.StatusText;
@@ -347,6 +421,8 @@ public partial class MainWindow : Window
             SetStatus(ex.Message);
         }
     }
+
+    private async void OnTestApproved(object? sender, EventArgs e) => await RefreshApprovalStateAsync();
 
     private async void StopMonitoringButton_Click(object sender, RoutedEventArgs e) =>
         await _monitorViewModel.StopAsync();
@@ -493,6 +569,7 @@ public partial class MainWindow : Window
     {
         StatusText.Text = message;
         RefreshConfigurationSummary();
+        _ = RefreshApprovalStateAsync();
     }
 
     [StructLayout(LayoutKind.Sequential)]

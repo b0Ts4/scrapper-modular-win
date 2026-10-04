@@ -22,6 +22,9 @@ public partial class TestModeView : UserControl
     private TestModeViewModel? _viewModel;
     private IntegrationConfiguration? _configuration;
 
+    /// <summary>Raised after an approval has been recorded.</summary>
+    public event EventHandler? Approved;
+
     public TestModeView()
     {
         InitializeComponent();
@@ -70,7 +73,7 @@ public partial class TestModeView : UserControl
         }
     }
 
-    private void ApproveButton_Click(object sender, RoutedEventArgs e)
+    private async void ApproveButton_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel is null)
         {
@@ -79,12 +82,17 @@ public partial class TestModeView : UserControl
 
         try
         {
-            _viewModel.Approve();
+            await _viewModel.ApproveAsync();
             TestStatusText.Text = "Configuração aprovada. Ela pode ser ativada agora.";
+            Approved?.Invoke(this, EventArgs.Empty);
         }
         catch (InvalidOperationException ex)
         {
             TestStatusText.Text = $"Não foi possível aprovar: {ex.Message}";
+        }
+        catch (System.IO.IOException ex)
+        {
+            TestStatusText.Text = $"Não foi possível gravar a aprovação: {ex.Message}";
         }
     }
 

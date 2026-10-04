@@ -63,18 +63,28 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
     private readonly IntegrationTestRunner _runner;
     private readonly Dispatcher? _dispatcher;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly ApprovalService? _approvals;
 
     private IntegrationTestReport? _report;
     private bool _isRunning;
     private ConfigurationApproval? _lastApproval;
     private string? _gateMessage;
 
-    public TestModeViewModel(IntegrationTestRunner runner, Dispatcher? dispatcher = null, Func<DateTimeOffset>? clock = null)
+    /// <param name="approvals">
+    /// Where <see cref="ApproveAsync"/> records approvals so they survive an Agent restart.
+    /// Without it, approvals are kept in memory only.
+    /// </param>
+    public TestModeViewModel(
+        IntegrationTestRunner runner,
+        Dispatcher? dispatcher = null,
+        Func<DateTimeOffset>? clock = null,
+        ApprovalService? approvals = null)
     {
         ArgumentNullException.ThrowIfNull(runner);
 
         _runner = runner;
         _dispatcher = dispatcher;
+        _approvals = approvals;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
     }
 
@@ -150,6 +160,33 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
 
         var approval = report.ToApproval(_clock())
             ?? throw new InvalidOperationException("Cannot approve: the most recent test run did not pass every check.");
+
+        RunOnDispatcher(() =>
+        {
+            _lastApproval = approval;
+            OnPropertyChanged(nameof(LastApproval));
+        });
+
+        return approval;
+    }
+
+    /// <summary>
+    /// Like <see cref="Approve"/>, and also records the approval through the
+    /// <see cref="ApprovalService"/> (when one was supplied) so it survives a restart. A
+    /// failed run throws before anything is recorded.
+    /// </summary>
+    public async Task<ConfigurationApproval> ApproveAsync(CancellationToken cancellationToken = default)
+    {
+        var report = _report
+            ?? throw new InvalidOperationException("Run the test suite (call RunAsync) before approving.");
+        if (!report.AllPassed)
+        {
+            throw new InvalidOperationException("Cannot approve: the most recent test run did not pass every check.");
+        }
+
+        var approval = _approvals is null
+            ? Approve()
+            : await _approvals.RecordAsync(report, cancellationToken).ConfigureAwait(false);
 
         RunOnDispatcher(() =>
         {

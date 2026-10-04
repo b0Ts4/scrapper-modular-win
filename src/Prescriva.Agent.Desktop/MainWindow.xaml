@@ -33,8 +33,10 @@
                 <TextBlock Text="Stage name:" VerticalAlignment="Center" />
                 <TextBox x:Name="StageNameBox" Text="Intake" Margin="2" />
             </UniformGrid>
-            <Button x:Name="AddStageButton" Content="Add Stage" Margin="0,6,0,0"
-                    Click="AddStageButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Button x:Name="AddStageButton" Content="Add Stage" Click="AddStageButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="RemoveStageButton" Content="Remove Stage" Click="RemoveStageButton_Click" Padding="8,2" />
+            </StackPanel>
 
             <Separator Margin="0,10,0,10" />
 
@@ -57,8 +59,11 @@
                 <TextBox x:Name="FieldMeaningBox" Text="Medication name" Margin="2" />
             </UniformGrid>
             <CheckBox x:Name="FieldRequiredBox" Content="Required" IsChecked="True" Margin="0,4,0,0" />
-            <Button x:Name="AddFieldButton" Content="Add Field From Confirmed Selection" Margin="0,6,0,0"
-                    Click="AddFieldButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Button x:Name="AddFieldButton" Content="Add Field From Confirmed Selection" Click="AddFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="UpdateFieldButton" Content="Update Meaning/Required" Click="UpdateFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="RemoveFieldButton" Content="Remove Field" Click="RemoveFieldButton_Click" Padding="8,2" />
+            </StackPanel>
 
             <Separator Margin="0,10,0,10" />
 
@@ -85,10 +90,14 @@
                 </ComboBox>
             </UniformGrid>
             <CheckBox x:Name="TriggerClearStateBox" Content="Clear captured state after emitting" Margin="0,4,0,0" />
-            <Button x:Name="AddTriggerButton" Content="Add Trigger From Confirmed Selection" Margin="0,6,0,0"
-                    Click="AddTriggerButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Button x:Name="AddTriggerButton" Content="Add Trigger From Confirmed Selection" Click="AddTriggerButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ReplaceTriggerActionsButton" Content="Replace Actions" Click="ReplaceTriggerActionsButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="RemoveTriggerButton" Content="Remove Trigger" Click="RemoveTriggerButton_Click" Padding="8,2" />
+            </StackPanel>
 
             <TextBlock x:Name="ConfigurationSummaryText" Text="(no integration)" Margin="0,8,0,0" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" />
+            <TextBlock x:Name="ApprovalStateText" Text="(no integration)" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
 
             <Separator Margin="0,10,0,10" />
 
