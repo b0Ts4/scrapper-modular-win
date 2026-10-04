@@ -392,7 +392,7 @@ internal static class DesktopDriver
 
         public static DesktopProcess Launch(string dataDirectory, IReadOnlyDictionary<string, string>? environment = null)
         {
-            var testTargetPath = TestTargetLauncher.ResolveExecutablePath();
+            var testTargetPath = TestTargetLauncher.ResolveBuiltExecutablePath();
             var binDirectory = Path.GetDirectoryName(testTargetPath)!;
             var executablePath = Path.GetFullPath(Path.Combine(
                 binDirectory, "..", "..", "..", "..", "Prescriva.Agent.Desktop", "bin",

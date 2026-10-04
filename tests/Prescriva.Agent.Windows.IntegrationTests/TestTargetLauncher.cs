@@ -97,7 +97,28 @@ internal sealed class TestTargetLauncher : IDisposable
         }
     }
 
+    /// <summary>
+    /// The TestTarget to launch: PRESCRIVA_TESTTARGET_EXE when set (CI uses it to run the
+    /// suite against a 32-bit build), otherwise the solution's own build output.
+    /// </summary>
     internal static string ResolveExecutablePath()
+    {
+        var overridden = Environment.GetEnvironmentVariable("PRESCRIVA_TESTTARGET_EXE");
+        if (string.IsNullOrEmpty(overridden))
+        {
+            return ResolveBuiltExecutablePath();
+        }
+
+        if (!File.Exists(overridden))
+        {
+            throw new FileNotFoundException("PRESCRIVA_TESTTARGET_EXE does not point to an existing file.", overridden);
+        }
+
+        return overridden;
+    }
+
+    /// <summary>The TestTarget produced by building the solution (src/.../bin/{configuration}/net10.0-windows).</summary>
+    internal static string ResolveBuiltExecutablePath()
     {
         var repoRoot = FindRepositoryRoot(AppContext.BaseDirectory);
         var configuration = FindConfigurationSegment(AppContext.BaseDirectory);

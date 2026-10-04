@@ -41,6 +41,24 @@ jobs:
           --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
           --results-directory TestResults
 
+      - name: Publish a 32-bit TestTarget
+        if: always()
+        run: >
+          dotnet publish src/Prescriva.Agent.TestTarget --configuration Release
+          --runtime win-x86 --self-contained true -p:PlatformTarget=x86
+          --output ${{ github.workspace }}/out/testtarget-x86
+
+      - name: Windows UI Automation tests against the 32-bit TestTarget
+        if: always()
+        env:
+          PRESCRIVA_TESTTARGET_EXE: ${{ github.workspace }}/out/testtarget-x86/Prescriva.Agent.TestTarget.exe
+          PRESCRIVA_TESTTARGET_EXPECTED_BITNESS: "32"
+        run: >
+          dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build
+          --filter "FullyQualifiedName~TestTargetSmokeTests|FullyQualifiedName~SelectorResolutionTests|FullyQualifiedName~CaptureProviderTests|FullyQualifiedName~TriggerProviderTests|FullyQualifiedName~ElementInspectionTests|FullyQualifiedName~MilestoneFlowTests|FullyQualifiedName~ProcessIdentityDiscoveryTests"
+          --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration-x86" --logger "console;verbosity=normal"
+          --results-directory TestResults
+
       - name: Print hover screenshots (base64 crops, for reviewers without artifact access)
         if: always()
         shell: pwsh
