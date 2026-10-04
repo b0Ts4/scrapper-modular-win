@@ -83,7 +83,16 @@ public partial class MainWindow : Window
             _runtimeFactories.CreateCaptureProvider,
             outbox,
             _technicalLog);
-        _monitorViewModel = new RuntimeMonitorViewModel(runtime, outbox, Dispatcher);
+        _monitorViewModel = new RuntimeMonitorViewModel(
+            runtime,
+            outbox,
+            Dispatcher,
+            CreateCapacityPolicy(),
+            async cancellationToken =>
+            {
+                await outbox.DeleteAllAsync(cancellationToken);
+                _technicalLog.Clear();
+            });
         _monitorViewModel.PropertyChanged += (_, _) => RefreshMonitor();
         Loaded += async (_, _) => await ApplyRetentionAsync(outbox);
 
@@ -342,6 +351,44 @@ public partial class MainWindow : Window
     private async void StopMonitoringButton_Click(object sender, RoutedEventArgs e) =>
         await _monitorViewModel.StopAsync();
 
+    private async void ClearLocalDataButton_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            this,
+            "Apagar TODOS os eventos da fila local (inclusive os ainda não confirmados) e o log técnico? Esta ação não pode ser desfeita. As configurações são mantidas.",
+            "Limpar dados locais",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await _monitorViewModel.ClearLocalDataAsync();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Clearing local data failed: {ex.GetType().Name}.");
+        }
+    }
+
+    /// <summary>
+    /// Pending-event alert thresholds: 1000 (warning) and 5000 (critical) by default, or the
+    /// PRESCRIVA_AGENT_OUTBOX_WARNING / PRESCRIVA_AGENT_OUTBOX_CRITICAL environment variables.
+    /// </summary>
+    private static OutboxCapacityPolicy CreateCapacityPolicy()
+    {
+        static int Read(string name, int fallback) =>
+            int.TryParse(Environment.GetEnvironmentVariable(name), out var value) && value >= 0 ? value : fallback;
+
+        var warning = Read("PRESCRIVA_AGENT_OUTBOX_WARNING", 1000);
+        var critical = Math.Max(warning, Read("PRESCRIVA_AGENT_OUTBOX_CRITICAL", 5000));
+        return new OutboxCapacityPolicy(warning, critical);
+    }
+
     private void RefreshMonitor()
     {
         MonitorStatusText.Text = _monitorViewModel.StatusText;
@@ -355,6 +402,12 @@ public partial class MainWindow : Window
 
         ActivateButton.IsEnabled = !_monitorViewModel.IsMonitoring;
         StopMonitoringButton.IsEnabled = _monitorViewModel.IsMonitoring;
+        ClearLocalDataButton.IsEnabled = !_monitorViewModel.IsMonitoring;
+
+        var alert = _monitorViewModel.CapacityAlert;
+        CapacityAlertText.Text = alert ?? string.Empty;
+        CapacityAlertText.Foreground = _monitorViewModel.IsCapacityCritical ? System.Windows.Media.Brushes.DarkRed : System.Windows.Media.Brushes.DarkOrange;
+        CapacityAlertText.Visibility = alert is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async Task ApplyRetentionAsync(SqliteEventOutbox outbox)

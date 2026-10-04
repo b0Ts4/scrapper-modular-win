@@ -125,10 +125,13 @@
                 <Button x:Name="StopMonitoringButton" Content="Stop" Click="StopMonitoringButton_Click" Padding="8,2" />
             </StackPanel>
             <TextBlock x:Name="MonitorStatusText" Text="Inativo." Margin="0,6,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
+            <TextBlock x:Name="CapacityAlertText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="DarkOrange" FontWeight="SemiBold" Visibility="Collapsed" />
             <TextBlock Text="Diagnostics" Margin="0,6,0,2" FontStyle="Italic" />
             <ListBox x:Name="DiagnosticsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Message" />
             <TextBlock Text="Persisted events (local encrypted queue)" Margin="0,6,0,2" FontStyle="Italic" />
             <ListBox x:Name="EventsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Text" />
+            <Button x:Name="ClearLocalDataButton" Content="Clear Local Data (events and technical log)..." Click="ClearLocalDataButton_Click"
+                    HorizontalAlignment="Left" Padding="8,2" Margin="0,6,0,0" />
 
             <Separator Margin="0,10,0,10" />
 

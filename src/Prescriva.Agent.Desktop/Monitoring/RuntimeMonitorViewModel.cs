@@ -11,6 +11,7 @@ using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Domain.Events;
 using Prescriva.Agent.Domain.Sessions;
+using Prescriva.Agent.Infrastructure.Events;
 
 namespace Prescriva.Agent.Desktop.Monitoring;
 
@@ -59,12 +60,26 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     private long _eventReadsStarted;
     private long _newestAppliedEventRead;
 
+    private readonly OutboxCapacityPolicy _capacityPolicy;
+    private readonly Func<CancellationToken, Task>? _clearLocalData;
+    private OutboxCapacityAssessment? _capacity;
+
     private CancellationTokenSource? _activationCts;
     private Task<ActivationResult>? _activation;
     private bool _isMonitoring;
     private string _statusText = "Inativo.";
 
-    public RuntimeMonitorViewModel(AgentRuntime runtime, IEventOutbox outbox, Dispatcher? dispatcher = null)
+    /// <param name="capacityPolicy">Thresholds for the pending-events alert (defaults: 1000 warning, 5000 critical).</param>
+    /// <param name="clearLocalData">
+    /// The operator's explicit "clear local data" action (deletes the event queue and the
+    /// technical log). Null when the host offers no such action.
+    /// </param>
+    public RuntimeMonitorViewModel(
+        AgentRuntime runtime,
+        IEventOutbox outbox,
+        Dispatcher? dispatcher = null,
+        OutboxCapacityPolicy? capacityPolicy = null,
+        Func<CancellationToken, Task>? clearLocalData = null)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(outbox);
@@ -72,6 +87,8 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         _runtime = runtime;
         _outbox = outbox;
         _dispatcher = dispatcher;
+        _capacityPolicy = capacityPolicy ?? new OutboxCapacityPolicy();
+        _clearLocalData = clearLocalData;
         _runtime.DiagnosticPublished += OnDiagnosticPublished;
     }
 
@@ -80,6 +97,56 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     public bool IsMonitoring => _isMonitoring;
 
     public string StatusText => _statusText;
+
+    /// <summary>
+    /// A visible Portuguese alert once pending events reach the warning threshold, or null.
+    /// Alerting never deletes anything: pending events stay until confirmed or until the
+    /// operator explicitly clears local data.
+    /// </summary>
+    public string? CapacityAlert
+    {
+        get
+        {
+            var capacity = Volatile.Read(ref _capacity);
+            return capacity?.Status switch
+            {
+                OutboxCapacityStatus.Warning =>
+                    $"Atenção: {capacity.PendingCount} eventos pendentes na fila local (alerta a partir de {capacity.WarningThreshold}). Eles não serão apagados automaticamente.",
+                OutboxCapacityStatus.Critical =>
+                    $"Limite crítico: {capacity.PendingCount} eventos pendentes na fila local (crítico a partir de {capacity.CriticalThreshold}). Nada é apagado automaticamente; exporte ou limpe os dados locais.",
+                _ => null,
+            };
+        }
+    }
+
+    /// <summary>True when pending events reached the critical threshold.</summary>
+    public bool IsCapacityCritical => Volatile.Read(ref _capacity)?.Status == OutboxCapacityStatus.Critical;
+
+    /// <summary>
+    /// Deletes local business data (event queue and technical log) through the host's
+    /// action. Refused - returning false with an explanation - while a configuration is
+    /// being monitored, or when the host offers no such action.
+    /// </summary>
+    public async Task<bool> ClearLocalDataAsync(CancellationToken cancellationToken = default)
+    {
+        if (_clearLocalData is null)
+        {
+            SetStatus(_isMonitoring, "A limpeza de dados locais não está disponível.");
+            return false;
+        }
+
+        if (_activation is not null)
+        {
+            SetStatus(true, "Pare o monitoramento antes de apagar os dados locais.");
+            return false;
+        }
+
+        await _clearLocalData(cancellationToken).ConfigureAwait(false);
+        await RefreshEventsAsync(cancellationToken).ConfigureAwait(false);
+        AddDiagnostic(new DiagnosticDisplay(DateTimeOffset.UtcNow, false, "Dados locais apagados pelo operador."));
+        SetStatus(false, "Dados locais apagados: fila de eventos e log técnico.");
+        return true;
+    }
 
     /// <summary>
     /// The most recent diagnostics, oldest first (bounded). Always read under the lock
@@ -199,9 +266,15 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
 
             _newestAppliedEventRead = read;
             _events = events;
+            _capacity = _capacityPolicy.Evaluate(events.Length);
         }
 
-        RunOnDispatcher(() => OnPropertyChanged(nameof(Events)));
+        RunOnDispatcher(() =>
+        {
+            OnPropertyChanged(nameof(Events));
+            OnPropertyChanged(nameof(CapacityAlert));
+            OnPropertyChanged(nameof(IsCapacityCritical));
+        });
     }
 
     private async Task ObserveActivationAsync(Task<ActivationResult> activation)

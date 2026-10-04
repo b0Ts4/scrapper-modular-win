@@ -25,6 +25,64 @@ public sealed class SqliteEventOutboxTests : IDisposable
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
     }
 
+    [Fact]
+    public async Task DeleteAllAsync_removes_pending_confirmed_and_quarantined_events_and_their_ciphertext_from_the_file()
+    {
+        var protector = new DpapiPayloadProtector();
+        var outbox = new SqliteEventOutbox(_dbPath, protector);
+        var sessionId = Guid.NewGuid();
+        var confirmedId = Guid.NewGuid();
+        var quarantinedId = Guid.NewGuid();
+        var events = new[]
+        {
+            MakeEvent(sessionId, 1, "pendente-limpeza-1"),
+            MakeEvent(sessionId, 2, "confirmado-limpeza-2", confirmedId),
+            MakeEvent(sessionId, 3, "quarentena-limpeza-3", quarantinedId),
+        };
+        foreach (var domainEvent in events)
+        {
+            await outbox.AppendAsync(domainEvent, CancellationToken.None);
+        }
+
+        await outbox.MarkConfirmedAsync(confirmedId, CancellationToken.None);
+        await outbox.QuarantineAsync(quarantinedId, "test", CancellationToken.None);
+        SqliteConnection.ClearAllPools();
+        var ciphertextBefore = await ReadCiphertextsAsync();
+        Assert.Equal(3, ciphertextBefore.Count);
+
+        var deleted = await outbox.DeleteAllAsync(CancellationToken.None);
+
+        Assert.Equal(3, deleted);
+        Assert.Empty(await outbox.ReadPendingAsync(CancellationToken.None));
+        SqliteConnection.ClearAllPools();
+        var fileBytes = await File.ReadAllBytesAsync(_dbPath);
+        foreach (var ciphertext in ciphertextBefore)
+        {
+            // Not even the encrypted payload may linger in freed database pages.
+            Assert.True(fileBytes.AsSpan().IndexOf(ciphertext.AsSpan(0, 32)) < 0, "Deleted ciphertext is still present in the database file.");
+        }
+
+        // The outbox keeps working after a cleanup.
+        await outbox.AppendAsync(MakeEvent(Guid.NewGuid(), 1, "depois"), CancellationToken.None);
+        Assert.Single(await outbox.ReadPendingAsync(CancellationToken.None));
+    }
+
+    private async Task<List<byte[]>> ReadCiphertextsAsync()
+    {
+        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT payload_ciphertext FROM events;";
+        await using var reader = await command.ExecuteReaderAsync();
+        var result = new List<byte[]>();
+        while (await reader.ReadAsync())
+        {
+            result.Add((byte[])reader[0]);
+        }
+
+        return result;
+    }
+
     private static DomainEvent MakeEvent(Guid sessionId, long sequence, string secretValue, Guid? id = null) =>
         new(
             id ?? Guid.NewGuid(),

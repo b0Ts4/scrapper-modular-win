@@ -38,7 +38,11 @@ public sealed class StructuredTechnicalLog : ITechnicalLog, IDisposable
             Directory.CreateDirectory(directory);
         }
 
-        _writer = new StreamWriter(new FileStream(fullPath, FileMode.Append, FileAccess.Write, FileShare.Read));
+        // Opened at the end rather than with FileMode.Append, which forbids the truncation
+        // Clear needs; writes still always go to the end of the file.
+        var stream = new FileStream(fullPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+        stream.Seek(0, SeekOrigin.End);
+        _writer = new StreamWriter(stream);
         _ownsWriter = true;
     }
 
@@ -62,6 +66,25 @@ public sealed class StructuredTechnicalLog : ITechnicalLog, IDisposable
         {
             _writer.WriteLine(line);
             _writer.Flush();
+        }
+    }
+
+    /// <summary>
+    /// Empties the log file (part of the operator's explicit "clear local data"). Logging
+    /// keeps working afterwards. Only supported for a log that owns its file.
+    /// </summary>
+    public void Clear()
+    {
+        if (!_ownsWriter || _writer is not StreamWriter { BaseStream: FileStream stream })
+        {
+            throw new NotSupportedException("Only a file-backed technical log can be cleared.");
+        }
+
+        lock (_gate)
+        {
+            _writer.Flush();
+            stream.SetLength(0);
+            stream.Flush();
         }
     }
 

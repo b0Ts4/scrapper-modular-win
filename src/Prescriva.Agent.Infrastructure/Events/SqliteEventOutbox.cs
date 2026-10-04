@@ -192,6 +192,31 @@ public sealed class SqliteEventOutbox : IEventOutbox
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// The operator's explicit "clear local data": deletes every event whatever its status
+    /// (pending ones included - this is a deliberate, confirmed user action, never an
+    /// automatic policy) and compacts the file so freed pages no longer hold the deleted
+    /// ciphertext. Returns how many events were deleted.
+    /// </summary>
+    public async Task<int> DeleteAllAsync(CancellationToken cancellationToken)
+    {
+        using var connection = OpenConnection();
+        int deleted;
+        using (var delete = connection.CreateCommand())
+        {
+            delete.CommandText = "DELETE FROM events;";
+            deleted = await delete.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        using (var vacuum = connection.CreateCommand())
+        {
+            vacuum.CommandText = "VACUUM;";
+            await vacuum.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        return deleted;
+    }
+
     private static async Task QuarantineRowAsync(SqliteConnection connection, long rowId, string reason, CancellationToken cancellationToken)
     {
         using var command = connection.CreateCommand();
