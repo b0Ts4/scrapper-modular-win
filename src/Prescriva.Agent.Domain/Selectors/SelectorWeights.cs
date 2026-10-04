@@ -6,11 +6,11 @@ public sealed record SelectorWeights
 
     public int AutomationId { get; init; } = 40;
     public int ControlType { get; init; } = 15;
-    public int Name { get; init; } = 10;
+    public int Name { get; init; } = 7;
     public int ClassName { get; init; } = 5;
     public int FrameworkId { get; init; } = 2;
-    public int Ancestors { get; init; } = 8;
-    public int NearbyLabels { get; init; } = 15;
+    public int Ancestors { get; init; } = 6;
+    public int NearbyLabels { get; init; } = 20;
     public int RelativeBounds { get; init; } = 5;
     public int MinimumScore { get; init; } = 40;
     public int MinimumLead { get; init; } = 10;

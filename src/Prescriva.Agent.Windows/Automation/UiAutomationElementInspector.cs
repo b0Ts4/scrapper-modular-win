@@ -192,6 +192,7 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
             processName = string.Empty;
         }
 
+        var window = FindTopLevelWindow(element);
         return new ElementSnapshot(
             NullIfEmpty(current.AutomationId),
             NullIfEmpty(current.Name),
@@ -200,7 +201,11 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
             new BoundingRectangle(rect.X, rect.Y, rect.Width, rect.Height),
             current.ProcessId,
             processName,
-            NullIfEmpty(FindTopLevelWindowTitle(element)));
+            NullIfEmpty(window?.Current.Name),
+            StructuralSignals.Ancestors(element),
+            StructuralSignals.NearbyLabels(element),
+            window is null ? null : StructuralSignals.Relative(rect, window.Current.BoundingRectangle),
+            NullIfEmpty(current.FrameworkId));
     }
 
     /// <summary>
@@ -209,7 +214,7 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
     /// <see cref="ElementSnapshot.WindowTitle"/>. Best-effort: returns null rather than
     /// throwing if the element disappears mid-walk.
     /// </summary>
-    private static string? FindTopLevelWindowTitle(AutomationElement element)
+    private static AutomationElement? FindTopLevelWindow(AutomationElement element)
     {
         try
         {
@@ -222,7 +227,7 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
                 var parent = walker.GetParent(current);
                 if (parent is null || System.Windows.Automation.Automation.Compare(parent, root))
                 {
-                    return current.Current.Name;
+                    return current;
                 }
 
                 current = parent;

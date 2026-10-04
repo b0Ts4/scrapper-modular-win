@@ -246,7 +246,11 @@ public sealed class InspectionController
             AutomationId: snapshot.AutomationId,
             Name: snapshot.Name,
             ControlType: snapshot.ControlType,
-            ClassName: snapshot.ClassName);
+            ClassName: snapshot.ClassName,
+            FrameworkId: snapshot.FrameworkId,
+            Ancestors: snapshot.Ancestors,
+            NearbyLabels: snapshot.NearbyLabels,
+            RelativeBounds: snapshot.RelativeBounds);
 
     private void SetState(InspectionState state)
     {
