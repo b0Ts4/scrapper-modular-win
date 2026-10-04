@@ -15,6 +15,10 @@ namespace Prescriva.Agent.Desktop.Testing;
 /// <param name="StatusText">A short Portuguese status label ("Encontrado", "Não encontrado", "Ambíguo").</param>
 /// <param name="ProviderText">The serving provider ID, or "-" when the field did not resolve.</param>
 /// <param name="ConfidenceText">The confidence as a percentage, or "-" when the field did not resolve.</param>
+/// <param name="ValueText">
+/// The value read from the live field during this run (in memory only, never logged or
+/// persisted), or "-" when the field did not resolve or produced no value.
+/// </param>
 /// <param name="FailureMessage">
 /// Actionable Portuguese text for the operator when the field failed, or null when it
 /// passed. Built purely from <see cref="FieldCheckResult.FailureCode"/> - never from any
@@ -26,7 +30,8 @@ public sealed record FieldResultDisplay(
     string StatusText,
     string ProviderText,
     string ConfidenceText,
-    string? FailureMessage);
+    string? FailureMessage,
+    string ValueText = "-");
 
 /// <summary>Everything the view needs to render one trigger's test result - already in display-ready form.</summary>
 public sealed record TriggerResultDisplay(
@@ -191,7 +196,8 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
             statusText,
             passed ? result.ProviderId ?? "-" : "-",
             passed ? $"{result.Confidence:P0}" : "-",
-            passed ? null : DescribeFieldFailure(result.FailureCode));
+            passed ? null : DescribeFieldFailure(result.FailureCode),
+            passed && !string.IsNullOrEmpty(result.Value) ? result.Value : "-");
     }
 
     private static TriggerResultDisplay ToDisplay(TriggerCheckResult result)

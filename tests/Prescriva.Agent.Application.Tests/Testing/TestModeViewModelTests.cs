@@ -50,6 +50,18 @@ public sealed class TestModeViewModelTests
     }
 
     [Fact]
+    public async Task RunAsync_shows_the_value_read_from_a_found_field_and_none_for_a_failed_one()
+    {
+        var runner = BuildRunner(passing: false);
+        var viewModel = new TestModeViewModel(runner);
+
+        await viewModel.RunAsync(BuildFailingConfiguration());
+
+        Assert.Equal("Dipirona", Assert.Single(viewModel.FieldResults, f => f.FieldId == FoundFieldId).ValueText);
+        Assert.Equal("-", Assert.Single(viewModel.FieldResults, f => f.FieldId == MissingFieldId).ValueText);
+    }
+
+    [Fact]
     public async Task RunAsync_a_not_found_field_reports_actionable_portuguese_text_and_blocks_approval()
     {
         var configuration = BuildFailingConfiguration();
