@@ -134,6 +134,7 @@
                 <Button x:Name="StopMonitoringButton" Content="Stop" Click="StopMonitoringButton_Click" Padding="8,2" />
             </StackPanel>
             <TextBlock x:Name="MonitorStatusText" Text="Inativo." Margin="0,6,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
+            <TextBlock x:Name="HealthText" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
             <TextBlock x:Name="CapacityAlertText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="DarkOrange" FontWeight="SemiBold" Visibility="Collapsed" />
             <TextBlock Text="Diagnostics" Margin="0,6,0,2" FontStyle="Italic" />
             <ListBox x:Name="DiagnosticsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Message" />

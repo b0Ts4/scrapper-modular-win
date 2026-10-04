@@ -480,6 +480,14 @@ public partial class MainWindow : Window
         StopMonitoringButton.IsEnabled = _monitorViewModel.IsMonitoring;
         ClearLocalDataButton.IsEnabled = !_monitorViewModel.IsMonitoring;
 
+        HealthText.Text = _monitorViewModel.HealthText;
+        HealthText.Foreground = _monitorViewModel.HealthState switch
+        {
+            IntegrationHealthState.Broken => System.Windows.Media.Brushes.DarkRed,
+            IntegrationHealthState.Degraded => System.Windows.Media.Brushes.DarkOrange,
+            _ => System.Windows.Media.Brushes.DarkGreen,
+        };
+
         var alert = _monitorViewModel.CapacityAlert;
         CapacityAlertText.Text = alert ?? string.Empty;
         CapacityAlertText.Foreground = _monitorViewModel.IsCapacityCritical ? System.Windows.Media.Brushes.DarkRed : System.Windows.Media.Brushes.DarkOrange;

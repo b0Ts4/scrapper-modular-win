@@ -63,6 +63,7 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     private readonly OutboxCapacityPolicy _capacityPolicy;
     private readonly Func<CancellationToken, Task>? _clearLocalData;
     private OutboxCapacityAssessment? _capacity;
+    private IntegrationHealthTracker? _health;
 
     private CancellationTokenSource? _activationCts;
     private Task<ActivationResult>? _activation;
@@ -116,6 +117,36 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
                     $"Limite crítico: {capacity.PendingCount} eventos pendentes na fila local (crítico a partir de {capacity.CriticalThreshold}). Nada é apagado automaticamente; exporte ou limpe os dados locais.",
                 _ => null,
             };
+        }
+    }
+
+    /// <summary>The active integration's health, or null when nothing has been activated.</summary>
+    public IntegrationHealthState? HealthState
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _health?.Current.State;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The integration's health with every reason (spec §8), in Portuguese: empty before
+    /// any activation. Built only from IDs and confidence - never from a captured value.
+    /// </summary>
+    public string HealthText
+    {
+        get
+        {
+            IntegrationHealth? health;
+            lock (_gate)
+            {
+                health = _health?.Current;
+            }
+
+            return health is null ? string.Empty : Describe(health);
         }
     }
 
@@ -191,6 +222,11 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
             throw new InvalidOperationException("Uma configuração já está ativa. Pare o monitoramento antes de ativar outra.");
         }
 
+        lock (_gate)
+        {
+            _health = new IntegrationHealthTracker(configuration);
+        }
+
         var cts = new CancellationTokenSource();
         var activation = _runtime.ActivateAsync(configuration, approval, cts.Token);
 
@@ -202,6 +238,12 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
             var result = await activation.ConfigureAwait(false);
             if (result.Status == ActivationStatus.NotTested)
             {
+                lock (_gate)
+                {
+                    _health = null;
+                }
+
+                RunOnDispatcher(NotifyHealthChanged);
                 SetStatus(false, "Ativação recusada: esta configuração não passou no modo de teste ou foi alterada depois do último teste. Execute o teste e aprove-a novamente.");
             }
 
@@ -299,6 +341,13 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
 
     private void OnDiagnosticPublished(object? sender, RuntimeDiagnostic diagnostic)
     {
+        lock (_gate)
+        {
+            _health?.Apply(diagnostic);
+        }
+
+        RunOnDispatcher(NotifyHealthChanged);
+
         AddDiagnostic(new DiagnosticDisplay(
             diagnostic.Timestamp,
             diagnostic.Severity == RuntimeDiagnosticSeverity.Error,
@@ -347,6 +396,35 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
             "Aplicação fechada ou monitoramento parado: sessão encerrada.",
         _ => $"Diagnóstico {diagnostic.Code}.",
     };
+
+    internal static string Describe(IntegrationHealth health)
+    {
+        if (health.State == IntegrationHealthState.Healthy)
+        {
+            return "Integração saudável.";
+        }
+
+        var reasons = string.Join(" ", health.Issues.Select(issue => issue.Kind switch
+        {
+            IntegrationIssueKind.FieldUnreadable =>
+                $"Não foi possível ler o campo '{issue.FieldId}' (ausente, ambíguo ou ilegível): ajuste o seletor e teste novamente.",
+            IntegrationIssueKind.TriggerUnwatchable =>
+                $"O gatilho '{issue.TriggerId}' não pode ser monitorado.",
+            IntegrationIssueKind.LowConfidenceMatch =>
+                $"O campo '{issue.FieldId}' foi encontrado com confiança baixa ({issue.Confidence:P0}): revise o seletor.",
+            _ => issue.Kind.ToString(),
+        }));
+
+        return health.State == IntegrationHealthState.Broken
+            ? $"Integração quebrada. {reasons}"
+            : $"Integração degradada. {reasons}";
+    }
+
+    private void NotifyHealthChanged()
+    {
+        OnPropertyChanged(nameof(HealthState));
+        OnPropertyChanged(nameof(HealthText));
+    }
 
     private static string DescribeFailure(SessionFailureCode? code, string? fieldId) => code switch
     {
