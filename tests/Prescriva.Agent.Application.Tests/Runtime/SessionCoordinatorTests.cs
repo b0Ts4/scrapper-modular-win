@@ -240,6 +240,110 @@ public sealed class SessionCoordinatorTests
         Assert.NotNull(captureEntry.Elapsed);
     }
 
+    [Fact]
+    public async Task A_trigger_watch_becoming_live_publishes_a_visible_monitoring_diagnostic()
+    {
+        var log = new FakeTechnicalLog();
+        var triggerProvider = new FakeTriggerProvider(new());
+        var coordinator = CreateCoordinator(
+            triggerProvider, new FakeSelectorResolver(new()), new FakeCaptureProvider(new()), new FakeEventOutbox(), log);
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        var started = diagnostics.Where(d => d.Code == RuntimeDiagnosticCode.TriggerWatchStarted).ToArray();
+        Assert.Equal([AddTriggerId, FinishTriggerId], started.Select(d => d.TriggerId).Order());
+        Assert.All(started, d =>
+        {
+            Assert.Equal(RuntimeDiagnosticSeverity.Info, d.Severity);
+            Assert.Equal(SessionId, d.SessionId);
+        });
+        Assert.Contains(log.Entries, entry => entry.Code == nameof(RuntimeDiagnosticCode.TriggerWatchStarted) && entry.TriggerId == AddTriggerId);
+    }
+
+    [Fact]
+    public async Task A_trigger_watch_that_fails_is_reported_once_retried_and_does_not_stop_the_other_triggers()
+    {
+        var outbox = new FakeEventOutbox();
+        var log = new FakeTechnicalLog();
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [NameFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+            [NoteFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [NameFieldId] = Captured("Dipirona", NameFieldId),
+            [NoteFieldId] = Captured("Take with food", NoteFieldId),
+        });
+        var triggerProvider = new FakeTriggerProvider(
+            new() { [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)] },
+            failingTriggerId: FinishTriggerId);
+        var coordinator = CreateCoordinator(triggerProvider, resolver, captureProvider, outbox, log);
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        using var cts = new CancellationTokenSource();
+        var run = coordinator.RunAsync(cts.Token);
+        await WaitUntilAsync(() => triggerProvider.FailedAttempts >= 3);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        // Retried while failing, but the operator sees one error per failure streak.
+        var failed = Assert.Single(diagnostics, d => d.Code == RuntimeDiagnosticCode.TriggerWatchFailed);
+        Assert.Equal(RuntimeDiagnosticSeverity.Error, failed.Severity);
+        Assert.Equal(FinishTriggerId, failed.TriggerId);
+        Assert.Single(outbox.Appended); // the Add trigger still worked
+        Assert.Single(log.Entries, entry =>
+            entry.Code == nameof(RuntimeDiagnosticCode.TriggerWatchFailed) &&
+            entry.Level == TechnicalLogLevel.Error &&
+            entry.TriggerId == FinishTriggerId);
+    }
+
+    [Fact]
+    public async Task A_trigger_watch_that_recovers_reports_monitoring_again_and_handles_occurrences()
+    {
+        var outbox = new FakeEventOutbox();
+        var log = new FakeTechnicalLog();
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [NameFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+            [NoteFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [NameFieldId] = Captured("Dipirona", NameFieldId),
+            [NoteFieldId] = Captured("Take with food", NoteFieldId),
+        });
+        var triggerProvider = new FakeTriggerProvider(
+            new() { [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)] },
+            failingTriggerId: AddTriggerId,
+            failuresBeforeSuccess: 2);
+        var coordinator = CreateCoordinator(triggerProvider, resolver, captureProvider, outbox, log);
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        var addDiagnostics = diagnostics.Where(d => d.TriggerId == AddTriggerId).Select(d => d.Code).ToArray();
+        Assert.Equal(
+            [RuntimeDiagnosticCode.TriggerWatchFailed, RuntimeDiagnosticCode.TriggerWatchStarted, RuntimeDiagnosticCode.EventPersisted],
+            addDiagnostics);
+        Assert.Single(outbox.Appended);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(condition(), "Timed out waiting for the expected condition.");
+    }
+
     private static SessionCoordinator CreateCoordinator(
         FakeTriggerProvider triggerProvider,
         FakeSelectorResolver resolver,
@@ -261,7 +365,8 @@ public sealed class SessionCoordinatorTests
             outbox,
             log,
             eventIdFactory: () => eventIds.Dequeue(),
-            clock: () => Now);
+            clock: () => Now,
+            triggerRetryDelay: TimeSpan.FromMilliseconds(10));
     }
 
     private static IntegrationConfiguration BuildConfiguration(bool requireName, bool requireNote) => new(
@@ -297,12 +402,29 @@ public sealed class SessionCoordinatorTests
     private static CaptureResult Captured(string value, string fieldId) =>
         new(CaptureOutcome.Captured, value, CaptureResult.UiaProviderId, 0.97, TimeSpan.FromMilliseconds(5), [new PatternAttempt("Value", true)]);
 
-    private sealed class FakeTriggerProvider(Dictionary<string, TriggerSignal[]> signalsByTrigger) : ITriggerProvider
+    private sealed class FakeTriggerProvider(
+        Dictionary<string, TriggerSignal[]> signalsByTrigger,
+        string? failingTriggerId = null,
+        int failuresBeforeSuccess = int.MaxValue) : ITriggerProvider
     {
+        private int _failedAttempts;
+
+        public event EventHandler<string>? WatchEstablished;
+
+        public int FailedAttempts => Volatile.Read(ref _failedAttempts);
+
         public async IAsyncEnumerable<TriggerSignal> WatchAsync(
             TriggerDefinition trigger,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
+            await Task.Yield();
+            if (trigger.Id == failingTriggerId && FailedAttempts < failuresBeforeSuccess)
+            {
+                Interlocked.Increment(ref _failedAttempts);
+                throw new InvalidOperationException("The trigger's element could not be resolved.");
+            }
+
+            WatchEstablished?.Invoke(this, trigger.Id);
             if (signalsByTrigger.TryGetValue(trigger.Id, out var signals))
             {
                 foreach (var signal in signals)

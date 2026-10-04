@@ -1,0 +1,10 @@
+# Security and privacy
+
+- **Explicit and visible.** Only elements the operator selected and confirmed are captured, only when a configured trigger fires, and only while a tested configuration is visibly active ("Monitorando gatilho ..." in the Desktop). No keylogger, clipboard reader, hidden monitoring or screen capture exists.
+- **Configuration** JSON contains selectors, stages and actions — never captured values.
+- **Business data at rest.** Event payloads are encrypted with Windows DPAPI (`DataProtectionScope.CurrentUser`) before they reach SQLite; only metadata (IDs, sequence, timestamp, type, configuration version, status) is plaintext. The end-to-end tests assert the captured values never appear in the database file bytes (UTF-8 and UTF-16).
+- **Technical logs** (`StructuredTechnicalLog`, JSON lines) record IDs, codes, provider, confidence and timings. No log call site passes a captured value; trigger-watch failures log only the exception type. End-to-end tests assert captured values are absent from the log.
+- **Test mode** values stay in memory (`TestModeViewModel.Report`); nothing persists them.
+- **Display.** The Desktop monitor shows decrypted event values on screen for the operator; they are not written anywhere else.
+- **Retention.** Confirmed events: 7 days. Pending events: kept until confirmed, with capacity alerts. An explicit "clear local data" command is not implemented yet (roadmap).
+- **DPAPI scope** ties data to the Windows user running the Agent; moving to a Windows service requires a migration strategy (spec §15).

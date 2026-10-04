@@ -15,6 +15,10 @@ namespace Prescriva.Agent.Desktop.Testing;
 /// <param name="StatusText">A short Portuguese status label ("Encontrado", "Não encontrado", "Ambíguo").</param>
 /// <param name="ProviderText">The serving provider ID, or "-" when the field did not resolve.</param>
 /// <param name="ConfidenceText">The confidence as a percentage, or "-" when the field did not resolve.</param>
+/// <param name="ValueText">
+/// The value read from the live field during this run (in memory only, never logged or
+/// persisted), or "-" when the field did not resolve or produced no value.
+/// </param>
 /// <param name="FailureMessage">
 /// Actionable Portuguese text for the operator when the field failed, or null when it
 /// passed. Built purely from <see cref="FieldCheckResult.FailureCode"/> - never from any
@@ -26,7 +30,8 @@ public sealed record FieldResultDisplay(
     string StatusText,
     string ProviderText,
     string ConfidenceText,
-    string? FailureMessage);
+    string? FailureMessage,
+    string ValueText = "-");
 
 /// <summary>Everything the view needs to render one trigger's test result - already in display-ready form.</summary>
 public sealed record TriggerResultDisplay(
@@ -56,7 +61,7 @@ public sealed record TriggerResultDisplay(
 public sealed class TestModeViewModel : INotifyPropertyChanged
 {
     private readonly IntegrationTestRunner _runner;
-    private readonly Dispatcher _dispatcher;
+    private readonly Dispatcher? _dispatcher;
     private readonly Func<DateTimeOffset> _clock;
 
     private IntegrationTestReport? _report;
@@ -69,7 +74,7 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
         ArgumentNullException.ThrowIfNull(runner);
 
         _runner = runner;
-        _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
+        _dispatcher = dispatcher;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
     }
 
@@ -191,7 +196,8 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
             statusText,
             passed ? result.ProviderId ?? "-" : "-",
             passed ? $"{result.Confidence:P0}" : "-",
-            passed ? null : DescribeFieldFailure(result.FailureCode));
+            passed ? null : DescribeFieldFailure(result.FailureCode),
+            passed && !string.IsNullOrEmpty(result.Value) ? result.Value : "-");
     }
 
     private static TriggerResultDisplay ToDisplay(TriggerCheckResult result)
@@ -239,9 +245,15 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
         });
     }
 
+    /// <summary>
+    /// Marshals a state update onto the UI dispatcher a WPF host supplied. Without one
+    /// (headless use, e.g. tests) updates are applied inline: defaulting to the
+    /// constructing thread's dispatcher would deadlock whenever that thread is not pumping
+    /// messages while an awaited runner continuation calls <see cref="Dispatcher.Invoke(Action)"/>.
+    /// </summary>
     private void RunOnDispatcher(Action action)
     {
-        if (_dispatcher.CheckAccess())
+        if (_dispatcher is null || _dispatcher.CheckAccess())
         {
             action();
         }

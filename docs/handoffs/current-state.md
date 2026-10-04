@@ -1,5 +1,61 @@
 # Current state
 
+## Status — 2026-10-04
+
+**Milestone 1 is functionally complete and verified by automated tests on Windows; a person-driven visual walkthrough on a Windows 10/11 desktop is the only open acceptance item.**
+
+- Active plan: `docs/superpowers/plans/2026-09-27-trigger-runtime-events-and-test-mode.md` (plan 3 of 3). Tasks 1–5 implemented. Task 5 Step 3 (manual acceptance by a person) is partially open — see below.
+- Branch: `claude/implementacao-progresso-testes-dgszzj`.
+- Test evidence: GitHub Actions runs 37168362725 (push) and 37168362358/37168363903/37168365381/37168366872/37168368026 (repeat dispatches) on commit `f347080` (`windows-latest` = Windows Server 2025, x64), Release, warnings as errors: **210 tests, 210 passed, 6 of 6 runs green** — Domain 58, Infrastructure 29, Application 73, Windows 15, Windows integration 35 (real TestTarget/Desktop processes, real UI Automation, real cursor, real SQLite + DPAPI). This also executes, for the first time, the tests earlier sessions could only approve by reading (`MultipleInstanceTests`, the PID-scoped `SelectorResolutionTests`, `OverlayExclusionTests`) — all pass.
+
+### What works (and the test proving it)
+
+| Milestone criterion (spec §14) | Evidence |
+| --- | --- |
+| 1. Start the Agent and detect the TestTarget | `DesktopWalkthroughTests`, `ProcessIdentityDiscoveryTests`, `MultipleInstanceTests` |
+| 2. Select fields and buttons visually | `DesktopWalkthroughTests` (real OS cursor over TestTarget, Agent shows and confirms the element), `ElementInspectionTests` |
+| 3. Assign meanings, stages and actions | `DesktopWalkthroughTests` (capture + emit for Add, finish for Finish), `TriggerActionsBuilderTests` |
+| 4. Save and reload | `DesktopWalkthroughTests`, `MilestoneFlowTests`, `JsonConfigurationStoreTests` |
+| 5. Re-find elements with diagnostics | `SelectorResolutionTests` (incl. moved layout, ambiguity), test mode in `DesktopWalkthroughTests` |
+| 6–8. Detect Add, capture fields, persist `item_added`; detect Finish, emit `budget_finished` | `MilestoneFlowTests`, `DesktopWalkthroughTests`, `SessionCoordinatorTests` |
+| 9. Show values, events, confidence and failures in test mode | `TestModeViewModelTests` (value, provider, confidence, Portuguese failures), `RuntimeMonitorViewModelTests` (monitoring, events with values, rejected-field errors), `DesktopWalkthroughTests` |
+| Only tested configurations activate; edits invalidate approval | `MilestoneFlowTests`, `AgentRuntimeTests`, `DesktopWalkthroughTests` |
+| Encrypted at rest, no values in logs, ordered after restart | `MilestoneFlowTests`, `DesktopWalkthroughTests`, `SqliteEventOutboxTests` |
+
+### This session's changes (Task 5)
+
+- **CI**: `.github/workflows/ci.yml` builds and runs every suite on `windows-latest` (the development machine's Smart App Control blocks had left several suites unexecuted).
+- **Fix — test hang**: `TestModeViewModel` deadlocked under xUnit (defaulted to the constructing thread's dispatcher and `Invoke`d from a pool thread). Without an explicit dispatcher it now updates inline.
+- **Fix — process identity**: `Prescriva.Agent.TestTarget.exe` (the configurator's suggested value) never matched a running process; `ProcessIdentity` normalizes `.exe` for discovery and window location.
+- **Fix — button selection**: pointing at a button selected its anonymous caption `Text` element (found by the cursor-driven walkthrough). The inspector promotes an anonymous caption to its interactive container.
+- **Fix — stale monitor list**: two diagnostics raised in the same millisecond could be displayed out of order, leaving only one trigger shown as monitored (walkthrough failed 3 of 5 CI runs; the attached technical log proved both watches were live). The monitor now reads its lists under the lock and ignores out-of-date outbox reads; 6 of 6 runs green afterwards. The concurrency unit test added for it passes on old and new code alike (the race needs WPF dispatcher reordering), so the repeated walkthrough is the evidence.
+- **Runtime**: `TriggerWatchStarted` (visible monitoring state) and `TriggerWatchFailed` (typed error, once per streak, with automatic retry every 2 s) diagnostics; `ITriggerProvider.WatchEstablished`. `UiAutomationRuntimeFactories` composes PID-scoped UIA providers.
+- **Desktop**: trigger actions (capture, emit, clear, transition, finish/cancel) via `TriggerActionsBuilder`; configuration summary; test mode hosted (`Prepare Test`), shows values read; Activate/Stop through `RuntimeMonitorViewModel` with Portuguese diagnostics and persisted events; data in `%LOCALAPPDATA%\Prescriva\Agent` (`PRESCRIVA_AGENT_DATA` override); retention applied at start-up.
+- **Docs**: `docs/architecture/*`, `docs/roadmap.md`, `docs/testing/milestone-1-manual.md`, README, setup, testing.
+
+### Not verified / known issues
+
+- **Person-driven walkthrough on Windows 10/11**: not performed. Open rows in `docs/testing/milestone-1-manual.md`: overlay outline drawn on the right control, reload after restarting the Agent, rejected-field message / moved layout / ambiguity seen through the Desktop UI. CI ran on Windows Server 2025, not a Windows 10/11 client.
+- Approvals live in memory: after restarting the Agent the configuration must be tested again before activation.
+- When the monitored application closes, the trigger liveness check can report one `TriggerWatchFailed` error before the session is closed (≤ instance poll interval, 500 ms). Cosmetic but red.
+- No explicit "clear local data" command and no visible capacity alert in the Desktop yet (Infrastructure `OutboxCapacityPolicy` exists).
+- The configurator cannot remove/edit fields or triggers; fields are added to the stage in the Stage box.
+- The plan's x86 verification remains open (no x86 sample exists).
+- Older limitations below remain unless marked resolved.
+
+### Important files
+
+`src/Prescriva.Agent.Desktop/MainWindow.xaml(.cs)` (composition root), `src/Prescriva.Agent.Desktop/Monitoring/RuntimeMonitorViewModel.cs`, `src/Prescriva.Agent.Desktop/Configuration/TriggerActionsBuilder.cs`, `src/Prescriva.Agent.Application/Runtime/SessionCoordinator.cs`, `src/Prescriva.Agent.Windows/Runtime/UiAutomationRuntimeFactories.cs`, `src/Prescriva.Agent.Windows/Processes/ProcessIdentity.cs`, `tests/Prescriva.Agent.Windows.IntegrationTests/EndToEnd/*`.
+
+### Exact next action
+
+1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop and records the result in its table; fix anything it finds (with a test first).
+2. Then use the branch-finishing workflow to integrate the branch, and pick the next plan from `docs/roadmap.md` (operator data controls are the first candidate).
+
+---
+
+# History
+
 Foundation plan: `docs/superpowers/plans/2026-09-27-foundation-domain-and-configuration.md`.
 
 Foundation Tasks 1–4 are implemented:
@@ -78,7 +134,7 @@ Tasks 1–3 of 5 are complete (each task-reviewed, each with a fix round applied
 
 **Environment note — Smart App Control, worsening:** during Tasks 2/3 and the prerequisite fix, the Smart App Control block (see the Windows Inspector plan's note above and `docs/testing.md`) was reproduced on assemblies with zero UI Automation involvement (`Prescriva.Agent.Domain.dll`, `Prescriva.Agent.Application.dll`) immediately after a one-line edit — it is keyed on "any freshly-modified binary's reputation/hash," not on what the assembly does. During the prerequisite fix, the block became persistent across a full session (did not clear on retry, on a `dotnet build-server shutdown` + clean rebuild, or over several minutes — worse than every prior occurrence, which had cleared within one or two retries). Two pieces of work in this plan (`MultipleInstanceTests`, the prerequisite fix's new `SelectorResolutionTests` cases) are approved on read-by-hand review only and still owe a real execution run once this clears or on a different machine.
 
-Next: Task 4 (test mode and activation gate — `IntegrationTestRunner`, `ConfigurationApproval`, `ConfigurationFingerprint`, `TestModeView`), then Task 5 (end-to-end milestone verification and handoff, the plan's own closing task), and the still-open manual click-through / x86 verification noted above (the Windows Inspector plan's debt) plus a real execution run of everything currently approved by reading alone (above).
+(Superseded — see Status at the top.) Next was: Task 4 (test mode and activation gate — `IntegrationTestRunner`, `ConfigurationApproval`, `ConfigurationFingerprint`, `TestModeView`), then Task 5 (end-to-end milestone verification and handoff, the plan's own closing task), and the still-open manual click-through / x86 verification noted above (the Windows Inspector plan's debt) plus a real execution run of everything currently approved by reading alone (above).
 
 Limitations (Windows Inspector plan, still open):
 - The "element destroyed during capture" test scenario (Task 3) kills the whole TestTarget process rather than removing a single element from a still-running app/window — a real WPF/UIA limitation (`AutomationPeer.InvalidatePeer()` doesn't reliably produce `ElementNotAvailableException` since the CLR peer object stays alive) made the narrower scenario impractical to construct; accepted as a documented trade-off, not fixed.
@@ -87,15 +143,15 @@ Limitations (Windows Inspector plan, still open):
 - `FindApplicationWindow`/`AutomationWindowLocator.Find` enumerate every top-level desktop window and call `Process.GetProcessById` per window — O(all top-level windows) per call, unoptimized but not a correctness issue at current scale.
 - `InspectionController.ObservePointerAsync` has no guard against being called after `StopAsync` (no check on the current status) — a stray call after stop could silently resume producing `Active` states; not covered by required scenarios, likely a non-issue given intended caller usage from a ViewModel.
 - `HighlightOverlayWindow` uses `GetWindowLong`/`SetWindowLong` (32-bit, not the `Ptr` variants) for `GWL_EXSTYLE` — correct since the style is always a 32-bit bitmask on both x86/x64, but worth a comment if touched again, since it's a common source of P/Invoke review confusion.
-- The 2 `OverlayExclusionTests` could not be re-verified after Task 4's fix round due to the Smart App Control issue above (the fix round's only change to that file was a comment; no production-code reason to suspect a regression, but this is inference, not a fresh green run) — worth an explicit re-run once the environment issue is resolved or on a different machine.
+- (Resolved 2026-10-04: both pass on Windows CI.) The 2 `OverlayExclusionTests` could not be re-verified after Task 4's fix round due to the Smart App Control issue above (the fix round's only change to that file was a comment; no production-code reason to suspect a regression, but this is inference, not a fresh green run) — worth an explicit re-run once the environment issue is resolved or on a different machine.
 - (Task 5) `IntegrationEditorViewModel`'s `_resolvedHandles` cache is never invalidated by `ReloadAsync`/`AddField`/`SaveAsync` beyond an explicit `_resolvedHandles.Clear()` in `CreateIntegration`/`ReloadAsync` — if a field is ever removed or re-added with the same semantic ID after a resolve (no "remove field" API exists yet, so not currently reachable), a stale handle could linger. Not a defect against any current capability, but worth a guard if field removal is ever added.
 - (Task 5) `MainWindow`'s pointer-inspection loop polls `GetCursorPos` on a fixed 80ms `DispatcherTimer` rather than reacting to real mouse-move events (e.g. a low-level mouse hook) — simple and sufficient for a minimal vertical slice, but coarser and slightly laggier than a true event-driven approach; acceptable trade-off for scope, not revisited.
 - (Task 5) `Prescriva.Agent.Application`'s `InternalsVisibleTo` was widened to include `Prescriva.Agent.Application.Tests` (previously only `Prescriva.Agent.Windows`) so `ResolvedElementHandle` could be subclassed by a test-only fake for `IntegrationEditorViewModelTests`' resolve/read-value tests. The type remains unconstructable from any other assembly, including `Prescriva.Agent.Desktop` and any other test project — but this is a real (if narrow) widening of the opacity boundary Task 3 established, worth being aware of if that boundary matters again in a future review.
 - (Task 5) Manual, human-in-the-loop verification of `Prescriva.Agent.Desktop.exe`'s own compiled WPF UI (clicking its buttons, watching the highlight overlay track the mouse) was not performed in this session (no mouse/keyboard interaction available) — see `docs/testing/windows-inspector-manual.md` for exactly what was and was not verified, and the real automated test that covers the underlying pipeline instead. No x86 sample application exists in this repository, so the brief's x86 repeat-verification step is an open gap, not performed.
 - (Final-review fix wave) Controls without a stable `AutomationId` currently cannot be resolved at all: `ElementFingerprint` carries no ancestors/labels/relative-position signals (per spec §6), so any control lacking a stable `AutomationId` scores below the ambiguity threshold and `SelectorMatcher`/`UiAutomationSelectorResolver` always report it `NotFound`, regardless of how uniquely a human could otherwise identify it on screen. Deferred to the next plan.
-- (Final-review fix wave) `ApplicationDefinition.ProcessIdentity` (as typed into `MainWindow`'s "Target process" box, e.g. `Prescriva.Agent.TestTarget.exe`) is never cross-validated against what `AutomationWindowLocator` actually compares — a bare `Process.ProcessName` (no `.exe` suffix). Nothing currently catches a configuration whose `ProcessIdentity` has (or is missing) the `.exe` suffix mismatching the locator's comparison; it would simply never resolve, with no diagnostic pointing at the mismatch specifically. Deferred to the next plan.
+- (Resolved 2026-10-04 by `ProcessIdentity`.) (Final-review fix wave) `ApplicationDefinition.ProcessIdentity` (as typed into `MainWindow`'s "Target process" box, e.g. `Prescriva.Agent.TestTarget.exe`) is never cross-validated against what `AutomationWindowLocator` actually compares — a bare `Process.ProcessName` (no `.exe` suffix). Nothing currently catches a configuration whose `ProcessIdentity` has (or is missing) the `.exe` suffix mismatching the locator's comparison; it would simply never resolve, with no diagnostic pointing at the mismatch specifically. Deferred to the next plan.
 - (Final-review fix wave) The single dispatcher STA thread (`AutomationDispatcher`) has no recovery path if a queued COM call wedges — e.g. inspecting a hung x86 process via UIA can block the STA thread indefinitely. Every later operation queued to it would then time out (per-call timeout still applies) but the thread itself never recovers, so every subsequent call times out too, forever, until the process is restarted. `AutomationDispatcher.Dispose()` also has a latent unhandled-exception path: it `Join`s the thread with a 5s timeout, and if the thread is still stuck when the queue is disposed after that `Join` returns, disposing the queue while the stuck thread may still reference it is not guaranteed safe. Neither issue is covered by any current test (both require a genuinely wedged COM call to reproduce). Deferred to the next plan.
-- **No human has yet manually clicked through the real `Prescriva.Agent.Desktop.exe` UI end-to-end.** The final-review fix wave (trigger UI, Confirm-with-a-real-mouse, DPI-aware overlay) addresses defects found by code review and fake/real-UIA-backed automated tests against that path, but an actual manual walkthrough by a person with a mouse — launching `Prescriva.Agent.Desktop.exe`, creating an integration, adding a stage, inspecting a real target, confirming a selection, adding a field and a trigger, saving, reloading, resolving and reading a value, all by hand — is still needed before this plan can be considered fully verified. Called out explicitly for whoever picks this up next.
+- (Partly resolved 2026-10-04: `DesktopWalkthroughTests` now drives the compiled Desktop UI with the real cursor on CI; only the visual checks remain for a person.) **No human has yet manually clicked through the real `Prescriva.Agent.Desktop.exe` UI end-to-end.** The final-review fix wave (trigger UI, Confirm-with-a-real-mouse, DPI-aware overlay) addresses defects found by code review and fake/real-UIA-backed automated tests against that path, but an actual manual walkthrough by a person with a mouse — launching `Prescriva.Agent.Desktop.exe`, creating an integration, adding a stage, inspecting a real target, confirming a selection, adding a field and a trigger, saving, reloading, resolving and reading a value, all by hand — is still needed before this plan can be considered fully verified. Called out explicitly for whoever picks this up next.
 
 Limitations (foundation plan, still open — carried forward, see the original list below for full detail): `DomainEvent.ConfigurationVersion` conflates schema version with content revision; `SessionEngine`'s field-lookup relies on an upstream validator invariant; `SessionFailure.CaptureFailure` naming clash with its enum; untyped `FileNotFoundException` on missing-file load; case-sensitive ID uniqueness in `ConfigurationValidator`; `SelectorWeights` not persisted alongside saved configurations.
 

@@ -55,17 +55,17 @@ public partial class TestModeView : UserControl
             return;
         }
 
-        StatusText.Text = "Executando teste...";
+        TestStatusText.Text = "Executando teste...";
         try
         {
             await _viewModel.RunAsync(_configuration);
-            StatusText.Text = _viewModel.CanApprove
+            TestStatusText.Text = _viewModel.CanApprove
                 ? "Teste concluído: todos os campos e gatilhos passaram."
                 : "Teste concluído: um ou mais campos ou gatilhos falharam. Veja os detalhes acima.";
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Falha ao executar o teste: {ex.Message}";
+            TestStatusText.Text = $"Falha ao executar o teste: {ex.Message}";
         }
     }
 
@@ -79,11 +79,11 @@ public partial class TestModeView : UserControl
         try
         {
             _viewModel.Approve();
-            StatusText.Text = "Configuração aprovada. Ela pode ser ativada agora.";
+            TestStatusText.Text = "Configuração aprovada. Ela pode ser ativada agora.";
         }
         catch (InvalidOperationException ex)
         {
-            StatusText.Text = $"Não foi possível aprovar: {ex.Message}";
+            TestStatusText.Text = $"Não foi possível aprovar: {ex.Message}";
         }
     }
 

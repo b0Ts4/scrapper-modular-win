@@ -97,7 +97,7 @@ internal sealed class TestTargetLauncher : IDisposable
         }
     }
 
-    private static string ResolveExecutablePath()
+    internal static string ResolveExecutablePath()
     {
         var repoRoot = FindRepositoryRoot(AppContext.BaseDirectory);
         var configuration = FindConfigurationSegment(AppContext.BaseDirectory);

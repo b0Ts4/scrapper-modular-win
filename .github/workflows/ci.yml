@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: SDK version
+        run: dotnet --version
+
+      - name: Restore
+        run: dotnet restore Prescriva.Agent.slnx
+
+      - name: Build (Release, warnings as errors)
+        run: dotnet build Prescriva.Agent.slnx --configuration Release --no-restore
+
+      - name: Unit tests
+        run: >
+          dotnet test Prescriva.Agent.slnx --configuration Release --no-build
+          --filter "FullyQualifiedName!~Prescriva.Agent.Windows.IntegrationTests"
+          --blame-hang-timeout 5m --logger "trx;LogFilePrefix=unit" --logger "console;verbosity=normal"
+          --results-directory TestResults
+
+      - name: Windows UI Automation integration tests
+        if: always()
+        run: >
+          dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build
+          --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults

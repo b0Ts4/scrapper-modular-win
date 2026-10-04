@@ -65,6 +65,9 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
         _resolver = new UiAutomationSelectorResolver(dispatcher, processId: processId);
     }
 
+    /// <inheritdoc />
+    public event EventHandler<string>? WatchEstablished;
+
     public async IAsyncEnumerable<TriggerSignal> WatchAsync(
         TriggerDefinition trigger,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -128,6 +131,8 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
             // failure AutomationDispatcher.RunAsync uses internally.
             throw new OperationCanceledException(failure.Message, failure, cancellationToken);
         }
+
+        WatchEstablished?.Invoke(this, trigger.Id);
 
         using var livenessCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var livenessTask = MonitorLivenessAsync(element, channel, livenessCts.Token);
