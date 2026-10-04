@@ -29,14 +29,14 @@ jobs:
         run: >
           dotnet test Prescriva.Agent.slnx --configuration Release --no-build
           --filter "FullyQualifiedName!~Prescriva.Agent.Windows.IntegrationTests"
-          --logger "trx;LogFilePrefix=unit" --logger "console;verbosity=normal"
+          --blame-hang-timeout 5m --logger "trx;LogFilePrefix=unit" --logger "console;verbosity=normal"
           --results-directory TestResults
 
       - name: Windows UI Automation integration tests
         if: always()
         run: >
           dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build
-          --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
+          --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
           --results-directory TestResults
 
       - name: Upload test results

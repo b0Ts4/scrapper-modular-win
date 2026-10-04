@@ -56,7 +56,7 @@ public sealed record TriggerResultDisplay(
 public sealed class TestModeViewModel : INotifyPropertyChanged
 {
     private readonly IntegrationTestRunner _runner;
-    private readonly Dispatcher _dispatcher;
+    private readonly Dispatcher? _dispatcher;
     private readonly Func<DateTimeOffset> _clock;
 
     private IntegrationTestReport? _report;
@@ -69,7 +69,7 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
         ArgumentNullException.ThrowIfNull(runner);
 
         _runner = runner;
-        _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
+        _dispatcher = dispatcher;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
     }
 
@@ -239,9 +239,15 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
         });
     }
 
+    /// <summary>
+    /// Marshals a state update onto the UI dispatcher a WPF host supplied. Without one
+    /// (headless use, e.g. tests) updates are applied inline: defaulting to the
+    /// constructing thread's dispatcher would deadlock whenever that thread is not pumping
+    /// messages while an awaited runner continuation calls <see cref="Dispatcher.Invoke(Action)"/>.
+    /// </summary>
     private void RunOnDispatcher(Action action)
     {
-        if (_dispatcher.CheckAccess())
+        if (_dispatcher is null || _dispatcher.CheckAccess())
         {
             action();
         }
