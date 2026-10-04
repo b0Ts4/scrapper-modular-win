@@ -224,7 +224,7 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         RuntimeDiagnosticCode.TriggerWatchStarted =>
             $"Monitorando gatilho '{diagnostic.TriggerId}'.",
         RuntimeDiagnosticCode.TriggerWatchFailed =>
-            $"O gatilho '{diagnostic.TriggerId}' não pode ser monitorado: o elemento não foi encontrado ou deixou de existir. Verifique a tela da aplicação, teste e aprove a configuração novamente.",
+            $"O gatilho '{diagnostic.TriggerId}' não está sendo monitorado: o elemento não foi encontrado ou deixou de existir. Nova tentativa automática em andamento; se persistir, verifique a tela da aplicação e teste a configuração novamente.",
         RuntimeDiagnosticCode.EventPersisted =>
             $"Evento '{diagnostic.EventType}' gravado na fila local (gatilho '{diagnostic.TriggerId}').",
         RuntimeDiagnosticCode.SessionRejected =>

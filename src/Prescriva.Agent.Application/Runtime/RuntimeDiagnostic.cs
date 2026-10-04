@@ -36,8 +36,10 @@ public enum RuntimeDiagnosticCode
 
     /// <summary>
     /// A configured trigger could not be watched (e.g. its element could not be resolved,
-    /// or disappeared mid-watch). Occurrences of that trigger are no longer observed; the
-    /// session's other triggers keep running.
+    /// or disappeared mid-watch). Reported once per failure streak; the watch is retried
+    /// until it recovers (announced by a new <see cref="TriggerWatchStarted"/>) or the
+    /// session ends. Occurrences while it is failing are not observed; the session's other
+    /// triggers keep running.
     /// </summary>
     TriggerWatchFailed
 }

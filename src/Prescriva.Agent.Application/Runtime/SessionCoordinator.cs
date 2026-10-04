@@ -39,6 +39,8 @@ public sealed class SessionCoordinator
     private readonly Func<Guid> _eventIdFactory;
     private readonly Func<DateTimeOffset> _clock;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly TimeSpan _triggerRetryDelay;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _failingTriggers = new(StringComparer.Ordinal);
 
     private CaptureSession _session;
 
@@ -52,7 +54,8 @@ public sealed class SessionCoordinator
         IEventOutbox outbox,
         ITechnicalLog log,
         Func<Guid>? eventIdFactory = null,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        TimeSpan? triggerRetryDelay = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(initialStageId);
@@ -72,6 +75,7 @@ public sealed class SessionCoordinator
         _log = log;
         _eventIdFactory = eventIdFactory ?? Guid.NewGuid;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _triggerRetryDelay = triggerRetryDelay ?? DefaultTriggerRetryDelay;
         _triggerProvider.WatchEstablished += OnWatchEstablished;
     }
 
@@ -143,58 +147,80 @@ public sealed class SessionCoordinator
         }
     }
 
+    /// <summary>How long to wait before re-establishing a trigger watch that failed.</summary>
+    private static readonly TimeSpan DefaultTriggerRetryDelay = TimeSpan.FromSeconds(2);
+
     /// <summary>
     /// Watches one trigger until cancelled. A watch that fails for any other reason (its
-    /// element cannot be resolved, or disappears mid-watch) is reported as a typed
-    /// <see cref="RuntimeDiagnosticCode.TriggerWatchFailed"/> error rather than faulting
-    /// <see cref="RunAsync"/>: the failure stays visible, and the session's other
-    /// triggers keep being observed.
+    /// element cannot be resolved yet, or disappears - e.g. the button belongs to a screen
+    /// the application is not showing right now) never faults <see cref="RunAsync"/>: the
+    /// first failure of a streak is reported as a typed
+    /// <see cref="RuntimeDiagnosticCode.TriggerWatchFailed"/> error, the watch is retried
+    /// every <see cref="_triggerRetryDelay"/> until cancelled, and a recovered watch is
+    /// announced again through <see cref="RuntimeDiagnosticCode.TriggerWatchStarted"/>.
+    /// The session's other triggers keep being observed throughout.
     /// </summary>
     private async Task WatchTriggerAsync(TriggerDefinition trigger, CancellationToken cancellationToken)
     {
-        var deduplicator = new TriggerDeduplicator();
-        try
+        while (true)
         {
-            await foreach (var signal in _triggerProvider.WatchAsync(trigger, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+            var deduplicator = new TriggerDeduplicator();
+            try
             {
-                if (!deduplicator.Accept(signal))
+                await foreach (var signal in _triggerProvider.WatchAsync(trigger, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
-                    continue;
+                    if (!deduplicator.Accept(signal))
+                    {
+                        continue;
+                    }
+
+                    await HandleTriggerAsync(trigger, cancellationToken).ConfigureAwait(false);
                 }
 
-                await HandleTriggerAsync(trigger, cancellationToken).ConfigureAwait(false);
+                return;
             }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            var now = _clock();
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                if (_failingTriggers.TryAdd(trigger.Id, true))
+                {
+                    PublishTriggerWatchFailed(trigger, exception);
+                }
+            }
 
-            // Only the exception type is logged: provider messages are technical, but the
-            // log contract is IDs, codes and metadata only.
-            _log.Log(new TechnicalLogEntry(
-                TechnicalLogLevel.Error,
-                nameof(RuntimeDiagnosticCode.TriggerWatchFailed),
-                $"Trigger '{trigger.Id}' can no longer be watched ({exception.GetType().Name}).",
-                now,
-                SessionId: SessionId,
-                TriggerId: trigger.Id));
-
-            Publish(new RuntimeDiagnostic(
-                RuntimeDiagnosticCode.TriggerWatchFailed,
-                RuntimeDiagnosticSeverity.Error,
-                SessionId,
-                now,
-                TimeSpan.Zero,
-                TriggerId: trigger.Id));
+            await Task.Delay(_triggerRetryDelay, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private void PublishTriggerWatchFailed(TriggerDefinition trigger, Exception exception)
+    {
+        var now = _clock();
+
+        // Only the exception type is logged: provider messages are technical, but the
+        // log contract is IDs, codes and metadata only.
+        _log.Log(new TechnicalLogEntry(
+            TechnicalLogLevel.Error,
+            nameof(RuntimeDiagnosticCode.TriggerWatchFailed),
+            $"Trigger '{trigger.Id}' cannot be watched ({exception.GetType().Name}); retrying.",
+            now,
+            SessionId: SessionId,
+            TriggerId: trigger.Id));
+
+        Publish(new RuntimeDiagnostic(
+            RuntimeDiagnosticCode.TriggerWatchFailed,
+            RuntimeDiagnosticSeverity.Error,
+            SessionId,
+            now,
+            TimeSpan.Zero,
+            TriggerId: trigger.Id));
     }
 
     private void OnWatchEstablished(object? sender, string triggerId)
     {
+        _failingTriggers.TryRemove(triggerId, out _);
         var now = _clock();
         _log.Log(new TechnicalLogEntry(
             TechnicalLogLevel.Info,
