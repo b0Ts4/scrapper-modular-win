@@ -55,7 +55,7 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
                         throw new ElementInspectionFailure(ElementInspectionFailureKind.WindowMissing, "No element was found at the given point.");
                     }
 
-                    return CreateSnapshot(element);
+                    return CreateSnapshot(PromoteToInteractiveAncestor(element));
                 },
                 timeout,
                 cancellationToken)
@@ -123,6 +123,58 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
 
     private static OperationCanceledException ToOperationCanceledException(ElementInspectionFailure failure, CancellationToken cancellationToken) =>
         new(failure.Message, failure, cancellationToken);
+
+    private static readonly ControlType[] CaptionControlTypes = [ControlType.Text, ControlType.Image];
+
+    private static readonly ControlType[] InteractiveControlTypes =
+    [
+        ControlType.Button, ControlType.SplitButton, ControlType.CheckBox, ControlType.RadioButton,
+        ControlType.Hyperlink, ControlType.MenuItem, ControlType.TabItem, ControlType.ListItem,
+        ControlType.ComboBox, ControlType.TreeItem,
+    ];
+
+    private const int MaxCaptionDepth = 3;
+
+    /// <summary>
+    /// UI Automation hit-tests the innermost element, so pointing at a button's centre
+    /// returns its caption (an anonymous Text or Image with no AutomationId) rather than
+    /// the button. When the hit element is such an anonymous caption and an interactive
+    /// control contains it within a few levels, the operator means that control. A
+    /// stand-alone label, or any element with its own AutomationId, is returned as is.
+    /// </summary>
+    private static AutomationElement PromoteToInteractiveAncestor(AutomationElement element)
+    {
+        try
+        {
+            var current = element.Current;
+            if (!string.IsNullOrEmpty(current.AutomationId) || !CaptionControlTypes.Contains(current.ControlType))
+            {
+                return element;
+            }
+
+            var walker = TreeWalker.RawViewWalker;
+            var candidate = element;
+            for (var depth = 0; depth < MaxCaptionDepth; depth++)
+            {
+                candidate = walker.GetParent(candidate);
+                if (candidate is null || System.Windows.Automation.Automation.Compare(candidate, AutomationElement.RootElement))
+                {
+                    break;
+                }
+
+                if (InteractiveControlTypes.Contains(candidate.Current.ControlType))
+                {
+                    return candidate;
+                }
+            }
+        }
+        catch (ElementNotAvailableException)
+        {
+            // The element went away mid-walk; report what was hit.
+        }
+
+        return element;
+    }
 
     private static ElementSnapshot CreateSnapshot(AutomationElement element)
     {

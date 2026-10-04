@@ -49,6 +49,43 @@ public sealed class ElementInspectionTests
         Assert.Equal("MedicationTextBox", result.Snapshot?.AutomationId);
     }
 
+    [Theory]
+    [InlineData("AddButton")]
+    [InlineData("FinishButton")]
+    public async Task FromPointAsync_over_a_buttons_caption_reports_the_button_not_its_inner_text(string automationId)
+    {
+        using var target = TestTargetLauncher.Launch();
+        using var dispatcher = new AutomationDispatcher();
+        var inspector = new UiAutomationElementInspector(dispatcher);
+
+        var button = target.Window.FindFirst(
+            TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.AutomationIdProperty, automationId));
+        Assert.NotNull(button);
+
+        // The centre of a WPF button is covered by its caption TextBlock, which UI
+        // Automation hit-tests first. An operator pointing at the button means the button.
+        var rect = WaitForLaidOutBoundingRectangle(button!);
+        var point = new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+
+        InspectionResult result = null!;
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            button!.SetFocus();
+            result = await inspector.FromPointAsync(point, TimeSpan.FromSeconds(10), CancellationToken.None);
+            if (result.Snapshot?.ProcessId == target.Window.Current.ProcessId)
+            {
+                break;
+            }
+
+            await Task.Delay(200);
+        }
+
+        Assert.Equal(InspectionOutcome.Found, result.Outcome);
+        Assert.Equal(automationId, result.Snapshot?.AutomationId);
+        Assert.Equal("ControlType.Button", result.Snapshot?.ControlType);
+    }
+
     [Fact]
     public async Task FromPointAsync_returns_TimedOut_when_the_timeout_is_effectively_immediate()
     {

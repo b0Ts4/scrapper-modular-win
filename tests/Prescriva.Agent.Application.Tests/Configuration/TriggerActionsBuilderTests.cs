@@ -23,7 +23,7 @@ public sealed class TriggerActionsBuilderTests
 
         Assert.Collection(
             actions,
-            action => Assert.Equal(["medication", "concentration", "quantity"], Assert.IsType<CaptureFieldsAction>(action).FieldIds),
+            action => Assert.Equal(["medication", "concentration", "quantity"], Assert.IsType<CaptureFieldsAction>(action).FieldIds.ToArray()),
             action => Assert.Equal("item_added", Assert.IsType<EmitEventAction>(action).EventType));
     }
 
@@ -54,7 +54,7 @@ public sealed class TriggerActionsBuilderTests
     {
         var actions = TriggerActionsBuilder.Build("name,,name, ", "", "", clearState: false, TriggerTerminalAction.None);
 
-        Assert.Equal(["name"], Assert.IsType<CaptureFieldsAction>(Assert.Single(actions)).FieldIds);
+        Assert.Equal(["name"], Assert.IsType<CaptureFieldsAction>(Assert.Single(actions)).FieldIds.ToArray());
     }
 
     [Fact]
