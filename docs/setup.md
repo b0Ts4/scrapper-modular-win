@@ -18,4 +18,6 @@ dotnet build Prescriva.Agent.slnx --configuration Release
 dotnet test Prescriva.Agent.slnx --configuration Release --no-build
 ```
 
-The first restore downloads xUnit and the .NET test packages. The current solution has no executable Agent or TestTarget yet; those projects are scheduled in later plans. See [current-state](handoffs/current-state.md).
+The first restore downloads xUnit and the .NET test packages. The build produces two executables: `src/Prescriva.Agent.Desktop/bin/Release/net10.0-windows/Prescriva.Agent.Desktop.exe` (the Agent configurator and monitor) and `src/Prescriva.Agent.TestTarget/bin/Release/net10.0-windows/Prescriva.Agent.TestTarget.exe` (the simulated ERP). The Agent keeps configurations, the encrypted event queue and technical logs in `%LOCALAPPDATA%\Prescriva\Agent`; set the `PRESCRIVA_AGENT_DATA` environment variable to use another directory. See [current-state](handoffs/current-state.md).
+
+Building on Linux/macOS (Windows projects compile with `-p:EnableWindowsTargeting=true`) only checks compilation; the WPF, UI Automation and DPAPI tests require Windows.
