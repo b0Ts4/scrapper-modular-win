@@ -49,10 +49,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (string.Equals(variant, "duplicate-labels", StringComparison.OrdinalIgnoreCase))
+        {
+            // A second unnamed field labelled "Observações:" - the label no longer
+            // identifies one control, so a label-based selector must be ambiguous.
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
+            row.Children.Add(new TextBlock { Text = "Observações:", Width = 90, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(new TextBox { Width = 300 });
+            LabelledFieldsPanel.Children.Add(row);
+            return;
+        }
+
         if (!string.Equals(variant, "alternate", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
+
+        // The labelled, AutomationId-less fields swap places: same labels, new positions.
+        var first = LabelledFieldsPanel.Children[0];
+        LabelledFieldsPanel.Children.RemoveAt(0);
+        LabelledFieldsPanel.Children.Add(first);
 
         // Same controls, same automation IDs, different screen positions.
         Grid.SetRow(ButtonsPanel, 0);
