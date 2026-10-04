@@ -42,11 +42,20 @@
 - **x86**: CI publishes a self-contained `win-x86` TestTarget and re-runs 30 integration tests against it (bitness asserted) — all pass.
 - Evidence: run 37216735104 — Domain 58, Infrastructure 31, Application 76, Windows 15, integration 37 (217 total) + 30 on x86, all passing.
 
+### Plan 4 — Configuration lifecycle (2026-10-04)
+
+Plan: `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`. All 5 tasks implemented, each with its test first (RED observed on CI for Tasks 2, 3 and 4: runs on f22b877, e36812a, 6076fa6).
+
+- `IApprovalStore` / `JsonApprovalStore` (approvals persisted next to configurations; corrupt/foreign files never approve) and `ApprovalService` (`NotTested` / `Approved` / `ChangedSinceTest` for the current content hash).
+- `IntegrationEditorViewModel`: `RemoveField` (refused while captured, forgets the resolved handle — closes the plan-2 stale-handle limitation), `UpdateField`, `RemoveTrigger`, `ReplaceTriggerActions`, `RemoveStage` (refused while used), duplicate IDs refused on add.
+- Desktop: approval state line, Approve records through the service, Activate uses the stored approval for the current content, edit buttons with refusals shown.
+- Evidence: run 37221107495 (push) and 37221111403 (PR) on 18a463c — Domain 58, Infrastructure 43, Application 90, Windows 15, integration 38 (244) + 30 x86, all passing; `DesktopConfigurationLifecycleTests` passed first time.
+- Observed once (PR run 37220266848): the x86 pass hung 5 min in `ElementInspectionTests` (TimedOut or Cancelled test; TestTarget alive). Not reproduced in 6 following runs. xUnit long-running-test diagnostics are now on so a repeat names the test. Suspect an unbounded cross-process UIA call made directly on the test thread (those tests call `target.Window.Current` with no timeout); not yet root-caused.
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
-- Approvals live in memory: after restarting the Agent the configuration must be tested again before activation (by design for now; roadmap item 1).
-- The configurator cannot remove/edit fields or triggers; fields are added to the stage in the Stage box.
+- Edits are by typed ID (no list selection yet); a field's selector can only be replaced by removing and re-adding it.
 - Older limitations below remain unless marked resolved.
 
 ### Important files
@@ -56,7 +65,7 @@
 ### Exact next action
 
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
-2. Then use the branch-finishing workflow to integrate the branch, and pick the next plan from `docs/roadmap.md` (operator data controls are the first candidate).
+2. Review/merge PR #2 (it now contains milestone 1 and plan 4), then pick the next plan from `docs/roadmap.md` (selector resilience: ancestors/labels/relative position, `Degraded`/`Broken` states).
 
 ---
 

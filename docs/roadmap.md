@@ -6,9 +6,9 @@ Configure, test, activate and capture against `Prescriva.Agent.TestTarget` with 
 
 ## Next candidates
 
-1. **Persisted approvals:** today an approval lives in memory and the configuration must be re-tested after the Agent restarts. (Clear-local-data and the capacity alert shipped in milestone 1.)
+1. ~~Persisted approvals and configuration editing~~ — shipped in the configuration lifecycle plan (`docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`). Remaining configurator UX: list-based editing (select a row instead of typing IDs), editing a field's selector by re-inspection, stage reordering.
 2. **Selector resilience:** populate ancestors, nearby labels and relative position so controls without a stable `AutomationId` can be resolved; persist the `SelectorWeights` version with configurations; `Degraded`/`Broken` integration states with visible reasons.
-3. **Configurator UX:** remove/edit fields and triggers, per-field required/optional editing, stage list editing, tray icon.
+3. **Configurator UX:** list-based selection for edits, re-inspect to replace a selector, tray icon.
 4. **Dispatcher recovery:** recover the UIA STA thread after a wedged COM call (hung target process).
 5. **Providers:** MSAA/Win32 providers, then OCR for applications without usable UI Automation.
 6. **Transport:** deliver outbox events to the backend with idempotent confirmation (`MarkConfirmedAsync`), driving the 7-day retention of confirmed events.
