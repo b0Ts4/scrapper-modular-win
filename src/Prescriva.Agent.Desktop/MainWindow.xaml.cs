@@ -345,11 +345,12 @@ public partial class MainWindow : Window
     private void RefreshMonitor()
     {
         MonitorStatusText.Text = _monitorViewModel.StatusText;
-        DiagnosticsList.ItemsSource = _monitorViewModel.Diagnostics;
+        var diagnostics = _monitorViewModel.Diagnostics;
+        DiagnosticsList.ItemsSource = diagnostics;
         EventsList.ItemsSource = _monitorViewModel.Events;
-        if (_monitorViewModel.Diagnostics.Count > 0)
+        if (diagnostics.Count > 0)
         {
-            DiagnosticsList.ScrollIntoView(_monitorViewModel.Diagnostics[^1]);
+            DiagnosticsList.ScrollIntoView(diagnostics[^1]);
         }
 
         ActivateButton.IsEnabled = !_monitorViewModel.IsMonitoring;

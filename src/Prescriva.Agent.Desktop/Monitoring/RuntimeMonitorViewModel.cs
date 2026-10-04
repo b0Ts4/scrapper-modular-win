@@ -55,6 +55,10 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     private readonly object _gate = new();
     private readonly List<DiagnosticDisplay> _diagnostics = new();
 
+    private IReadOnlyList<EventDisplay> _events = Array.Empty<EventDisplay>();
+    private long _eventReadsStarted;
+    private long _newestAppliedEventRead;
+
     private CancellationTokenSource? _activationCts;
     private Task<ActivationResult>? _activation;
     private bool _isMonitoring;
@@ -77,11 +81,34 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
 
     public string StatusText => _statusText;
 
-    /// <summary>The most recent diagnostics, oldest first (bounded).</summary>
-    public IReadOnlyList<DiagnosticDisplay> Diagnostics { get; private set; } = Array.Empty<DiagnosticDisplay>();
+    /// <summary>
+    /// The most recent diagnostics, oldest first (bounded). Always read under the lock
+    /// from the single list every publisher appends to: diagnostics arrive concurrently
+    /// from different sessions/triggers, and a snapshot taken by one publisher must never
+    /// be able to overwrite a newer one taken by another.
+    /// </summary>
+    public IReadOnlyList<DiagnosticDisplay> Diagnostics
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _diagnostics.ToArray();
+            }
+        }
+    }
 
-    /// <summary>Every pending event in the outbox, in append order.</summary>
-    public IReadOnlyList<EventDisplay> Events { get; private set; } = Array.Empty<EventDisplay>();
+    /// <summary>Every pending event in the outbox, in append order (as of the newest completed read).</summary>
+    public IReadOnlyList<EventDisplay> Events
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _events;
+            }
+        }
+    }
 
     /// <summary>
     /// Activates <paramref name="configuration"/>. Returns <see cref="ActivationStatus.NotTested"/>
@@ -158,13 +185,23 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     /// <summary>Reloads <see cref="Events"/> from the outbox.</summary>
     public async Task RefreshEventsAsync(CancellationToken cancellationToken = default)
     {
+        // Reads overlap when events are persisted in quick succession; a read that
+        // started earlier must never replace the result of one that started later.
+        var read = Interlocked.Increment(ref _eventReadsStarted);
         var pending = await _outbox.ReadPendingAsync(cancellationToken).ConfigureAwait(false);
         var events = pending.Select(ToDisplay).ToArray();
-        RunOnDispatcher(() =>
+        lock (_gate)
         {
-            Events = events;
-            OnPropertyChanged(nameof(Events));
-        });
+            if (read < _newestAppliedEventRead)
+            {
+                return;
+            }
+
+            _newestAppliedEventRead = read;
+            _events = events;
+        }
+
+        RunOnDispatcher(() => OnPropertyChanged(nameof(Events)));
     }
 
     private async Task ObserveActivationAsync(Task<ActivationResult> activation)
@@ -256,7 +293,6 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
 
     private void AddDiagnostic(DiagnosticDisplay display)
     {
-        DiagnosticDisplay[] snapshot;
         lock (_gate)
         {
             _diagnostics.Add(display);
@@ -264,15 +300,9 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
             {
                 _diagnostics.RemoveAt(0);
             }
-
-            snapshot = _diagnostics.ToArray();
         }
 
-        RunOnDispatcher(() =>
-        {
-            Diagnostics = snapshot;
-            OnPropertyChanged(nameof(Diagnostics));
-        });
+        RunOnDispatcher(() => OnPropertyChanged(nameof(Diagnostics)));
     }
 
     private void SetStatus(bool isMonitoring, string statusText) =>
