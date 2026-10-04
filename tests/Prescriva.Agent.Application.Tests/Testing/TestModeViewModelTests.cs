@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Prescriva.Agent.Application.Capture;
+using Prescriva.Agent.Application.Configuration;
 using Prescriva.Agent.Application.Selection;
 using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Application.Triggers;
@@ -158,6 +159,34 @@ public sealed class TestModeViewModelTests
         Assert.Null(viewModel.LastApproval);
     }
 
+    [Fact]
+    public async Task ApproveAsync_records_the_approval_so_it_survives_a_restart()
+    {
+        var configuration = BuildPassingConfiguration();
+        var store = new InMemoryApprovalStore();
+        var viewModel = new TestModeViewModel(BuildRunner(passing: true), approvals: new ApprovalService(store));
+
+        await viewModel.RunAsync(configuration);
+        var approval = await viewModel.ApproveAsync();
+
+        Assert.Same(approval, viewModel.LastApproval);
+        var afterRestart = await new ApprovalService(store).GetStatusAsync(configuration);
+        Assert.Equal(ApprovalState.Approved, afterRestart.State);
+        Assert.Equal(approval, afterRestart.Approval);
+    }
+
+    [Fact]
+    public async Task ApproveAsync_after_a_failed_run_records_nothing()
+    {
+        var store = new InMemoryApprovalStore();
+        var viewModel = new TestModeViewModel(BuildRunner(passing: false), approvals: new ApprovalService(store));
+
+        await viewModel.RunAsync(BuildFailingConfiguration());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => viewModel.ApproveAsync());
+        Assert.Equal(ApprovalState.NotTested, (await new ApprovalService(store).GetStatusAsync(BuildFailingConfiguration())).State);
+    }
+
     private static IntegrationTestRunner BuildRunner(bool passing)
     {
         var resolver = passing
@@ -258,6 +287,26 @@ public sealed class TestModeViewModelTests
                     yield return signal;
                 }
             }
+        }
+    }
+
+    private sealed class InMemoryApprovalStore : IApprovalStore
+    {
+        private readonly Dictionary<string, ConfigurationApproval> _approvals = new();
+
+        public Task SaveAsync(ConfigurationApproval approval, CancellationToken cancellationToken)
+        {
+            _approvals[approval.ConfigurationId] = approval;
+            return Task.CompletedTask;
+        }
+
+        public Task<ConfigurationApproval?> LoadAsync(string configurationId, CancellationToken cancellationToken) =>
+            Task.FromResult(_approvals.TryGetValue(configurationId, out var approval) ? approval : null);
+
+        public Task DeleteAsync(string configurationId, CancellationToken cancellationToken)
+        {
+            _approvals.Remove(configurationId);
+            return Task.CompletedTask;
         }
     }
 }
