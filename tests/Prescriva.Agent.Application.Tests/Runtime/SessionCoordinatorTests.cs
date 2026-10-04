@@ -333,6 +333,31 @@ public sealed class SessionCoordinatorTests
         Assert.Single(outbox.Appended);
     }
 
+    [Fact]
+    public async Task A_watch_failure_followed_by_the_session_ending_within_the_retry_delay_is_not_reported()
+    {
+        // The application closing makes its elements disappear a moment before the
+        // instance source reports the process gone; that is not a failure to show.
+        var log = new FakeTechnicalLog();
+        var triggerProvider = new FakeTriggerProvider(new(), failingTriggerId: FinishTriggerId);
+        var coordinator = CreateCoordinator(
+            triggerProvider, new FakeSelectorResolver(new()), new FakeCaptureProvider(new()), new FakeEventOutbox(), log,
+            triggerRetryDelay: TimeSpan.FromSeconds(5));
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        using var cts = new CancellationTokenSource();
+        var run = coordinator.RunAsync(cts.Token);
+        await WaitUntilAsync(() => triggerProvider.FailedAttempts >= 1);
+        await coordinator.CloseAsync();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == RuntimeDiagnosticCode.TriggerWatchFailed);
+        Assert.Contains(diagnostics, d => d.Code == RuntimeDiagnosticCode.SessionClosed);
+        Assert.DoesNotContain(log.Entries, entry => entry.Level == TechnicalLogLevel.Error);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
@@ -351,7 +376,8 @@ public sealed class SessionCoordinatorTests
         FakeEventOutbox outbox,
         FakeTechnicalLog log,
         bool requireName = true,
-        bool requireNote = true)
+        bool requireNote = true,
+        TimeSpan? triggerRetryDelay = null)
     {
         var configuration = BuildConfiguration(requireName, requireNote);
         var eventIds = new Queue<Guid>(Enumerable.Range(0, 8).Select(_ => Guid.NewGuid()));
@@ -366,7 +392,7 @@ public sealed class SessionCoordinatorTests
             log,
             eventIdFactory: () => eventIds.Dequeue(),
             clock: () => Now,
-            triggerRetryDelay: TimeSpan.FromMilliseconds(10));
+            triggerRetryDelay: triggerRetryDelay ?? TimeSpan.FromMilliseconds(10));
     }
 
     private static IntegrationConfiguration BuildConfiguration(bool requireName, bool requireNote) => new(
