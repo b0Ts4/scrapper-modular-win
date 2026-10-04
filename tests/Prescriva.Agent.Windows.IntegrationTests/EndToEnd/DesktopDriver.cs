@@ -1,0 +1,309 @@
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows.Automation;
+
+namespace Prescriva.Agent.Windows.IntegrationTests.EndToEnd;
+
+/// <summary>
+/// Drives the real Prescriva.Agent.Desktop.exe through UI Automation (Invoke/Value/Selection
+/// patterns for the Agent's own controls) and the real OS cursor (for pointer inspection),
+/// playing the operator in the Desktop walkthrough tests.
+/// </summary>
+internal static class DesktopDriver
+{
+    internal static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// Steps 1-4 of the walkthrough through the real Desktop UI: integration and stage,
+    /// three required fields and the Add/Finish buttons selected with the real cursor,
+    /// then saved. Leaves inspection stopped.
+    /// </summary>
+    internal static async Task ConfigureAndSaveMedicineIntegrationAsync(AutomationElement agent, TestTargetLauncher target)
+    {
+        SetText(agent, "IntegrationIdBox", "walkthrough");
+        SetText(agent, "IntegrationNameBox", "Walkthrough");
+        SetText(agent, "ProcessIdentityBox", "Prescriva.Agent.TestTarget.exe");
+        SetText(agent, "WindowRuleBox", "Prescriva Agent Test Target");
+        Press(agent, "CreateIntegrationButton");
+        SetText(agent, "StageIdBox", "budget");
+        SetText(agent, "StageNameBox", "Orçamento");
+        Press(agent, "AddStageButton");
+        await WaitForTextAsync(agent, "StatusText", "Added stage 'budget'");
+
+        Press(agent, "StartInspectionButton");
+        foreach (var (automationId, fieldId) in new[]
+                 {
+                     ("MedicationTextBox", "medication"),
+                     ("ConcentrationTextBox", "concentration"),
+                     ("QuantityTextBox", "quantity"),
+                 })
+        {
+            await HoverAndConfirmAsync(agent, target, automationId);
+            SetText(agent, "FieldSemanticIdBox", fieldId);
+            SetText(agent, "FieldMeaningBox", fieldId);
+            Press(agent, "AddFieldButton");
+            await WaitForTextAsync(agent, "StatusText", $"Added field '{fieldId}'");
+        }
+
+        await HoverAndConfirmAsync(agent, target, "AddButton");
+        SetText(agent, "TriggerSemanticIdBox", "add_item");
+        SetText(agent, "TriggerCaptureFieldsBox", "medication, concentration, quantity");
+        SetText(agent, "TriggerEmitEventBox", "item_added");
+        SelectComboItem(agent, "TriggerTerminalBox", "Nothing");
+        Press(agent, "AddTriggerButton");
+        await WaitForTextAsync(agent, "StatusText", "Added trigger 'add_item' with 2 action(s)");
+
+        await HoverAndConfirmAsync(agent, target, "FinishButton");
+        SetText(agent, "TriggerSemanticIdBox", "finish_budget");
+        SetText(agent, "TriggerCaptureFieldsBox", "");
+        SetText(agent, "TriggerEmitEventBox", "");
+        SelectComboItem(agent, "TriggerTerminalBox", "Finish session (budget_finished)");
+        Press(agent, "AddTriggerButton");
+        await WaitForTextAsync(agent, "StatusText", "Added trigger 'finish_budget' with 1 action(s)");
+        Press(agent, "StopInspectionButton");
+
+        Press(agent, "SaveButton");
+        await WaitForTextAsync(agent, "StatusText", "Saved. Unsaved changes: False");
+    }
+
+    /// <summary>Prepares and runs test mode while the "operator" presses Add and Finish, until the run completes.</summary>
+    internal static async Task RunTestModeAsync(AutomationElement agent, TestTargetLauncher target)
+    {
+        Press(agent, "PrepareTestButton");
+        await WaitForTextAsync(agent, "StatusText", "Test prepared");
+        await WaitForTextAsync(agent, "TestStatusText", "Pronto.");
+        Press(agent, "RunTestButton");
+        await PressUntilAsync(target, ["AddButton", "FinishButton"], () => Text(agent, "TestStatusText").StartsWith("Teste concluído", StringComparison.Ordinal));
+    }
+
+    /// <summary>Arranges the two windows side by side so the cursor over TestTarget is never over the Agent.</summary>
+    internal static void ArrangeSideBySide(AutomationElement agent, TestTargetLauncher target)
+    {
+        Move(target.Window, 0, 0);
+        Move(agent, 560, 0);
+    }
+
+    /// <summary>The Agent's technical log (IDs, codes, timings only), for failure messages.</summary>
+    internal static string ReadTechnicalLog(string dataDirectory)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                Path.Combine(dataDirectory, "logs", "technical.jsonl"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (IOException exception)
+        {
+            return $"(unreadable: {exception.GetType().Name})";
+        }
+    }
+
+    internal static async Task HoverAndConfirmAsync(AutomationElement agent, TestTargetLauncher target, string automationId)
+    {
+        var rect = Find(target.Window, automationId).Current.BoundingRectangle;
+        var x = (int)(rect.X + rect.Width / 2);
+        var y = (int)(rect.Y + rect.Height / 2);
+
+        await WaitUntilAsync(
+            () =>
+            {
+                SetCursorPos(x, y);
+                return Text(agent, "HoverStateText").Contains($"AutomationId='{automationId}'", StringComparison.Ordinal);
+            },
+            () => $"hovering ({x},{y}) for {automationId}; Agent shows: {Text(agent, "HoverStateText")}");
+
+        Press(agent, "ConfirmSelectionButton");
+        await WaitForTextAsync(agent, "ConfirmedSelectionText", $"AutomationId='{automationId}'");
+    }
+
+    internal static Task WaitForEventsAsync(AutomationElement agent, string dataDirectory, int count) =>
+        WaitUntilAsync(
+            () => ListTexts(agent, "EventsList").Length >= count,
+            () => string.Join(" | ", ListTexts(agent, "DiagnosticsList")) + " / log: " + ReadTechnicalLog(dataDirectory));
+
+    internal static Task WaitForTextAsync(AutomationElement root, string automationId, string expected) =>
+        WaitUntilAsync(
+            () => Text(root, automationId).Contains(expected, StringComparison.Ordinal),
+            () => $"'{automationId}' shows: {Text(root, automationId)}");
+
+    internal static async Task WaitUntilAsync(Func<bool> condition, Func<string> describe)
+    {
+        var deadline = DateTime.UtcNow + StepTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(150);
+        }
+
+        Assert.True(condition(), "Timed out: " + describe());
+    }
+
+    internal static async Task PressUntilAsync(TestTargetLauncher target, string[] automationIds, Func<bool> done)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+        while (!done() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(400);
+            foreach (var automationId in automationIds)
+            {
+                Press(target.Window, automationId);
+            }
+        }
+
+        Assert.True(done(), "The test-mode run never passed.");
+    }
+
+    internal static void SetMedicine(TestTargetLauncher target, string medication, string concentration, string quantity)
+    {
+        SetText(target.Window, "MedicationTextBox", medication);
+        SetText(target.Window, "ConcentrationTextBox", concentration);
+        SetText(target.Window, "QuantityTextBox", quantity);
+    }
+
+    internal static AutomationElement Find(AutomationElement root, string automationId) =>
+        root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, automationId))
+        ?? throw new InvalidOperationException($"Element '{automationId}' not found.");
+
+    internal static void SetText(AutomationElement root, string automationId, string value) =>
+        ((ValuePattern)Find(root, automationId).GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
+
+    internal static void Press(AutomationElement root, string automationId) =>
+        ((InvokePattern)Find(root, automationId).GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+
+    internal static bool IsEnabled(AutomationElement root, string automationId) =>
+        Find(root, automationId).Current.IsEnabled;
+
+    internal static string Text(AutomationElement root, string automationId) =>
+        Find(root, automationId).Current.Name ?? string.Empty;
+
+    internal static string[] AllTexts(AutomationElement root) =>
+        root.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text))
+            .Cast<AutomationElement>()
+            .Select(element => element.Current.Name ?? string.Empty)
+            .ToArray();
+
+    internal static string[] ListTexts(AutomationElement root, string automationId) =>
+        Find(root, automationId)
+            .FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem))
+            .Cast<AutomationElement>()
+            .Select(item => string.Join(" ", new[] { item.Current.Name }
+                .Concat(item.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>().Select(child => child.Current.Name))))
+            .ToArray();
+
+    internal static void SelectComboItem(AutomationElement root, string automationId, string itemName)
+    {
+        var combo = Find(root, automationId);
+        var expand = (ExpandCollapsePattern)combo.GetCurrentPattern(ExpandCollapsePattern.Pattern);
+        expand.Expand();
+        var item = combo.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, itemName))
+            ?? throw new InvalidOperationException($"Combo item '{itemName}' not found.");
+        ((SelectionItemPattern)item.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        expand.Collapse();
+    }
+
+    internal static void Move(AutomationElement window, double x, double y)
+    {
+        var transform = (TransformPattern)window.GetCurrentPattern(TransformPattern.Pattern);
+        transform.Move(x, y);
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetCursorPos(int x, int y);
+
+    /// <summary>Launches the built Prescriva.Agent.Desktop.exe with an isolated data directory.</summary>
+    internal sealed class DesktopProcess : IDisposable
+    {
+        private readonly Process _process;
+
+        private DesktopProcess(Process process, AutomationElement window)
+        {
+            _process = process;
+            Window = window;
+        }
+
+        public AutomationElement Window { get; }
+
+        public int ProcessId => _process.Id;
+
+        public static DesktopProcess Launch(string dataDirectory, IReadOnlyDictionary<string, string>? environment = null)
+        {
+            var testTargetPath = TestTargetLauncher.ResolveExecutablePath();
+            var binDirectory = Path.GetDirectoryName(testTargetPath)!;
+            var executablePath = Path.GetFullPath(Path.Combine(
+                binDirectory, "..", "..", "..", "..", "Prescriva.Agent.Desktop", "bin",
+                new DirectoryInfo(binDirectory).Parent!.Name, "net10.0-windows", "Prescriva.Agent.Desktop.exe"));
+            if (!File.Exists(executablePath))
+            {
+                throw new FileNotFoundException("Build Prescriva.Agent.Desktop before running this test.", executablePath);
+            }
+
+            var startInfo = new ProcessStartInfo(executablePath) { UseShellExecute = false };
+            startInfo.Environment["PRESCRIVA_AGENT_DATA"] = dataDirectory;
+            foreach (var (name, value) in environment ?? new Dictionary<string, string>())
+            {
+                startInfo.Environment[name] = value;
+            }
+            var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the Agent.");
+
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+            while (DateTime.UtcNow < deadline)
+            {
+                process.Refresh();
+                if (process.HasExited)
+                {
+                    throw new InvalidOperationException($"Prescriva.Agent.Desktop exited early with code {process.ExitCode}.");
+                }
+
+                if (process.MainWindowHandle != IntPtr.Zero)
+                {
+                    return new DesktopProcess(process, AutomationElement.FromHandle(process.MainWindowHandle));
+                }
+
+                Thread.Sleep(100);
+            }
+
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException("Timed out waiting for the Prescriva.Agent.Desktop main window.");
+        }
+
+        public void Close()
+        {
+            if (_process.HasExited)
+            {
+                return;
+            }
+
+            ((WindowPattern)Window.GetCurrentPattern(WindowPattern.Pattern)).Close();
+            if (!_process.WaitForExit(10_000))
+            {
+                _process.Kill(entireProcessTree: true);
+                _process.WaitForExit(5_000);
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (!_process.HasExited)
+                {
+                    _process.Kill(entireProcessTree: true);
+                    _process.WaitForExit(5_000);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            finally
+            {
+                _process.Dispose();
+            }
+        }
+    }
+}

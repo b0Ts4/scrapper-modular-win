@@ -44,6 +44,7 @@ public partial class TestModeView : UserControl
         _viewModel = viewModel;
         _configuration = configuration;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        TestStatusText.Text = "Pronto.";
 
         Refresh();
     }
