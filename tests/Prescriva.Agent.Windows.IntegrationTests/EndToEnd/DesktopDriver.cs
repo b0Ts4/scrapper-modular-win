@@ -100,9 +100,17 @@ internal static class DesktopDriver
         }
     }
 
-    internal static async Task HoverAndConfirmAsync(AutomationElement agent, TestTargetLauncher target, string automationId)
+    internal static Task HoverAndConfirmAsync(AutomationElement agent, TestTargetLauncher target, string automationId) =>
+        HoverAndConfirmElementAsync(agent, Find(target.Window, automationId), $"AutomationId='{automationId}'", $"hover-{automationId}");
+
+    /// <summary>
+    /// Moves the real cursor over <paramref name="element"/> until the Agent's hover text
+    /// contains <paramref name="expectedHover"/>, checks the highlight outline surrounds the
+    /// element, then confirms the selection.
+    /// </summary>
+    internal static async Task HoverAndConfirmElementAsync(AutomationElement agent, AutomationElement element, string expectedHover, string screenshotName)
     {
-        var rect = Find(target.Window, automationId).Current.BoundingRectangle;
+        var rect = element.Current.BoundingRectangle;
         var x = (int)(rect.X + rect.Width / 2);
         var y = (int)(rect.Y + rect.Height / 2);
 
@@ -110,18 +118,18 @@ internal static class DesktopDriver
             () =>
             {
                 SetCursorPos(x, y);
-                return Text(agent, "HoverStateText").Contains($"AutomationId='{automationId}'", StringComparison.Ordinal);
+                return Text(agent, "HoverStateText").Contains(expectedHover, StringComparison.Ordinal);
             },
-            () => $"hovering ({x},{y}) for {automationId}; Agent shows: {Text(agent, "HoverStateText")}");
+            () => $"hovering ({x},{y}) expecting {expectedHover}; Agent shows: {Text(agent, "HoverStateText")}");
 
         // The highlight outline must be drawn exactly around the hovered control.
         await WaitUntilAsync(
             () => OverlayMatches(rect),
-            () => $"overlay for {automationId} is at {DescribeOverlay()}, control is at {rect}");
-        SaveScreenshot($"hover-{automationId}");
+            () => $"overlay is at {DescribeOverlay()}, control is at {rect}");
+        SaveScreenshot(screenshotName);
 
         Press(agent, "ConfirmSelectionButton");
-        await WaitForTextAsync(agent, "ConfirmedSelectionText", $"AutomationId='{automationId}'");
+        await WaitForTextAsync(agent, "ConfirmedSelectionText", expectedHover);
     }
 
     internal static Task WaitForEventsAsync(AutomationElement agent, string dataDirectory, int count) =>

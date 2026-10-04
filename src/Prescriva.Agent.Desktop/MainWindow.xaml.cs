@@ -174,7 +174,7 @@ public partial class MainWindow : Window
             var confirmed = await _inspectorViewModel.ConfirmAsync();
             _confirmedSelection = confirmed;
             ConfirmedSelectionText.Text =
-                $"Confirmed: AutomationId='{confirmed.Snapshot?.AutomationId}', Name='{confirmed.Snapshot?.Name}', ControlType='{confirmed.Snapshot?.ControlType}'.";
+                $"Confirmed: AutomationId='{confirmed.Snapshot?.AutomationId}', Name='{confirmed.Snapshot?.Name}', ControlType='{confirmed.Snapshot?.ControlType}', Label='{LabelOf(confirmed.Snapshot)}'.";
             SetStatus("Selection confirmed. Assign a semantic ID and click 'Add Field'.");
         }
         catch (InvalidOperationException ex)
@@ -567,11 +567,14 @@ public partial class MainWindow : Window
 
         var snapshot = _inspectorViewModel.Snapshot;
         HoverStateText.Text = snapshot is not null
-            ? $"Hovering: AutomationId='{snapshot.AutomationId}', Name='{snapshot.Name}', ControlType='{snapshot.ControlType}'."
+            ? $"Hovering: AutomationId='{snapshot.AutomationId}', Name='{snapshot.Name}', ControlType='{snapshot.ControlType}', Label='{LabelOf(snapshot)}'."
             : _inspectorViewModel.Warnings.Length > 0
                 ? string.Join(" ", _inspectorViewModel.Warnings)
                 : "(nothing under the pointer)";
     }
+
+    private static string LabelOf(ElementSnapshot? snapshot) =>
+        snapshot is null || snapshot.NearbyLabels.IsDefaultOrEmpty ? string.Empty : snapshot.NearbyLabels[0];
 
     private void SetStatus(string message)
     {
