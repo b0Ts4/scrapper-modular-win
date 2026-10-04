@@ -89,7 +89,30 @@ public sealed class RuntimeMonitorViewModelTests
         await harness.ViewModel.StopAsync();
     }
 
-    private static IntegrationConfiguration Configuration() => new(
+    [Fact]
+    public async Task Diagnostics_published_concurrently_are_never_lost_from_the_displayed_list()
+    {
+        // Every trigger's watch becomes live at the same moment on its own thread - the
+        // real situation when a session starts - and each one must stay on screen.
+        const int triggerCount = 48;
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var harness = new Harness(release.Task);
+        var configuration = Configuration(triggerCount);
+        await harness.ViewModel.StartAsync(configuration, Approve(configuration));
+        harness.InstanceSource.Start(new ApplicationInstance(Guid.NewGuid(), 4242));
+        await WaitUntilAsync(() => harness.Triggers.Waiting == triggerCount);
+
+        release.SetResult();
+        await WaitUntilAsync(() => harness.Triggers.Established == triggerCount);
+        await Task.Delay(100);
+
+        var monitored = harness.ViewModel.Diagnostics.Count(d => d.Message.StartsWith("Monitorando gatilho", StringComparison.Ordinal));
+        Assert.Equal(triggerCount, monitored);
+
+        await harness.ViewModel.StopAsync();
+    }
+
+    private static IntegrationConfiguration Configuration(int extraTriggers = 0) => new(
         IntegrationConfiguration.CurrentSchemaVersion,
         "monitor-config",
         "Monitor configuration",
@@ -103,6 +126,12 @@ public sealed class RuntimeMonitorViewModelTests
                 new ElementFingerprint("Fake.App", "Fake Window", AutomationId: "Add"),
                 "Invoke",
                 [new CaptureFieldsAction(["medication"]), new EmitEventAction("item_added")]),
+            .. Enumerable.Range(1, extraTriggers - (extraTriggers > 0 ? 1 : 0)).Select(index => new TriggerDefinition(
+                $"button_{index}",
+                StageId,
+                new ElementFingerprint("Fake.App", "Fake Window", AutomationId: $"Button{index}"),
+                "Invoke",
+                [new EmitEventAction("noop")])),
         ]);
 
     private static ConfigurationApproval Approve(IntegrationConfiguration configuration) =>
@@ -121,8 +150,9 @@ public sealed class RuntimeMonitorViewModelTests
 
     private sealed class Harness
     {
-        public Harness()
+        public Harness(Task? watchGate = null)
         {
+            Triggers = new FakeTriggers(watchGate ?? Task.CompletedTask);
             var runtime = new AgentRuntime(
                 InstanceSource,
                 (_, sessionId) => Triggers.ForSession(sessionId),
@@ -134,7 +164,7 @@ public sealed class RuntimeMonitorViewModelTests
         }
 
         public FakeInstanceSource InstanceSource { get; } = new();
-        public FakeTriggers Triggers { get; } = new();
+        public FakeTriggers Triggers { get; }
         public FakeCapture Capture { get; } = new();
         public InMemoryOutbox Outbox { get; } = new();
         public RuntimeMonitorViewModel ViewModel { get; }
@@ -161,13 +191,21 @@ public sealed class RuntimeMonitorViewModelTests
         }
     }
 
-    private sealed class FakeTriggers
+    private sealed class FakeTriggers(Task watchGate)
     {
         private readonly ConcurrentBag<Provider> _providers = new();
+        private int _waiting;
+        private int _established;
+
+        public Task WatchGate => watchGate;
+
+        public int Waiting => Volatile.Read(ref _waiting);
+
+        public int Established => Volatile.Read(ref _established);
 
         public ITriggerProvider ForSession(Guid sessionId)
         {
-            var provider = new Provider(sessionId);
+            var provider = new Provider(sessionId, this);
             _providers.Add(provider);
             return provider;
         }
@@ -180,7 +218,7 @@ public sealed class RuntimeMonitorViewModelTests
             }
         }
 
-        private sealed class Provider(Guid sessionId) : ITriggerProvider
+        private sealed class Provider(Guid sessionId, FakeTriggers owner) : ITriggerProvider
         {
             private readonly Channel<TriggerSignal> _signals = Channel.CreateUnbounded<TriggerSignal>();
 
@@ -193,8 +231,11 @@ public sealed class RuntimeMonitorViewModelTests
                 TriggerDefinition trigger,
                 [EnumeratorCancellation] CancellationToken cancellationToken)
             {
+                Interlocked.Increment(ref owner._waiting);
+                await owner.WatchGate.ConfigureAwait(false);
                 await Task.Yield();
                 WatchEstablished?.Invoke(this, trigger.Id);
+                Interlocked.Increment(ref owner._established);
                 await foreach (var signal in _signals.Reader.ReadAllAsync(cancellationToken))
                 {
                     if (signal.TriggerId == trigger.Id)
