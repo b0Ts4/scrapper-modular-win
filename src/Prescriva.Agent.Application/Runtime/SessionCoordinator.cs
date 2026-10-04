@@ -154,9 +154,10 @@ public sealed class SessionCoordinator
     /// Watches one trigger until cancelled. A watch that fails for any other reason (its
     /// element cannot be resolved yet, or disappears - e.g. the button belongs to a screen
     /// the application is not showing right now) never faults <see cref="RunAsync"/>: the
-    /// first failure of a streak is reported as a typed
-    /// <see cref="RuntimeDiagnosticCode.TriggerWatchFailed"/> error, the watch is retried
-    /// every <see cref="_triggerRetryDelay"/> until cancelled, and a recovered watch is
+    /// first failure of a streak that outlives <see cref="_triggerRetryDelay"/> is reported
+    /// as a typed <see cref="RuntimeDiagnosticCode.TriggerWatchFailed"/> error (a session
+    /// ended within that delay - the application closing - reports nothing), the watch is
+    /// retried every <see cref="_triggerRetryDelay"/> until cancelled, and a recovered watch is
     /// announced again through <see cref="RuntimeDiagnosticCode.TriggerWatchStarted"/>.
     /// The session's other triggers keep being observed throughout.
     /// </summary>
@@ -185,13 +186,17 @@ public sealed class SessionCoordinator
             }
             catch (Exception exception)
             {
+                // Report only once the failure outlives the retry delay: when the
+                // application closes, its elements vanish a moment before the session is
+                // ended, and that must not surface as an error.
+                await Task.Delay(_triggerRetryDelay, cancellationToken).ConfigureAwait(false);
                 if (_failingTriggers.TryAdd(trigger.Id, true))
                 {
                     PublishTriggerWatchFailed(trigger, exception);
                 }
-            }
 
-            await Task.Delay(_triggerRetryDelay, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
         }
     }
 
