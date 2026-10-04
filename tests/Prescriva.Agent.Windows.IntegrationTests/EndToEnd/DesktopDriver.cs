@@ -114,6 +114,12 @@ internal static class DesktopDriver
             },
             () => $"hovering ({x},{y}) for {automationId}; Agent shows: {Text(agent, "HoverStateText")}");
 
+        // The highlight outline must be drawn exactly around the hovered control.
+        await WaitUntilAsync(
+            () => OverlayMatches(rect),
+            () => $"overlay for {automationId} is at {DescribeOverlay()}, control is at {rect}");
+        SaveScreenshot($"hover-{automationId}");
+
         Press(agent, "ConfirmSelectionButton");
         await WaitForTextAsync(agent, "ConfirmedSelectionText", $"AutomationId='{automationId}'");
     }
@@ -213,8 +219,150 @@ internal static class DesktopDriver
         transform.Move(x, y);
     }
 
+    private const string OverlayTitle = "Prescriva Agent Highlight Overlay";
+    private const double OverlayTolerancePixels = 2;
+
+    /// <summary>True when the Agent's overlay window is visible and covers <paramref name="control"/> (physical pixels).</summary>
+    internal static bool OverlayMatches(System.Windows.Rect control)
+    {
+        var overlay = FindWindow(null, OverlayTitle);
+        if (overlay == IntPtr.Zero || !IsWindowVisible(overlay) || !GetWindowRect(overlay, out var bounds))
+        {
+            return false;
+        }
+
+        return Math.Abs(bounds.Left - control.Left) <= OverlayTolerancePixels
+            && Math.Abs(bounds.Top - control.Top) <= OverlayTolerancePixels
+            && Math.Abs(bounds.Right - control.Right) <= OverlayTolerancePixels
+            && Math.Abs(bounds.Bottom - control.Bottom) <= OverlayTolerancePixels;
+    }
+
+    private static string DescribeOverlay()
+    {
+        var overlay = FindWindow(null, OverlayTitle);
+        if (overlay == IntPtr.Zero)
+        {
+            return "(no overlay window)";
+        }
+
+        GetWindowRect(overlay, out var bounds);
+        return $"{bounds.Left},{bounds.Top} {bounds.Right - bounds.Left}x{bounds.Bottom - bounds.Top} visible={IsWindowVisible(overlay)}";
+    }
+
+    /// <summary>
+    /// Saves a PNG of the primary screen (layered windows included, so the overlay shows)
+    /// when PRESCRIVA_SCREENSHOT_DIR is set - CI uploads them for visual review.
+    /// </summary>
+    internal static void SaveScreenshot(string name)
+    {
+        var directory = Environment.GetEnvironmentVariable("PRESCRIVA_SCREENSHOT_DIR");
+        if (string.IsNullOrEmpty(directory))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, name + ".png");
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                CaptureScreen(path);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null)
+        {
+            throw new InvalidOperationException("Screenshot failed.", failure);
+        }
+    }
+
+    private static void CaptureScreen(string path)
+    {
+        const int SmCxScreen = 0;
+        const int SmCyScreen = 1;
+        const int SrcCopy = 0x00CC0020;
+        const int CaptureBlt = 0x40000000;
+
+        var width = GetSystemMetrics(SmCxScreen);
+        var height = GetSystemMetrics(SmCyScreen);
+        var screenDc = GetDC(IntPtr.Zero);
+        var memoryDc = CreateCompatibleDC(screenDc);
+        var bitmap = CreateCompatibleBitmap(screenDc, width, height);
+        var previous = SelectObject(memoryDc, bitmap);
+        try
+        {
+            BitBlt(memoryDc, 0, 0, width, height, screenDc, 0, 0, SrcCopy | CaptureBlt);
+            SelectObject(memoryDc, previous);
+            var source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                bitmap, IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(source));
+            using var file = File.Create(path);
+            encoder.Save(file);
+        }
+        finally
+        {
+            DeleteObject(bitmap);
+            DeleteDC(memoryDc);
+            ReleaseDC(IntPtr.Zero, screenDc);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindow(string? className, string windowName);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int width, int height);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height, IntPtr source, int sourceX, int sourceY, int operation);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr obj);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr hdc);
 
     /// <summary>Launches the built Prescriva.Agent.Desktop.exe with an isolated data directory.</summary>
     internal sealed class DesktopProcess : IDisposable

@@ -34,6 +34,8 @@ jobs:
 
       - name: Windows UI Automation integration tests
         if: always()
+        env:
+          PRESCRIVA_SCREENSHOT_DIR: ${{ github.workspace }}/TestResults/screenshots
         run: >
           dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build
           --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
