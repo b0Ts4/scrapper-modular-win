@@ -20,4 +20,16 @@ public interface ITriggerProvider
     /// as a typed failure).
     /// </summary>
     IAsyncEnumerable<TriggerSignal> WatchAsync(TriggerDefinition trigger, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Raised with the trigger ID once a <see cref="WatchAsync"/> call's native
+    /// subscription is actually live - from that moment on, an occurrence of the trigger
+    /// is observed rather than lost. Lets the runtime show a visible "monitoring" state
+    /// instead of guessing. Providers with no asynchronous setup may leave it unraised.
+    /// </summary>
+    event EventHandler<string>? WatchEstablished
+    {
+        add { }
+        remove { }
+    }
 }

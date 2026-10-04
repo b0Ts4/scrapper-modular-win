@@ -29,7 +29,17 @@ public enum RuntimeDiagnosticCode
     SelectorFallback,
 
     /// <summary>The application instance behind this session closed; the session was ended.</summary>
-    SessionClosed
+    SessionClosed,
+
+    /// <summary>A configured trigger's native subscription is live; the session is monitoring it.</summary>
+    TriggerWatchStarted,
+
+    /// <summary>
+    /// A configured trigger could not be watched (e.g. its element could not be resolved,
+    /// or disappeared mid-watch). Occurrences of that trigger are no longer observed; the
+    /// session's other triggers keep running.
+    /// </summary>
+    TriggerWatchFailed
 }
 
 /// <summary>

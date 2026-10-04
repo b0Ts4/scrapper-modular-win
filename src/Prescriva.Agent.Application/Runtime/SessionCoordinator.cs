@@ -72,6 +72,7 @@ public sealed class SessionCoordinator
         _log = log;
         _eventIdFactory = eventIdFactory ?? Guid.NewGuid;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _triggerProvider.WatchEstablished += OnWatchEstablished;
     }
 
     public Guid SessionId => _session.Id;
@@ -142,18 +143,74 @@ public sealed class SessionCoordinator
         }
     }
 
+    /// <summary>
+    /// Watches one trigger until cancelled. A watch that fails for any other reason (its
+    /// element cannot be resolved, or disappears mid-watch) is reported as a typed
+    /// <see cref="RuntimeDiagnosticCode.TriggerWatchFailed"/> error rather than faulting
+    /// <see cref="RunAsync"/>: the failure stays visible, and the session's other
+    /// triggers keep being observed.
+    /// </summary>
     private async Task WatchTriggerAsync(TriggerDefinition trigger, CancellationToken cancellationToken)
     {
         var deduplicator = new TriggerDeduplicator();
-        await foreach (var signal in _triggerProvider.WatchAsync(trigger, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+        try
         {
-            if (!deduplicator.Accept(signal))
+            await foreach (var signal in _triggerProvider.WatchAsync(trigger, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
             {
-                continue;
-            }
+                if (!deduplicator.Accept(signal))
+                {
+                    continue;
+                }
 
-            await HandleTriggerAsync(trigger, cancellationToken).ConfigureAwait(false);
+                await HandleTriggerAsync(trigger, cancellationToken).ConfigureAwait(false);
+            }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var now = _clock();
+
+            // Only the exception type is logged: provider messages are technical, but the
+            // log contract is IDs, codes and metadata only.
+            _log.Log(new TechnicalLogEntry(
+                TechnicalLogLevel.Error,
+                nameof(RuntimeDiagnosticCode.TriggerWatchFailed),
+                $"Trigger '{trigger.Id}' can no longer be watched ({exception.GetType().Name}).",
+                now,
+                SessionId: SessionId,
+                TriggerId: trigger.Id));
+
+            Publish(new RuntimeDiagnostic(
+                RuntimeDiagnosticCode.TriggerWatchFailed,
+                RuntimeDiagnosticSeverity.Error,
+                SessionId,
+                now,
+                TimeSpan.Zero,
+                TriggerId: trigger.Id));
+        }
+    }
+
+    private void OnWatchEstablished(object? sender, string triggerId)
+    {
+        var now = _clock();
+        _log.Log(new TechnicalLogEntry(
+            TechnicalLogLevel.Info,
+            nameof(RuntimeDiagnosticCode.TriggerWatchStarted),
+            $"Trigger '{triggerId}' is being monitored.",
+            now,
+            SessionId: SessionId,
+            TriggerId: triggerId));
+
+        Publish(new RuntimeDiagnostic(
+            RuntimeDiagnosticCode.TriggerWatchStarted,
+            RuntimeDiagnosticSeverity.Info,
+            SessionId,
+            now,
+            TimeSpan.Zero,
+            TriggerId: triggerId));
     }
 
     /// <summary>
