@@ -31,5 +31,5 @@ Each step lists its automated coverage. "Automated (CI)" steps run on every push
 
 | Date | Environment | Result |
 | --- | --- | --- |
-| 2026-10-04 | GitHub Actions `windows-latest` (Windows Server, x64), .NET SDK from `global.json` | All automated rows pass — see the CI run linked in [current state](../handoffs/current-state.md). |
+| 2026-10-04 | GitHub Actions `windows-latest` (Windows Server, x64), .NET SDK from `global.json` | All automated rows pass (6 of 6 runs on the final commit) — see the CI runs listed in [current state](../handoffs/current-state.md). |
 | — | Windows 10/11 desktop, by a person | **Not yet performed.** The rows marked *human* remain open. |

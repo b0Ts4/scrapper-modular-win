@@ -13,11 +13,11 @@ dotnet test Prescriva.Agent.slnx --configuration Release --no-build
 | --- | --- | --- |
 | `Prescriva.Agent.Domain.Tests` | 58 | any OS |
 | `Prescriva.Agent.Infrastructure.Tests` | 29 | Windows (DPAPI tests throw `PlatformNotSupportedException` elsewhere) |
-| `Prescriva.Agent.Application.Tests` | 72 | Windows (references the WPF Desktop project) |
+| `Prescriva.Agent.Application.Tests` | 73 | Windows (references the WPF Desktop project) |
 | `Prescriva.Agent.Windows.Tests` | 15 | Windows |
 | `Prescriva.Agent.Windows.IntegrationTests` | 35 | Windows **with an interactive desktop** (launch TestTarget/Desktop, real UI Automation, real cursor) |
 
-Total: 209, all passing. CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
+Total: 210, all passing (six consecutive green runs on the final commit, `DesktopWalkthroughTests` included). CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
 
 End-to-end coverage of the milestone:
 
