@@ -31,6 +31,7 @@ Each step lists its automated coverage. "Automated (CI)" steps run on every push
 | 17 | Stop, then *Clear Local Data...* and confirm. | Disabled while monitoring; afterwards the events list is empty, `events.db` holds no events, `technical.jsonl` is emptied, configurations remain. | Automated (CI): `DesktopResilienceWalkthroughTests`, `SqliteEventOutboxTests`, `StructuredTechnicalLogTests`. |
 | 19 | Approve, restart the Agent, Reload, Activate. | "Aprovada em …"; monitoring starts without retesting. Make a field optional → "Alterada desde o último teste", Activate refused; make it required again → "Aprovada" again. | Automated (CI): `DesktopConfigurationLifecycleTests`, `ApprovalServiceTests`, `JsonApprovalStoreTests`. |
 | 20 | Remove a field captured by a trigger; remove a trigger and save. | First is refused naming the trigger; second requires a new test before activation. | Automated (CI): `DesktopConfigurationLifecycleTests`, `IntegrationEditorViewModelTests`. |
+| 21 | Select TestTarget's "Observações:" box (no AutomationId) as a field captured by Add; restart TestTarget with `--layout-variant alternate`. | Hover text shows `Label='Observações:'`; the value is captured before and after the layout change; monitor shows "Integração saudável". | Automated (CI): `DesktopStructuralSelectorWalkthroughTests`, `StructuralSelectorTests`. |
 | 18 | Repeat rows 2–9 with a 32-bit target application. | Same results. | Automated (CI): x86 pass of the integration suite against a self-contained `win-x86` TestTarget (bitness asserted). |
 
 ## Recorded results

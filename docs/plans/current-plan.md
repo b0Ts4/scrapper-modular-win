@@ -14,3 +14,5 @@ Plan 2 (Windows Inspector and Capture) is complete: all 5 tasks implemented and 
 Plan 3 (Trigger Runtime, Events and Test Mode) is implemented: Tasks 1–5, with the milestone end-to-end tests (`MilestoneFlowTests`, `DesktopWalkthroughTests`) passing on Windows CI (209/209 tests, 2026-10-04). Remaining for milestone sign-off: the person-driven visual walkthrough in `docs/testing/milestone-1-manual.md` on a Windows 10/11 desktop. See `docs/handoffs/current-state.md`.
 
 Plan 4 — `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md` (persisted approvals, editable configurations) — Tasks 1–5 implemented and verified on Windows CI (244 tests + 30 x86, 2026-10-04), including the `DesktopConfigurationLifecycleTests` walkthrough. Next: see `docs/roadmap.md` (selector resilience is the next candidate).
+
+Plan 5 — `docs/superpowers/plans/2026-10-04-selector-resilience.md` (structural selector signals, weights v2, integration health) — Tasks 1–4 implemented and verified on Windows CI (263 tests + 30 x86, 2026-10-04). Next: see `docs/roadmap.md` (dispatcher recovery or transport are the next candidates).

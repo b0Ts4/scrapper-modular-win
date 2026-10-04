@@ -7,7 +7,7 @@ Configure, test, activate and capture against `Prescriva.Agent.TestTarget` with 
 ## Next candidates
 
 1. ~~Persisted approvals and configuration editing~~ — shipped in the configuration lifecycle plan (`docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`). Remaining configurator UX: list-based editing (select a row instead of typing IDs), editing a field's selector by re-inspection, stage reordering.
-2. **Selector resilience:** populate ancestors, nearby labels and relative position so controls without a stable `AutomationId` can be resolved; persist the `SelectorWeights` version with configurations; `Degraded`/`Broken` integration states with visible reasons.
+2. ~~Selector resilience~~ — shipped (`docs/superpowers/plans/2026-10-04-selector-resilience.md`): structural signals, weights v2, confidence relative to available signals, Degraded/Broken health. Remaining: labels above a field in another container, storing the weights version with each configuration.
 3. **Configurator UX:** list-based selection for edits, re-inspect to replace a selector, tray icon.
 4. **Dispatcher recovery:** recover the UIA STA thread after a wedged COM call (hung target process).
 5. **Providers:** MSAA/Win32 providers, then OCR for applications without usable UI Automation.

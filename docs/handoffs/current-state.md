@@ -52,6 +52,17 @@ Plan: `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`. All 5 task
 - Evidence: run 37221107495 (push) and 37221111403 (PR) on 18a463c — Domain 58, Infrastructure 43, Application 90, Windows 15, integration 38 (244) + 30 x86, all passing; `DesktopConfigurationLifecycleTests` passed first time.
 - Observed once (PR run 37220266848): the x86 pass hung 5 min in `ElementInspectionTests` (TimedOut or Cancelled test; TestTarget alive). Not reproduced in 6 following runs. xUnit long-running-test diagnostics are now on so a repeat names the test. Suspect an unbounded cross-process UIA call made directly on the test thread (those tests call `target.Window.Current` with no timeout); not yet root-caused.
 
+### Plan 5 — Selector resilience (2026-10-04)
+
+Plan: `docs/superpowers/plans/2026-10-04-selector-resilience.md`. Tasks 1–4 implemented, each test first (RED: Domain locally; structural integration tests on CI run 37225379923; health on fdfde7f).
+
+- Weights v2 (version 2) and confidence relative to the selector's own signals — fixes a spurious `SelectorFallback` on every capture (a full AutomationId+ControlType match was 0.65).
+- `StructuralSignals`: label (LabeledBy / preceding sibling Text), ancestors, relative bounds — recorded by the inspector (plus FrameworkId) and computed for resolution candidates. Controls without AutomationId are now found by their label, also after moving; duplicate labels are ambiguous.
+- TestTarget: labelled, unnamed fields "Observações:" / "Lote:" (swapped by `alternate`), `duplicate-labels` variant.
+- `IntegrationHealthTracker` + monitor line: Healthy / Degraded / Broken with reasons.
+- The Agent's hover/confirmed text shows the detected label.
+- Evidence: run 37226388696 (push) / 37226391838 (PR) on 955f124 — Domain 66, Infrastructure 43, Application 97, Windows 15, integration 42 (263) + 30 x86, all passing.
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
@@ -65,7 +76,7 @@ Plan: `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`. All 5 task
 ### Exact next action
 
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
-2. Review/merge PR #2 (it now contains milestone 1 and plan 4), then pick the next plan from `docs/roadmap.md` (selector resilience: ancestors/labels/relative position, `Degraded`/`Broken` states).
+2. Review/merge PR #2 (milestone 1 + plans 4 and 5), then pick the next plan from `docs/roadmap.md` (dispatcher recovery for wedged UIA calls, or event transport).
 
 ---
 
