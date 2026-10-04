@@ -21,7 +21,7 @@ public sealed class SelectorMatcherTests
 
         Assert.Equal(SelectorMatchStatus.Found, result.Status);
         Assert.Equal("add", result.CandidateId);
-        Assert.InRange(result.Score, 60, 100);
+        Assert.Equal(1.0, result.Confidence); // every signal the selector has matched
         Assert.Contains("automationId", result.Evidence.Keys);
         Assert.Contains("controlType", result.Evidence.Keys);
     }
@@ -39,7 +39,7 @@ public sealed class SelectorMatcherTests
 
         Assert.Equal(SelectorMatchStatus.NotFound, result.Status);
         Assert.Null(result.CandidateId);
-        Assert.InRange(result.Score, 1, 10);
+        Assert.InRange(result.Score, 1, new SelectorWeights().MinimumScore - 1);
         Assert.Contains("relativeBounds", result.Evidence.Keys);
     }
 
@@ -57,7 +57,7 @@ public sealed class SelectorMatcherTests
 
         Assert.Equal(SelectorMatchStatus.Ambiguous, result.Status);
         Assert.Null(result.CandidateId);
-        Assert.InRange(result.Score, 70, 100);
+        Assert.InRange(result.Score, new SelectorWeights().MinimumScore, 100);
         Assert.Contains("name", result.Evidence.Keys);
     }
 
@@ -108,7 +108,7 @@ public sealed class SelectorMatcherTests
 
         Assert.Equal(SelectorMatchStatus.Found, result.Status);
         Assert.Equal("add", result.CandidateId);
-        Assert.InRange(result.Score, 60, 100);
+        Assert.Equal(1.0, result.Confidence);
         Assert.Equal(new[] { "automationId", "controlType" }, result.Evidence.Keys.OrderBy(key => key));
     }
 
@@ -132,7 +132,6 @@ public sealed class SelectorMatcherTests
 
         Assert.Equal(SelectorMatchStatus.Found, result.Status);
         Assert.Equal("semantic", result.CandidateId);
-        Assert.InRange(result.Score, 60, 100);
         Assert.DoesNotContain("ancestors", result.Evidence.Keys);
     }
 
@@ -153,7 +152,7 @@ public sealed class SelectorMatcherTests
 
         Assert.Equal(SelectorMatchStatus.NotFound, result.Status);
         Assert.Null(result.CandidateId);
-        Assert.InRange(result.Score, 1, 10);
+        Assert.InRange(result.Score, 1, new SelectorWeights().MinimumScore - 1);
         Assert.Contains("ancestors", result.Evidence.Keys);
         Assert.Contains("nearbyLabels", result.Evidence.Keys);
         Assert.Contains("relativeBounds", result.Evidence.Keys);
@@ -193,6 +192,127 @@ public sealed class SelectorMatcherTests
         Assert.Equal(SelectorMatchStatus.Found, result.Status);
         Assert.Equal("customer", result.CandidateId);
         Assert.Contains("name", result.Evidence.Keys);
+    }
+
+    private static readonly ImmutableArray<AncestorFingerprint> FormAncestors =
+        ImmutableArray.Create(new AncestorFingerprint(ControlType: "ControlType.Pane", Name: "Dados do item"), new AncestorFingerprint(ControlType: "ControlType.Window"));
+
+    private static ElementFingerprint UnlabeledEdit(string? label, RelativeBounds? bounds) => new(
+        "erp.exe", "Main", ControlType: "ControlType.Edit", ClassName: "TextBox", FrameworkId: "WPF",
+        Ancestors: FormAncestors,
+        NearbyLabels: label is null ? default : ImmutableArray.Create(label),
+        RelativeBounds: bounds);
+
+    [Fact]
+    public void A_control_without_AutomationId_is_found_by_its_label_and_structure()
+    {
+        var selector = UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05));
+        var candidates = new[]
+        {
+            new ElementCandidate("notes", UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05))),
+            new ElementCandidate("batch", UnlabeledEdit("Lote", new(0.1, 0.6, 0.4, 0.05))),
+            new ElementCandidate("unlabeled", UnlabeledEdit(null, new(0.1, 0.7, 0.4, 0.05))),
+        };
+
+        var result = matcher.Match(selector, candidates, new SelectorWeights());
+
+        Assert.Equal(SelectorMatchStatus.Found, result.Status);
+        Assert.Equal("notes", result.CandidateId);
+        Assert.Equal(1.0, result.Confidence);
+        Assert.Contains("nearbyLabels", result.Evidence.Keys);
+    }
+
+    [Fact]
+    public void A_labelled_control_that_moved_is_still_found_with_lower_confidence()
+    {
+        var selector = UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05));
+        var candidates = new[]
+        {
+            new ElementCandidate("notes", UnlabeledEdit("Observações", new(0.5, 0.1, 0.4, 0.05))),
+            new ElementCandidate("batch", UnlabeledEdit("Lote", new(0.1, 0.5, 0.4, 0.05))),
+        };
+
+        var result = matcher.Match(selector, candidates, new SelectorWeights());
+
+        Assert.Equal(SelectorMatchStatus.Found, result.Status);
+        Assert.Equal("notes", result.CandidateId);
+        Assert.InRange(result.Confidence, 0.8, 0.99);
+        Assert.DoesNotContain("relativeBounds", result.Evidence.Keys);
+    }
+
+    [Fact]
+    public void Two_controls_without_AutomationId_sharing_a_label_are_ambiguous()
+    {
+        var selector = UnlabeledEdit("Observações", null);
+        var candidates = new[]
+        {
+            new ElementCandidate("first", UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05))),
+            new ElementCandidate("second", UnlabeledEdit("Observações", new(0.1, 0.6, 0.4, 0.05))),
+        };
+
+        var result = matcher.Match(selector, candidates, new SelectorWeights());
+
+        Assert.Equal(SelectorMatchStatus.Ambiguous, result.Status);
+        Assert.Null(result.CandidateId);
+    }
+
+    [Fact]
+    public void An_unlabeled_control_without_AutomationId_is_never_guessed_from_type_and_structure_alone()
+    {
+        var selector = UnlabeledEdit(null, null);
+        var candidates = new[] { new ElementCandidate("only", UnlabeledEdit(null, new(0.1, 0.7, 0.4, 0.05))) };
+
+        var result = matcher.Match(selector, candidates, new SelectorWeights());
+
+        Assert.Equal(SelectorMatchStatus.NotFound, result.Status);
+    }
+
+    [Fact]
+    public void Position_weighs_less_than_any_semantic_or_structural_signal()
+    {
+        var weights = new SelectorWeights();
+
+        Assert.True(weights.RelativeBounds < weights.Ancestors);
+        Assert.True(weights.RelativeBounds < weights.NearbyLabels);
+        Assert.True(weights.RelativeBounds < weights.ControlType);
+        Assert.True(weights.RelativeBounds < weights.AutomationId);
+        Assert.True(weights.RelativeBounds < weights.Name);
+    }
+
+    [Fact]
+    public void An_AutomationId_alone_is_a_strong_enough_match()
+    {
+        var selector = new ElementFingerprint("erp.exe", "Main", AutomationId: "add");
+        var candidates = new[] { new ElementCandidate("add", new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button")) };
+
+        var result = matcher.Match(selector, candidates, new SelectorWeights());
+
+        Assert.Equal(SelectorMatchStatus.Found, result.Status);
+        Assert.Equal(1.0, result.Confidence);
+    }
+
+    [Fact]
+    public void Confidence_is_the_share_of_the_selectors_own_signals_that_matched()
+    {
+        var selector = new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button", Name: "Adicionar");
+        var candidates = new[] { new ElementCandidate("add", new ElementFingerprint("erp.exe", "Main", AutomationId: "add", ControlType: "Button", Name: "Add")) };
+        var weights = new SelectorWeights();
+
+        var result = matcher.Match(selector, candidates, weights);
+
+        Assert.Equal(SelectorMatchStatus.Found, result.Status);
+        var expected = (double)(weights.AutomationId + weights.ControlType) / (weights.AutomationId + weights.ControlType + weights.Name);
+        Assert.Equal(expected, result.Confidence, precision: 6);
+    }
+
+    [Fact]
+    public void Weights_are_version_2_and_total_100()
+    {
+        var weights = new SelectorWeights();
+
+        Assert.Equal(2, SelectorWeights.Version);
+        Assert.Equal(100, weights.AutomationId + weights.ControlType + weights.Name + weights.ClassName + weights.FrameworkId
+            + weights.Ancestors + weights.NearbyLabels + weights.RelativeBounds);
     }
 
     [Theory]

@@ -24,23 +24,24 @@ public sealed class SelectorMatcher
             .ThenBy(item => item.candidate.Id, StringComparer.Ordinal)
             .ToArray();
 
+        var available = AvailableWeight(selector, weights);
         if (scored.Length == 0)
         {
-            return new SelectorMatch(SelectorMatchStatus.NotFound, null, 0, ImmutableDictionary<string, int>.Empty);
+            return new SelectorMatch(SelectorMatchStatus.NotFound, null, 0, ImmutableDictionary<string, int>.Empty, available);
         }
 
         var best = scored[0];
         if (best.score < weights.MinimumScore)
         {
-            return new SelectorMatch(SelectorMatchStatus.NotFound, null, best.score, best.evidence);
+            return new SelectorMatch(SelectorMatchStatus.NotFound, null, best.score, best.evidence, available);
         }
 
         if (scored.Length > 1 && best.score - scored[1].score < weights.MinimumLead)
         {
-            return new SelectorMatch(SelectorMatchStatus.Ambiguous, null, best.score, best.evidence);
+            return new SelectorMatch(SelectorMatchStatus.Ambiguous, null, best.score, best.evidence, available);
         }
 
-        return new SelectorMatch(SelectorMatchStatus.Found, best.candidate.Id, best.score, best.evidence);
+        return new SelectorMatch(SelectorMatchStatus.Found, best.candidate.Id, best.score, best.evidence, available);
     }
 
     private static ImmutableDictionary<string, int> Score(
@@ -77,6 +78,21 @@ public sealed class SelectorMatcher
         }
 
         return evidence.ToImmutable();
+    }
+
+    /// <summary>The total weight of the signals this selector carries - its best possible score.</summary>
+    private static int AvailableWeight(ElementFingerprint selector, SelectorWeights weights)
+    {
+        var total = 0;
+        if (!string.IsNullOrWhiteSpace(selector.AutomationId)) total += weights.AutomationId;
+        if (!string.IsNullOrWhiteSpace(selector.ControlType)) total += weights.ControlType;
+        if (!string.IsNullOrWhiteSpace(selector.Name)) total += weights.Name;
+        if (!string.IsNullOrWhiteSpace(selector.ClassName)) total += weights.ClassName;
+        if (!string.IsNullOrWhiteSpace(selector.FrameworkId)) total += weights.FrameworkId;
+        if (!selector.Ancestors.IsDefaultOrEmpty) total += weights.Ancestors;
+        if (!selector.NearbyLabels.IsDefaultOrEmpty) total += weights.NearbyLabels;
+        if (selector.RelativeBounds is not null) total += weights.RelativeBounds;
+        return total;
     }
 
     private static void AddIfMatched(
