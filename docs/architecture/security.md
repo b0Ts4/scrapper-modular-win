@@ -6,5 +6,6 @@
 - **Technical logs** (`StructuredTechnicalLog`, JSON lines) record IDs, codes, provider, confidence and timings. No log call site passes a captured value; trigger-watch failures log only the exception type. End-to-end tests assert captured values are absent from the log.
 - **Test mode** values stay in memory (`TestModeViewModel.Report`); nothing persists them.
 - **Display.** The Desktop monitor shows decrypted event values on screen for the operator; they are not written anywhere else.
-- **Retention.** Confirmed events: 7 days. Pending events: kept until confirmed, with capacity alerts. An explicit "clear local data" command is not implemented yet (roadmap).
+- **Retention.** Confirmed events: 7 days. Pending events: kept until confirmed; the Desktop shows an orange/red alert at 1000/5000 pending events (configurable) and never deletes them automatically.
+- **Explicit cleanup.** *Clear Local Data...* (disabled while monitoring, confirmed by the operator) deletes every queued event, then `VACUUM`s the database so freed pages hold no ciphertext, and empties the technical log. Configurations are kept.
 - **DPAPI scope** ties data to the Windows user running the Agent; moving to a Windows service requires a migration strategy (spec §15).

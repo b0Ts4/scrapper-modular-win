@@ -33,14 +33,20 @@
 - **Desktop**: trigger actions (capture, emit, clear, transition, finish/cancel) via `TriggerActionsBuilder`; configuration summary; test mode hosted (`Prepare Test`), shows values read; Activate/Stop through `RuntimeMonitorViewModel` with Portuguese diagnostics and persisted events; data in `%LOCALAPPDATA%\Prescriva\Agent` (`PRESCRIVA_AGENT_DATA` override); retention applied at start-up.
 - **Docs**: `docs/architecture/*`, `docs/roadmap.md`, `docs/testing/milestone-1-manual.md`, README, setup, testing.
 
+### Second round (same day): closing the remaining acceptance gaps
+
+- **Spec §10 gaps closed**: visible pending-events alert (`OutboxCapacityPolicy` in the monitor, thresholds 1000/5000, `PRESCRIVA_AGENT_OUTBOX_WARNING`/`_CRITICAL`) and explicit, confirmed *Clear Local Data* (all events + `VACUUM`, technical log emptied, configurations kept; refused while monitoring).
+- **Fix**: closing the monitored application no longer shows a red `TriggerWatchFailed` — a watch failure is reported only if it outlives the 2 s retry delay (RED observed on CI run 37215833760, GREEN 37215836025).
+- **Fix**: preparing a new test resets the test-mode status, so a previous verdict is never shown for the new run.
+- **Automation of the remaining manual rows**: `DesktopResilienceWalkthroughTests` (restart + reload, approval re-earned, empty required field rejected, capacity alert, app closed mid-session, cleanup, moved layout, ambiguity); the hover step now asserts the overlay window is within 2 px of the control and saves screenshots (reviewed: outline around the text box and the Add button).
+- **x86**: CI publishes a self-contained `win-x86` TestTarget and re-runs 30 integration tests against it (bitness asserted) — all pass.
+- Evidence: run 37216735104 — Domain 58, Infrastructure 31, Application 76, Windows 15, integration 37 (217 total) + 30 on x86, all passing.
+
 ### Not verified / known issues
 
-- **Person-driven walkthrough on Windows 10/11**: not performed. Open rows in `docs/testing/milestone-1-manual.md`: overlay outline drawn on the right control, reload after restarting the Agent, rejected-field message / moved layout / ambiguity seen through the Desktop UI. CI ran on Windows Server 2025, not a Windows 10/11 client.
-- Approvals live in memory: after restarting the Agent the configuration must be tested again before activation.
-- When the monitored application closes, the trigger liveness check can report one `TriggerWatchFailed` error before the session is closed (≤ instance poll interval, 500 ms). Cosmetic but red.
-- No explicit "clear local data" command and no visible capacity alert in the Desktop yet (Infrastructure `OutboxCapacityPolicy` exists).
+- **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
+- Approvals live in memory: after restarting the Agent the configuration must be tested again before activation (by design for now; roadmap item 1).
 - The configurator cannot remove/edit fields or triggers; fields are added to the stage in the Stage box.
-- The plan's x86 verification remains open (no x86 sample exists).
 - Older limitations below remain unless marked resolved.
 
 ### Important files
@@ -49,7 +55,7 @@
 
 ### Exact next action
 
-1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop and records the result in its table; fix anything it finds (with a test first).
+1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
 2. Then use the branch-finishing workflow to integrate the branch, and pick the next plan from `docs/roadmap.md` (operator data controls are the first candidate).
 
 ---

@@ -12,17 +12,21 @@ dotnet test Prescriva.Agent.slnx --configuration Release --no-build
 | Project | Tests | Runs on |
 | --- | --- | --- |
 | `Prescriva.Agent.Domain.Tests` | 58 | any OS |
-| `Prescriva.Agent.Infrastructure.Tests` | 29 | Windows (DPAPI tests throw `PlatformNotSupportedException` elsewhere) |
-| `Prescriva.Agent.Application.Tests` | 73 | Windows (references the WPF Desktop project) |
+| `Prescriva.Agent.Infrastructure.Tests` | 31 | Windows (DPAPI tests throw `PlatformNotSupportedException` elsewhere) |
+| `Prescriva.Agent.Application.Tests` | 76 | Windows (references the WPF Desktop project) |
 | `Prescriva.Agent.Windows.Tests` | 15 | Windows |
-| `Prescriva.Agent.Windows.IntegrationTests` | 35 | Windows **with an interactive desktop** (launch TestTarget/Desktop, real UI Automation, real cursor) |
+| `Prescriva.Agent.Windows.IntegrationTests` | 37 (+30 re-run against a 32-bit TestTarget) | Windows **with an interactive desktop** (launch TestTarget/Desktop, real UI Automation, real cursor) |
 
-Total: 210, all passing (six consecutive green runs on the final commit, `DesktopWalkthroughTests` included). CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
+Total: 217, all passing, plus the 30-test x86 pass. CI also saves screenshots of every hover (uploaded with the results; small crops are printed in the log). CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
 
 End-to-end coverage of the milestone:
 
 - `EndToEnd/MilestoneFlowTests` — the production pipeline with no fakes: JSON save/reload, test mode + approval, activation gate (`NotTested` without approval and after an edit), two `item_added` + `budget_finished` from real UIA invokes, a restarted outbox still holding the three events in order, and captured values absent from the database bytes and the technical log.
 - `EndToEnd/DesktopWalkthroughTests` — the same flow through the compiled `Prescriva.Agent.Desktop.exe` UI: the real OS cursor hovers TestTarget controls during inspection; the Agent's buttons/text boxes are driven through UIA Invoke/Value patterns; results are read back from the Agent's own status text, diagnostics and events lists, and from the `events.db`/`technical.jsonl` it leaves behind.
+
+- `EndToEnd/DesktopResilienceWalkthroughTests` — Agent restart and reload, approval required again, a required field left empty (visible rejection, no event), the capacity alert, the monitored application closing mid-session (no error), confirmed local-data cleanup, a moved layout and duplicated controls (ambiguous, approval blocked).
+
+Environment knobs used by the tests: `PRESCRIVA_AGENT_DATA` (Agent data directory), `PRESCRIVA_AGENT_OUTBOX_WARNING`/`_CRITICAL` (alert thresholds), `PRESCRIVA_TESTTARGET_EXE` and `PRESCRIVA_TESTTARGET_EXPECTED_BITNESS` (x86 pass), `PRESCRIVA_SCREENSHOT_DIR` (hover screenshots).
 
 The visual checks no automated test can make (overlay drawn in the right place, layout readable) are in the [milestone walkthrough](testing/milestone-1-manual.md).
 

@@ -6,7 +6,7 @@ Configure, test, activate and capture against `Prescriva.Agent.TestTarget` with 
 
 ## Next candidates
 
-1. **Operator data controls:** explicit "clear local data", visible capacity alert in the Desktop, persisted approvals (today approvals live in memory until the Agent restarts).
+1. **Persisted approvals:** today an approval lives in memory and the configuration must be re-tested after the Agent restarts. (Clear-local-data and the capacity alert shipped in milestone 1.)
 2. **Selector resilience:** populate ancestors, nearby labels and relative position so controls without a stable `AutomationId` can be resolved; persist the `SelectorWeights` version with configurations; `Degraded`/`Broken` integration states with visible reasons.
 3. **Configurator UX:** remove/edit fields and triggers, per-field required/optional editing, stage list editing, tray icon.
 4. **Dispatcher recovery:** recover the UIA STA thread after a wedged COM call (hung target process).
