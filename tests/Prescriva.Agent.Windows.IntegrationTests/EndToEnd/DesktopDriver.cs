@@ -303,10 +303,13 @@ internal static class DesktopDriver
             SelectObject(memoryDc, previous);
             var source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
                 bitmap, IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
-            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(source));
-            using var file = File.Create(path);
-            encoder.Save(file);
+            Save(source, path);
+
+            // A small crop of the area the walkthrough places TestTarget in, cheap enough
+            // to print into the CI log when artifacts cannot be downloaded.
+            var crop = new System.Windows.Media.Imaging.CroppedBitmap(
+                source, new System.Windows.Int32Rect(0, 0, Math.Min(560, width), Math.Min(500, height)));
+            Save(crop, Path.ChangeExtension(path, null) + "-crop.png");
         }
         finally
         {
@@ -314,6 +317,14 @@ internal static class DesktopDriver
             DeleteDC(memoryDc);
             ReleaseDC(IntPtr.Zero, screenDc);
         }
+    }
+
+    private static void Save(System.Windows.Media.Imaging.BitmapSource image, string path)
+    {
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+        using var file = File.Create(path);
+        encoder.Save(file);
     }
 
     [StructLayout(LayoutKind.Sequential)]

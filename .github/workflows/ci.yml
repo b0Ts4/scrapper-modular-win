@@ -41,6 +41,19 @@ jobs:
           --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
           --results-directory TestResults
 
+      - name: Print hover screenshots (base64 crops, for reviewers without artifact access)
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($name in 'hover-MedicationTextBox-crop', 'hover-AddButton-crop') {
+            $path = Join-Path $env:GITHUB_WORKSPACE "TestResults/screenshots/$name.png"
+            if (Test-Path $path) {
+              Write-Output "===BEGIN $name==="
+              Write-Output ([Convert]::ToBase64String([IO.File]::ReadAllBytes($path)))
+              Write-Output "===END $name==="
+            }
+          }
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
