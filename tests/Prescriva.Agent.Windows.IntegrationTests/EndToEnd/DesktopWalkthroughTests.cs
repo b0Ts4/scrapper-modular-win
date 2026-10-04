@@ -129,7 +129,7 @@ public sealed class DesktopWalkthroughTests : IDisposable
         Press(agent, "ActivateButton");
         await WaitUntilAsync(
             () => ListTexts(agent, "DiagnosticsList").Count(text => text.Contains("Monitorando gatilho", StringComparison.Ordinal)) >= 2,
-            () => string.Join(" | ", ListTexts(agent, "DiagnosticsList")) + " / " + Text(agent, "MonitorStatusText"));
+            () => string.Join(" | ", ListTexts(agent, "DiagnosticsList")) + " / " + Text(agent, "MonitorStatusText") + " / log: " + ReadTechnicalLog());
 
         SetMedicine(target, "Dipirona-UI-2", "500mg-UI-2", "12-UI-2");
         Press(target.Window, "AddButton");
@@ -164,6 +164,22 @@ public sealed class DesktopWalkthroughTests : IDisposable
         Assert.DoesNotContain("Amoxicilina-UI", technicalLog, StringComparison.Ordinal);
     }
 
+    /// <summary>The Agent's technical log (IDs, codes, timings only), for failure messages.</summary>
+    private string ReadTechnicalLog()
+    {
+        try
+        {
+            using var stream = new FileStream(
+                Path.Combine(_dataDirectory, "logs", "technical.jsonl"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (IOException exception)
+        {
+            return $"(unreadable: {exception.GetType().Name})";
+        }
+    }
+
     private static async Task HoverAndConfirmAsync(AutomationElement agent, TestTargetLauncher target, string automationId)
     {
         var rect = Find(target.Window, automationId).Current.BoundingRectangle;
@@ -182,10 +198,10 @@ public sealed class DesktopWalkthroughTests : IDisposable
         await WaitForTextAsync(agent, "ConfirmedSelectionText", $"AutomationId='{automationId}'");
     }
 
-    private static Task WaitForEventsAsync(AutomationElement agent, int count) =>
+    private Task WaitForEventsAsync(AutomationElement agent, int count) =>
         WaitUntilAsync(
             () => ListTexts(agent, "EventsList").Length >= count,
-            () => string.Join(" | ", ListTexts(agent, "DiagnosticsList")));
+            () => string.Join(" | ", ListTexts(agent, "DiagnosticsList")) + " / log: " + ReadTechnicalLog());
 
     private static Task WaitForTextAsync(AutomationElement root, string automationId, string expected) =>
         WaitUntilAsync(
