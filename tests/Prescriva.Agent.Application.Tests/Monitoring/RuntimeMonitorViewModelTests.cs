@@ -180,7 +180,7 @@ public sealed class RuntimeMonitorViewModelTests
         Assert.Equal(string.Empty, harness.ViewModel.HealthText);
 
         await harness.ViewModel.StartAsync(configuration, Approve(configuration));
-        Assert.Contains("Saudável", harness.ViewModel.HealthText, StringComparison.Ordinal);
+        Assert.Contains("Integração saudável", harness.ViewModel.HealthText, StringComparison.Ordinal);
 
         harness.InstanceSource.Start(new ApplicationInstance(Guid.NewGuid(), 4242));
         await WaitUntilAsync(() => harness.ViewModel.Diagnostics.Any(d => d.Message.StartsWith("Monitorando", StringComparison.Ordinal)));
@@ -188,7 +188,7 @@ public sealed class RuntimeMonitorViewModelTests
         harness.Capture.Unavailable = true;
         harness.Triggers.Fire("add_item");
         await WaitUntilAsync(() => harness.ViewModel.HealthState == IntegrationHealthState.Broken);
-        Assert.Contains("Quebrada", harness.ViewModel.HealthText, StringComparison.Ordinal);
+        Assert.Contains("Integração quebrada", harness.ViewModel.HealthText, StringComparison.Ordinal);
         Assert.Contains("medication", harness.ViewModel.HealthText, StringComparison.Ordinal);
 
         await Task.Delay(600); // past the double-click de-duplication window
@@ -196,7 +196,7 @@ public sealed class RuntimeMonitorViewModelTests
         harness.Capture.Value = "Dipirona";
         harness.Triggers.Fire("add_item");
         await WaitUntilAsync(() => harness.ViewModel.HealthState == IntegrationHealthState.Healthy);
-        Assert.Contains("Saudável", harness.ViewModel.HealthText, StringComparison.Ordinal);
+        Assert.Contains("Integração saudável", harness.ViewModel.HealthText, StringComparison.Ordinal);
 
         await harness.ViewModel.StopAsync();
     }
