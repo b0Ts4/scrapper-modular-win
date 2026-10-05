@@ -56,6 +56,11 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
                 nameof(handle));
         }
 
+        if (field.Kind == FieldKind.File)
+        {
+            return await CaptureFileAsync(uiaHandle, field, cancellationToken).ConfigureAwait(false);
+        }
+
         var stopwatch = Stopwatch.StartNew();
         try
         {
@@ -82,6 +87,48 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
                 : CaptureOutcome.ElementUnavailable;
             var attempts = new[] { new PatternAttempt("n/a", Succeeded: false, failure.Message) };
             return new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, attempts);
+        }
+    }
+
+    /// <summary>
+    /// A file field: the probe (text or screen image) runs on the dispatcher thread; reading
+    /// a file from disk does not, so a large file never blocks UI Automation.
+    /// </summary>
+    private async Task<CaptureResult> CaptureFileAsync(UiaResolvedElementHandle handle, FieldDefinition field, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var probe = await _dispatcher.RunAsync(
+                _ => FileFieldCapture.ProbeOnDispatcherThread(handle.Element),
+                _timeout,
+                cancellationToken).ConfigureAwait(false);
+
+            if (probe.Failure is { } failure)
+            {
+                return new CaptureResult(failure, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("File", false, probe.Detail)]);
+            }
+
+            if (probe.Png is { } png)
+            {
+                var attachment = new CapturedAttachment(png, field.Id + ".png", "image/png", AttachmentSource.Screen);
+                return png.LongLength > AttachmentLimits.MaxBytes
+                    ? new CaptureResult(CaptureOutcome.TooLarge, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("Screen", false, "too large")])
+                    : new CaptureResult(CaptureOutcome.Captured, null, CaptureResult.UiaProviderId, 1.0, stopwatch.Elapsed, [new PatternAttempt("Screen", true)], attachment);
+            }
+
+            var (outcome, file) = await FileFieldCapture.ReadFileAsync(probe.Path!, cancellationToken).ConfigureAwait(false);
+            return new CaptureResult(outcome, null, CaptureResult.UiaProviderId, outcome == CaptureOutcome.Captured ? 1.0 : 0, stopwatch.Elapsed,
+                [new PatternAttempt("File", outcome == CaptureOutcome.Captured)], file);
+        }
+        catch (ElementInspectionFailure failure) when (failure.Kind == ElementInspectionFailureKind.Cancelled)
+        {
+            throw new OperationCanceledException(failure.Message, failure, cancellationToken);
+        }
+        catch (ElementInspectionFailure failure)
+        {
+            var outcome = failure.Kind == ElementInspectionFailureKind.TimedOut ? CaptureOutcome.TimedOut : CaptureOutcome.ElementUnavailable;
+            return new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("File", false, failure.Message)]);
         }
     }
 

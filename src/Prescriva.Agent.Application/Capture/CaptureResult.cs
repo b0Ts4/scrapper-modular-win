@@ -14,6 +14,15 @@ public enum CaptureOutcome
 
     /// <summary>The operation did not complete within its allotted timeout.</summary>
     TimedOut,
+
+    /// <summary>A file field's control shows a path that does not exist or cannot be read, or no content at all.</summary>
+    FileUnavailable,
+
+    /// <summary>A file field's content exceeds <see cref="AttachmentLimits.MaxBytes"/>; nothing was read.</summary>
+    TooLarge,
+
+    /// <summary>An image-only control is off screen or covered by another window, so it was not captured.</summary>
+    Obscured,
 }
 
 /// <summary>
@@ -35,7 +44,8 @@ public sealed record CaptureResult(
     string ProviderId,
     double Confidence,
     TimeSpan Duration,
-    IReadOnlyList<PatternAttempt> Attempts)
+    IReadOnlyList<PatternAttempt> Attempts,
+    CapturedAttachment? Attachment = null)
 {
     /// <summary>The provider ID reported by every capture produced by the UI Automation provider.</summary>
     public const string UiaProviderId = "uia";
