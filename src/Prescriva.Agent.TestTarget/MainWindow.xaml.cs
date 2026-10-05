@@ -174,5 +174,35 @@ public partial class MainWindow : Window
             width, height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, width * 4);
     }
 
+    private void ShowScannedTextButton_Click(object sender, RoutedEventArgs e) => ShowScannedText("DIPIRONA 500 MG");
+
+    private void ShowOtherScannedTextButton_Click(object sender, RoutedEventArgs e) => ShowScannedText("AMOXICILINA 875 MG");
+
+    /// <summary>Renders <paramref name="text"/> into a bitmap: black on white, like a scan.</summary>
+    private void ShowScannedText(string text)
+    {
+        const int width = 298;
+        const int height = 42;
+        var visual = new System.Windows.Media.DrawingVisual();
+        using (var context = visual.RenderOpen())
+        {
+            context.DrawRectangle(System.Windows.Media.Brushes.White, null, new Rect(0, 0, width, height));
+            var formatted = new System.Windows.Media.FormattedText(
+                text,
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new System.Windows.Media.Typeface("Arial"),
+                24,
+                System.Windows.Media.Brushes.Black,
+                1.0);
+            context.DrawText(formatted, new Point(8, (height - formatted.Height) / 2));
+        }
+
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        ScannedPrescriptionImage.Source = bitmap;
+    }
+
     private sealed record GridRow(string Medication, string Concentration, string Quantity);
 }

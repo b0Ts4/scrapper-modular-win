@@ -68,8 +68,23 @@
                         AllowDrop="True" Drop="PrescriptionDropZone_Drop" Background="WhiteSmoke">
                     <Image x:Name="PrescriptionImage" Stretch="Fill" />
                 </Border>
-                <Button x:Name="ShowSampleImageButton" Content="Mostrar imagem de exemplo" Margin="6,0,0,0"
-                        VerticalAlignment="Top" Click="ShowSampleImageButton_Click" />
+                <StackPanel Margin="6,0,0,0">
+                    <Button x:Name="ShowSampleImageButton" Content="Mostrar imagem de exemplo"
+                            HorizontalAlignment="Left" Click="ShowSampleImageButton_Click" />
+                    <!--
+                        A "scanned prescription": text shown only as an image, with no text
+                        exposed to UI Automation - the case OCR fields exist for. The buttons
+                        render deterministic samples for the tests.
+                    -->
+                    <TextBlock Text="Receita digitalizada:" Margin="0,4,0,0" />
+                    <Border Width="300" Height="44" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left">
+                        <Image x:Name="ScannedPrescriptionImage" Stretch="None" />
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                        <Button x:Name="ShowScannedTextButton" Content="Mostrar receita digitalizada" Click="ShowScannedTextButton_Click" />
+                        <Button x:Name="ShowOtherScannedTextButton" Content="Outra receita" Margin="6,0,0,0" Click="ShowOtherScannedTextButton_Click" />
+                    </StackPanel>
+                </StackPanel>
             </StackPanel>
         </StackPanel>
 
