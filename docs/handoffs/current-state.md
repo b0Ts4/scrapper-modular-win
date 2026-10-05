@@ -84,7 +84,7 @@ Plan: `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md`, after
 - **Test-mode evidence** (spec §8): matched signals with weights, lead over the runner-up (`SelectorMatch.RunnerUpScore`), duration per field and trigger, `SelectorFragility` warnings (no AutomationId, confidence < 80%, narrow lead, position-only), trigger effects.
 - **Fix (found by CI)**: stopping monitoring could surface `OperationCanceledException` from `ActivateAsync` when the cancellation landed outside the instance poll's wait (MilestoneFlowTests on run 37356461035); cancellation is now always a normal end.
 - **Start with Windows**: opt-in *Iniciar com o Windows* (per-user Run key, `--background`); tray icon (show / stop / exit, monitoring tooltip, notifications); closing while monitoring hides to the tray; one Agent per data directory (a second start shows the running window); `--background` resumes only the integration left active (`monitoring.json`, written on Activate, cleared by Stop) and only while it is approved for its content.
-- Evidence: see the CI run listed in the PR for the final commit of this plan.
+- Evidence: run 37358301438 on 77da6cb — Domain 68, Infrastructure 62, Application 130, Windows 18, integration 51 (329) + 30 x86, all passing; `DesktopStartWithWindowsTests` (3) passed first time.
 - Not automated: a real Windows sign-in, the tray icon/menu/notification rendering (manual rows 24–25).
 
 ### Not verified / known issues
