@@ -13,3 +13,7 @@ Configure, test, activate and capture against `Prescriva.Agent.TestTarget` with 
 5. **Providers:** MSAA/Win32 providers, then OCR for applications without usable UI Automation.
 6. **Transport:** deliver outbox events to the backend with idempotent confirmation (`MarkConfirmedAsync`), driving the 7-day retention of confirmed events.
 7. **Packaging:** signed installer/updater (also removes Smart App Control friction on developer machines).
+
+## Shipped after milestone 1
+
+- File and image fields (`docs/superpowers/plans/2026-10-05-file-and-image-fields.md`). Possible follow-ups: capturing every file of an attachment list, choosing a per-field size limit or accepted types, OCR of captured images.

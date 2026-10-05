@@ -9,3 +9,4 @@
 - **Retention.** Confirmed events: 7 days. Pending events: kept until confirmed; the Desktop shows an orange/red alert at 1000/5000 pending events (configurable) and never deletes them automatically.
 - **Explicit cleanup.** *Clear Local Data...* (disabled while monitoring, confirmed by the operator) deletes every queued event, then `VACUUM`s the database so freed pages hold no ciphertext, and empties the technical log. Configurations are kept.
 - **DPAPI scope** ties data to the Windows user running the Agent; moving to a Windows service requires a migration strategy (spec §15).
+- **Attachments** (file fields): content and original file name encrypted with DPAPI in the `attachments` table; only SHA-256, size, type and source are plain. At most 10 MB each. Screen captures cover only the configured control and are refused when anything covers it. The technical log records size and source, never the file name or content.

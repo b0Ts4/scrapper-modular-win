@@ -12,12 +12,12 @@ dotnet test Prescriva.Agent.slnx --configuration Release --no-build
 | Project | Tests | Runs on |
 | --- | --- | --- |
 | `Prescriva.Agent.Domain.Tests` | 66 | any OS |
-| `Prescriva.Agent.Infrastructure.Tests` | 43 | Windows (DPAPI tests throw `PlatformNotSupportedException` elsewhere) |
-| `Prescriva.Agent.Application.Tests` | 97 | Windows (references the WPF Desktop project) |
+| `Prescriva.Agent.Infrastructure.Tests` | 55 | Windows (DPAPI tests throw `PlatformNotSupportedException` elsewhere) |
+| `Prescriva.Agent.Application.Tests` | 105 | Windows (references the WPF Desktop project) |
 | `Prescriva.Agent.Windows.Tests` | 15 | Windows |
-| `Prescriva.Agent.Windows.IntegrationTests` | 42 (+30 re-run against a 32-bit TestTarget) | Windows **with an interactive desktop** (launch TestTarget/Desktop, real UI Automation, real cursor) |
+| `Prescriva.Agent.Windows.IntegrationTests` | 48 (+30 re-run against a 32-bit TestTarget) | Windows **with an interactive desktop** (launch TestTarget/Desktop, real UI Automation, real cursor) |
 
-Total: 263, all passing, plus the 30-test x86 pass. CI also saves screenshots of every hover (uploaded with the results; small crops are printed in the log). CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
+Total: 289, all passing, plus the 30-test x86 pass. CI also saves screenshots of every hover (uploaded with the results; small crops are printed in the log). CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
 
 End-to-end coverage of the milestone:
 
@@ -29,6 +29,8 @@ End-to-end coverage of the milestone:
 - `EndToEnd/DesktopConfigurationLifecycleTests` — an approval survives an Agent restart (activation without retesting); an edit withdraws it, undoing the edit restores it; removing a captured field is refused; removing a trigger requires a new test.
 
 - `Automation/StructuralSelectorTests` and `EndToEnd/DesktopStructuralSelectorWalkthroughTests` — TestTarget's labelled fields without AutomationId ("Observações:", "Lote:") are inspected with their label/ancestors/position, re-found and captured in the default and `alternate` layouts (also through the real Desktop UI), and reported ambiguous in the `duplicate-labels` layout.
+
+- `Automation/FileCaptureTests` and `EndToEnd/DesktopFileFieldWalkthroughTests` — file fields: a path box yields an exact copy (10 MB limit, missing file is a typed failure), an image control yields a PNG of exactly its rectangle (refused when another window covers it); through the real Desktop UI the attachments are stored encrypted, referenced by `item_added`, and read back byte-for-byte.
 
 Integration tests running longer than 60 s are named in the output (`xunit.runner.json`), so a hang is attributable.
 

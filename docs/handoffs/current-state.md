@@ -63,6 +63,18 @@ Plan: `docs/superpowers/plans/2026-10-04-selector-resilience.md`. Tasks 1–4 im
 - The Agent's hover/confirmed text shows the detected label.
 - Evidence: run 37226388696 (push) / 37226391838 (PR) on 955f124 — Domain 66, Infrastructure 43, Application 97, Windows 15, integration 42 (263) + 30 x86, all passing.
 
+### Plan 6 — File and image fields (2026-10-05)
+
+Plan: `docs/superpowers/plans/2026-10-05-file-and-image-fields.md`, from the user's decisions (path box, displayed image, drag-and-drop; keep a copy of the original file; 10 MB). All 5 tasks implemented, tests first (RED: field kind locally; capture on CI run of 8804d06; runtime/test mode/GC on 34fef91).
+
+- `FieldDefinition.Kind` (`Text`/`File`); text-only configurations keep their content hash (characterization test), so existing approvals stay valid.
+- `IAttachmentStore` / `SqliteAttachmentStore`: encrypted content and file name, SHA-256 de-duplication, 10 MB limit, garbage collection, cleanup.
+- `FileFieldCapture`: path → exact copy; image/drop zone → PNG of the control's rectangle, refused if covered.
+- Runtime stores the attachment before the event; test mode and monitor show files by name/size/origin; Desktop "Field type" selector.
+- TestTarget: "Receita (arquivo):" path box with "Procurar...", image drop zone with a deterministic sample.
+- Evidence: run 37347134594 on 58e64da — Domain 66, Infrastructure 55, Application 105, Windows 15, integration 48 (289) + 30 x86, all passing; `DesktopFileFieldWalkthroughTests` passed first time.
+- Limit (accepted): a dropped image's original file is not exposed by UI Automation; the on-screen image is captured instead and marked `screen`. Real Explorer drag-and-drop is not automated (the sample button stands in for it).
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
