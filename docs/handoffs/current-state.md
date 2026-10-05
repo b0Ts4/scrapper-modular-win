@@ -50,7 +50,7 @@ Plan: `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`. All 5 task
 - `IntegrationEditorViewModel`: `RemoveField` (refused while captured, forgets the resolved handle — closes the plan-2 stale-handle limitation), `UpdateField`, `RemoveTrigger`, `ReplaceTriggerActions`, `RemoveStage` (refused while used), duplicate IDs refused on add.
 - Desktop: approval state line, Approve records through the service, Activate uses the stored approval for the current content, edit buttons with refusals shown.
 - Evidence: run 37221107495 (push) and 37221111403 (PR) on 18a463c — Domain 58, Infrastructure 43, Application 90, Windows 15, integration 38 (244) + 30 x86, all passing; `DesktopConfigurationLifecycleTests` passed first time.
-- Observed once (PR run 37220266848): the x86 pass hung 5 min in `ElementInspectionTests` (TimedOut or Cancelled test; TestTarget alive). Not reproduced in 6 following runs. xUnit long-running-test diagnostics are now on so a repeat names the test. Suspect an unbounded cross-process UIA call made directly on the test thread (those tests call `target.Window.Current` with no timeout); not yet root-caused.
+- Observed once (PR run 37220266848): the x86 pass hung 5 min in `ElementInspectionTests` (TimedOut or Cancelled test; TestTarget alive). Not reproduced in 6 following runs. **Root-caused 2026-10-05 (plan 8 session)**: the repeat on run 37387532470 named `FromPointAsync_returns_TimedOut_when_the_timeout_is_effectively_immediate`; a race in `AutomationDispatcher.RunAsync` (deadline flipped to cancelled just before the item ran; the item returned without completing the task and disposed the registration whose callback would have) left the caller awaiting forever. Reproduced locally (3 hangs in 20,000 calls), fixed (0 in 200,000), regression test in `AutomationDispatcherTests`.
 
 ### Plan 5 — Selector resilience (2026-10-04)
 
@@ -87,6 +87,18 @@ Plan: `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md`, after
 - Evidence: run 37358301438 on 77da6cb — Domain 68, Infrastructure 62, Application 130, Windows 18, integration 51 (329) + 30 x86, all passing; `DesktopStartWithWindowsTests` (3) passed first time.
 - Not automated: a real Windows sign-in, the tray icon/menu/notification rendering (manual rows 24–25).
 
+### Plan 8 — OCR text fields, and closing the remaining pending items (2026-10-05)
+
+Plan: `docs/superpowers/plans/2026-10-05-ocr-text-fields.md`, from the user's request for OCR; then the user asked to finish everything pending.
+
+- **OCR fields** (`FieldKind.OcrText`): the configured control's on-screen image (refused when covered) is read with the offline Windows OCR (`Windows.Media.Ocr`); Portuguese preferred (pt-BR > pt > profile > first installed); small images enlarged; image discarded; typed `OcrUnavailable` (not retried) with test-mode guidance to install the Portuguese OCR language. TestTarget: "Receita digitalizada" image with deterministic samples. RED observed on CI run 37387532470 (3 `OcrCaptureTests` against a stub); GREEN on run 37387804617 (`OcrCaptureTests` 3/3, `DesktopOcrFieldWalkthroughTests`). The CI runner has only the en-US recognizer (probe step in `ci.yml`), so Portuguese recognition of accented text is a manual row (26).
+- Windows-facing projects target `net10.0-windows10.0.19041.0` (ADR-001 update).
+- **x86 hang root-caused and fixed** (dispatcher race, above).
+- **Dispatcher recovery**: a call running past 30 s (a hung target application) is abandoned on the next call; queued work moves to a fresh STA thread (`RecoveredCount`). Validated locally with a non-STA copy; `AutomationDispatcherTests` on CI.
+- **Selector weights version** recorded on approvals; an approval tested under other weights no longer activates (existing approval files load as the current version).
+- **IDs**: semantic IDs unique ignoring case; loading a missing configuration fails with `CONFIGURATION_NOT_FOUND` (no file path); saving a case-variant of an existing configuration ID fails with `CONFIGURATION_ID_CONFLICT` (on Windows it would overwrite the other file).
+- **Fix found by CI**: the new TestTarget column made the last row taller, pushing the image drop zone off a 1024×768 screen at the default window position (`FileCaptureTests`); compacted, and the test now places the window.
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
@@ -100,8 +112,8 @@ Plan: `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md`, after
 ### Exact next action
 
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
-2. Review/merge PR #2 (milestone 1 + plans 4–7).
-3. Next plan: OCR (requested by the user) — "text via OCR" field type with the offline Windows OCR over the control's image; then dispatcher recovery or event transport (`docs/roadmap.md`).
+2. Review/merge the PR with plan 8 and the pending-item fixes.
+3. Next plans (`docs/roadmap.md`): event transport to the backend (needs the backend's API), signed installer/updater, configurator list-based editing.
 
 ---
 

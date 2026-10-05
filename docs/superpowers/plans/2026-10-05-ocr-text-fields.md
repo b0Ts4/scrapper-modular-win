@@ -33,23 +33,23 @@
 ---
 
 ### Task 1: Field kind and target framework
-- [ ] RED: `FieldKindTests`: `ocrText` faz round trip em JSON; o hash de uma configuração só-texto continua igual (o teste de caracterização já existe); trocar Texto→OCR muda o hash.
-- [ ] GREEN: `FieldKind.OcrText`. TFM `net10.0-windows10.0.19041.0` para Windows, Desktop e projetos de teste que os referenciam. Os caminhos de executável nos testes são atualizados.
+- [x] RED: `FieldKindTests`: `ocrText` faz round trip em JSON; o hash de uma configuração só-texto continua igual (o teste de caracterização já existe); trocar Texto→OCR muda o hash.
+- [x] GREEN: `FieldKind.OcrText`. TFM `net10.0-windows10.0.19041.0` para Windows, Desktop e projetos de teste que os referenciam. Os caminhos de executável nos testes são atualizados.
 
 ### Task 2: OCR capture on Windows
-- [ ] TestTarget: área "Receita digitalizada:" (`ScannedPrescriptionImage`), uma imagem sem texto acessível, com os botões determinísticos "Mostrar receita digitalizada" (`DIPIRONA 500 MG`) e "Outra receita" (`AMOXICILINA 875 MG`).
-- [ ] RED (integração): `OcrCaptureTests`:
+- [x] TestTarget: área "Receita digitalizada:" (`ScannedPrescriptionImage`), uma imagem sem texto acessível, com os botões determinísticos "Mostrar receita digitalizada" (`DIPIRONA 500 MG`) e "Outra receita" (`AMOXICILINA 875 MG`).
+- [x] RED (integração): `OcrCaptureTests`:
   - o texto da imagem é reconhecido;
   - trocar a imagem muda o valor;
   - o controle coberto por outra janela é `Obscured`;
   - o resultado traz o idioma usado.
-- [ ] RED (unidade): normalização das linhas; escolha do idioma (pt-BR > pt > perfil > primeiro).
-- [ ] GREEN: `ControlImageCapture`, `OcrFieldCapture`, ramo `OcrText` no `UiAutomationCaptureProvider`, `CaptureOutcome.OcrUnavailable`.
+- [x] RED (unidade): normalização das linhas; escolha do idioma (pt-BR > pt > perfil > primeiro).
+- [x] GREEN: `ControlImageCapture`, `OcrFieldCapture`, ramo `OcrText` no `UiAutomationCaptureProvider`, `CaptureOutcome.OcrUnavailable`.
 
 ### Task 3: Runtime, test mode, Desktop and end-to-end
-- [ ] RED: `SessionCoordinatorTests`: `OcrUnavailable` rejeita com `CaptureFailed` sem repetir. Mensagem do modo de teste para OCR indisponível.
-- [ ] GREEN: mapeamento no coordenador e no runner; tipo "Text via OCR" no Desktop.
-- [ ] E2E (`DesktopOcrFieldWalkthroughTests`): o campo OCR é selecionado com o cursor real, testado ("Valor lido: DIPIRONA 500 MG"), aprovado e ativado; Adicionar grava `item_added` com o texto reconhecido; outra receita grava o outro texto; o texto não aparece no log técnico.
+- [x] RED: `SessionCoordinatorTests`: `OcrUnavailable` rejeita com `CaptureFailed` sem repetir. Mensagem do modo de teste para OCR indisponível.
+- [x] GREEN: mapeamento no coordenador e no runner; tipo "Text via OCR" no Desktop.
+- [x] E2E (`DesktopOcrFieldWalkthroughTests`): o campo OCR é selecionado com o cursor real, testado ("Valor lido: DIPIRONA 500 MG"), aprovado e ativado; Adicionar grava `item_added` com o texto reconhecido; outra receita grava o outro texto; o texto não aparece no log técnico.
 
 ### Task 4: Docs and handoff
-- [ ] Arquitetura (capture-engine, security), roteiro manual (OCR, inclusive com pt-BR instalado), roadmap, setup (instalar o idioma de OCR), handoff.
+- [x] Arquitetura (capture-engine, security), roteiro manual (OCR, inclusive com pt-BR instalado), roadmap, setup (instalar o idioma de OCR), handoff.
