@@ -201,6 +201,40 @@ public sealed class RuntimeMonitorViewModelTests
         await harness.ViewModel.StopAsync();
     }
 
+    [Fact]
+    public async Task A_persisted_attachment_is_listed_by_file_name_never_by_its_raw_reference()
+    {
+        var reference = AttachmentReference.For(new string('A', 64));
+        var attachments = new SingleAttachmentStore(new AttachmentInfo(reference, "receita.pdf", "application/pdf", 4096, AttachmentSource.File));
+        var outbox = new InMemoryOutbox();
+        await outbox.AppendAsync(new DomainEvent(Guid.NewGuid(), "monitor-config", 1, Guid.NewGuid(), 1, DateTimeOffset.UtcNow, "item_added",
+            new DomainEventPayload(
+                System.Collections.Immutable.ImmutableDictionary<string, string>.Empty.Add("prescription", reference),
+                System.Collections.Immutable.ImmutableArray<System.Collections.Immutable.ImmutableDictionary<string, string>>.Empty)), CancellationToken.None);
+        var runtime = new AgentRuntime(new FakeInstanceSource(), (_, id) => new FakeTriggers(Task.CompletedTask).ForSession(id), _ => new FoundResolver(), _ => new FakeCapture(), outbox, new NullLog());
+        var viewModel = new RuntimeMonitorViewModel(runtime, outbox, attachments: attachments);
+
+        await viewModel.RefreshEventsAsync();
+
+        var shown = Assert.Single(viewModel.Events).FieldsText;
+        Assert.Contains("prescription=arquivo receita.pdf (4 KB, cópia do arquivo)", shown, StringComparison.Ordinal);
+        Assert.DoesNotContain(reference, shown, StringComparison.Ordinal);
+    }
+
+    private sealed class SingleAttachmentStore(AttachmentInfo info) : IAttachmentStore
+    {
+        public Task<AttachmentInfo> SaveAsync(CapturedAttachment attachment, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<AttachmentInfo?> GetInfoAsync(string reference, CancellationToken cancellationToken) =>
+            Task.FromResult(reference == info.Reference ? info : null);
+
+        public Task<byte[]?> ReadAsync(string reference, CancellationToken cancellationToken) => Task.FromResult<byte[]?>(null);
+
+        public Task<int> DeleteUnreferencedAsync(IReadOnlyCollection<string> referenced, CancellationToken cancellationToken) => Task.FromResult(0);
+
+        public Task<int> DeleteAllAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+    }
+
     private static IntegrationConfiguration Configuration(int extraTriggers = 0) => new(
         IntegrationConfiguration.CurrentSchemaVersion,
         "monitor-config",
