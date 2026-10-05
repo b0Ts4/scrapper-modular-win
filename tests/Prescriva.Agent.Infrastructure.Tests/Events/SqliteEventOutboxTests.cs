@@ -67,6 +67,71 @@ public sealed class SqliteEventOutboxTests : IDisposable
         Assert.Single(await outbox.ReadPendingAsync(CancellationToken.None));
     }
 
+    [Fact]
+    public async Task The_configuration_content_revision_round_trips()
+    {
+        var outbox = new SqliteEventOutbox(_dbPath, new DpapiPayloadProtector());
+        var domainEvent = MakeEvent(Guid.NewGuid(), 1, "valor") with { ConfigurationRevision = "746DDFCDB43694B0" };
+
+        await outbox.AppendAsync(domainEvent, CancellationToken.None);
+
+        Assert.Equal("746DDFCDB43694B0", Assert.Single(await outbox.ReadPendingAsync(CancellationToken.None)).ConfigurationRevision);
+    }
+
+    [Fact]
+    public async Task A_version_1_queue_is_migrated_in_place_keeping_its_events()
+    {
+        var protector = new DpapiPayloadProtector();
+        var existingId = Guid.NewGuid();
+        await using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString()))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (1);
+                CREATE TABLE events (
+                    id TEXT PRIMARY KEY,
+                    configuration_id TEXT NOT NULL,
+                    configuration_version INTEGER NOT NULL,
+                    session_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    payload_ciphertext BLOB NOT NULL,
+                    status TEXT NOT NULL,
+                    quarantine_reason TEXT NULL,
+                    confirmed_at TEXT NULL,
+                    UNIQUE (session_id, sequence)
+                );
+                INSERT INTO events (id, configuration_id, configuration_version, session_id, sequence, timestamp, type, payload_ciphertext, status)
+                VALUES ($id, 'budget-flow', 1, $session, 1, '2026-10-01T10:00:00.0000000+00:00', 'item_added', $payload, 'pending');
+                """;
+            command.Parameters.AddWithValue("$id", existingId.ToString("D"));
+            command.Parameters.AddWithValue("$session", Guid.NewGuid().ToString("D"));
+            command.Parameters.AddWithValue("$payload", protector.Protect(Encoding.UTF8.GetBytes("""{"Fields":{"medication":"antigo"},"Items":[]}""")));
+            await command.ExecuteNonQueryAsync();
+        }
+
+        SqliteConnection.ClearAllPools();
+        var outbox = new SqliteEventOutbox(_dbPath, protector);
+        await outbox.AppendAsync(MakeEvent(Guid.NewGuid(), 1, "novo") with { ConfigurationRevision = "REV2" }, CancellationToken.None);
+        var pending = await outbox.ReadPendingAsync(CancellationToken.None);
+
+        var existing = Assert.Single(pending, e => e.Id == existingId);
+        Assert.Equal("antigo", existing.Payload.Fields["medication"]);
+        Assert.Null(existing.ConfigurationRevision);
+        Assert.Equal("REV2", Assert.Single(pending, e => e.Id != existingId).ConfigurationRevision);
+
+        SqliteConnection.ClearAllPools();
+        await using var check = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());
+        await check.OpenAsync();
+        await using var version = check.CreateCommand();
+        version.CommandText = "SELECT MAX(version) FROM schema_version;";
+        Assert.Equal(2L, (long)(await version.ExecuteScalarAsync())!);
+    }
+
     private async Task<List<byte[]>> ReadCiphertextsAsync()
     {
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());

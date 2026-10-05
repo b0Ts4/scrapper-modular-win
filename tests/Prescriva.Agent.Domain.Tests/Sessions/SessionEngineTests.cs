@@ -95,6 +95,16 @@ public sealed class SessionEngineTests
     }
 
     [Fact]
+    public void Events_carry_the_content_revision_of_the_configuration_that_produced_them()
+    {
+        var withRevision = Engine(revision: "A1B2C3").Apply(Start(), new("add", [FirstId]), Values("A"), Now);
+        var withoutRevision = Engine().Apply(Start(), new("add", [FirstId]), Values("A"), Now);
+
+        Assert.Equal("A1B2C3", Assert.Single(withRevision.Events).ConfigurationRevision);
+        Assert.Null(Assert.Single(withoutRevision.Events).ConfigurationRevision);
+    }
+
+    [Fact]
     public void Events_use_caller_ids_time_configuration_and_monotonically_increasing_sequences()
     {
         var engine = Engine();
@@ -382,7 +392,7 @@ public sealed class SessionEngineTests
 
     private static ElementFingerprint Selector() => new("erp.exe", "Budget", AutomationId: "control");
 
-    private static SessionEngine Engine(TriggerDefinition? extra = null)
+    private static SessionEngine Engine(TriggerDefinition? extra = null, string? revision = null)
     {
         ImmutableArray<TriggerActionDefinition> add =
             [new CaptureFieldsAction(["name", "note"]), new EmitEventAction("item_added")];
@@ -400,6 +410,6 @@ public sealed class SessionEngineTests
             [new("name", "entry", "Item name", true, Selector()), new("note", "entry", "Note", false, Selector())],
             [new("entry", "Entry"), new("review", "Review")], extra is null ? triggers : triggers.Add(extra));
         Assert.True(ConfigurationValidator.Validate(configuration).IsValid);
-        return new(configuration);
+        return new(configuration, revision);
     }
 }

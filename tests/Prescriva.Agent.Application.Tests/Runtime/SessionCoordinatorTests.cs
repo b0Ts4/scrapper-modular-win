@@ -68,6 +68,31 @@ public sealed class SessionCoordinatorTests
     }
 
     [Fact]
+    public async Task Persisted_events_carry_the_content_revision_of_the_running_configuration()
+    {
+        var outbox = new FakeEventOutbox();
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [NameFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+            [NoteFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [NameFieldId] = Captured("Dipirona", NameFieldId),
+            [NoteFieldId] = Captured("Take with food", NoteFieldId),
+        });
+        var triggerProvider = new FakeTriggerProvider(new()
+        {
+            [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)],
+        });
+
+        await CreateCoordinator(triggerProvider, resolver, captureProvider, outbox, new FakeTechnicalLog()).RunAsync(CancellationToken.None);
+
+        var expected = Prescriva.Agent.Application.Testing.ConfigurationFingerprint.Compute(BuildConfiguration(requireName: true, requireNote: true));
+        Assert.Equal(expected, Assert.Single(outbox.Appended).ConfigurationRevision);
+    }
+
+    [Fact]
     public async Task Add_with_missing_required_field_is_rejected_and_never_appended()
     {
         // The required "name" field resolves and reads cleanly (no typed CaptureFailure) but
