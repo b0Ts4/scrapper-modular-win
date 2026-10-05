@@ -6,7 +6,7 @@ Run on Windows 10 or 11 x64 with an interactive desktop, after:
 dotnet build Prescriva.Agent.slnx --configuration Release
 ```
 
-Start `src\Prescriva.Agent.TestTarget\bin\Release\net10.0-windows\Prescriva.Agent.TestTarget.exe` and `src\Prescriva.Agent.Desktop\bin\Release\net10.0-windows\Prescriva.Agent.Desktop.exe`. Place the two windows side by side. Local data goes to `%LOCALAPPDATA%\Prescriva\Agent` (set `PRESCRIVA_AGENT_DATA` to use another directory).
+Start `src\Prescriva.Agent.TestTarget\bin\Release\net10.0-windows\Prescriva.Agent.TestTarget.exe` and `src\Prescriva.Agent.Desktop\bin\Release\net10.0-windows10.0.19041.0\Prescriva.Agent.Desktop.exe`. Place the two windows side by side. Local data goes to `%LOCALAPPDATA%\Prescriva\Agent` (set `PRESCRIVA_AGENT_DATA` to use another directory).
 
 Each step lists its automated coverage. "Automated (CI)" steps run on every push in `.github/workflows/ci.yml` on a hosted `windows-latest` runner; the remaining "human" checks are visual and need a person.
 
@@ -36,6 +36,7 @@ Each step lists its automated coverage. "Automated (CI)" steps run on every push
 | 23 | Run the test of row 21 (one AutomationId field, one label-only field). | Each field shows "Sinais: …" with weights and margin, and "Tempo: … ms"; only the label-only field shows "Aviso: Sem AutomationId…"; the trigger shows "Efeitos: evento item_added" and its time. | Automated (CI): `DesktopStructuralSelectorWalkthroughTests`, `TestModeViewModelTests`, `SelectorFragilityTests`. |
 | 24 | Check *Iniciar com o Windows*, Activate an approved integration, then sign out and back in (or restart the PC). | The Agent starts without opening its window; the tray icon's tooltip says "monitorando"; a notification says the integration was resumed; Add in the application persists `item_added` without touching the Agent. Opening the Agent again shows the same window (no second icon, no duplicate events). Press Stop, sign out/in: nothing is monitored. | Automated (CI): `DesktopStartWithWindowsTests` (Run value written/removed in an isolated key; background start after a killed process; hand-over; edited integration not resumed). Real sign-in and the tray icon/notification rendering: **human**. |
 | 25 | While monitoring, close the window; use the tray menu. | The window hides with a notification "Continua monitorando na bandeja"; *Mostrar* brings it back, *Parar monitoramento* stops, *Sair* exits. | **Human** (tray menus are outside the Agent's window). |
+| 26 | In TestTarget press "Mostrar receita digitalizada"; select the image under "Receita digitalizada:" as a *Text via OCR* field captured by Add; test, approve, activate, Add; then "Outra receita" and Add. | Test mode: "Valor lido: DIPIRONA 500 MG", provider `windows-ocr`; events carry `DIPIRONA 500 MG` then `AMOXICILINA 875 MG`. With the Portuguese OCR language installed (Settings > Time & language > Language), a text with accents (e.g. a real scanned prescription) is read in Portuguese. | Automated (CI, English recognizer): `DesktopOcrFieldWalkthroughTests`, `OcrCaptureTests`, `OcrTextTests`. Portuguese recognizer and real scans: **human**. |
 | 18 | Repeat rows 2–9 with a 32-bit target application. | Same results. | Automated (CI): x86 pass of the integration suite against a self-contained `win-x86` TestTarget (bitness asserted). |
 
 ## Recorded results

@@ -32,6 +32,8 @@ End-to-end coverage of the milestone:
 
 - `EndToEnd/DesktopStartWithWindowsTests` — start with Windows through the real Desktop executable: an approved integration activated by the operator is resumed by `--background` after the process is killed (no window, no click) and captures `item_added`; a second start hands over to the running instance (no duplicate events); an integration edited after its approval is not resumed; the option writes and removes the per-user Run value (isolated key via `PRESCRIVA_AGENT_RUN_KEY`).
 
+- `Automation/OcrCaptureTests` and `EndToEnd/DesktopOcrFieldWalkthroughTests` — OCR fields: text shown only as an image in TestTarget is recognized with the Windows OCR (the CI runner has the en-US recognizer), a different image gives a different value, a covered control is refused; through the real Desktop UI the recognized text is tested, approved, captured into `item_added` and kept out of the technical log.
+
 - `Automation/FileCaptureTests` and `EndToEnd/DesktopFileFieldWalkthroughTests` — file fields: a path box yields an exact copy (10 MB limit, missing file is a typed failure), an image control yields a PNG of exactly its rectangle (refused when another window covers it); through the real Desktop UI the attachments are stored encrypted, referenced by `item_added`, and read back byte-for-byte.
 
 Integration tests running longer than 60 s are named in the output (`xunit.runner.json`), so a hang is attributable.
