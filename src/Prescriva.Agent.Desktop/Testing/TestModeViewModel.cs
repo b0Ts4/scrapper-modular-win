@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using Prescriva.Agent.Application.Capture;
+using Prescriva.Agent.Application.Selection;
 using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Domain.Configuration;
 
@@ -32,7 +33,17 @@ public sealed record FieldResultDisplay(
     string ProviderText,
     string ConfidenceText,
     string? FailureMessage,
-    string ValueText = "-");
+    string ValueText = "-")
+{
+    /// <summary>Matched selector signals with their weights, strongest first, and the lead over the next candidate ("-" when none).</summary>
+    public string SignalsText { get; init; } = "-";
+
+    /// <summary>How long resolving and reading the field took.</summary>
+    public string DurationText { get; init; } = "-";
+
+    /// <summary>Fragility warnings in Portuguese; empty when the selector looks robust.</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}
 
 /// <summary>Everything the view needs to render one trigger's test result - already in display-ready form.</summary>
 public sealed record TriggerResultDisplay(
@@ -41,7 +52,14 @@ public sealed record TriggerResultDisplay(
     string StatusText,
     string? FailureMessage,
     IReadOnlyList<string> StageTransitions,
-    IReadOnlyList<string> EmittedEventTypes);
+    IReadOnlyList<string> EmittedEventTypes)
+{
+    /// <summary>How long the trigger took to be detected.</summary>
+    public string DurationText { get; init; } = "-";
+
+    /// <summary>What the trigger would do: stage transitions and emitted events ("-" when nothing).</summary>
+    public string EffectsText { get; init; } = "-";
+}
 
 /// <summary>
 /// Wires <see cref="IntegrationTestRunner"/> into something a WPF view can bind to: runs
@@ -218,8 +236,9 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
         });
     }
 
-    private static FieldResultDisplay ToDisplay(FieldCheckResult result)
+    public static FieldResultDisplay ToDisplay(FieldCheckResult result)
     {
+        ArgumentNullException.ThrowIfNull(result);
         var passed = result.Outcome == FieldCheckOutcome.Found;
         var statusText = result.Outcome switch
         {
@@ -238,11 +257,17 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
             passed ? null : DescribeFieldFailure(result.FailureCode),
             !passed ? "-"
                 : result.Attachment is { } attachment ? DescribeAttachment(attachment)
-                : !string.IsNullOrEmpty(result.Value) ? result.Value : "-");
+                : !string.IsNullOrEmpty(result.Value) ? result.Value : "-")
+        {
+            SignalsText = DescribeSignals(result.Signals, result.Lead),
+            DurationText = DescribeDuration(result.Duration),
+            Warnings = result.Warnings.IsDefaultOrEmpty ? [] : result.Warnings.Select(DescribeWarning).ToArray(),
+        };
     }
 
-    private static TriggerResultDisplay ToDisplay(TriggerCheckResult result)
+    public static TriggerResultDisplay ToDisplay(TriggerCheckResult result)
     {
+        ArgumentNullException.ThrowIfNull(result);
         var passed = result.Outcome == TriggerCheckOutcome.Detected;
         var statusText = passed ? "Detectado" : "Tempo esgotado";
 
@@ -252,8 +277,60 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
             statusText,
             passed ? null : DescribeTriggerFailure(result.FailureCode),
             result.StageTransitions,
-            result.EmittedEventTypes);
+            result.EmittedEventTypes)
+        {
+            DurationText = passed ? DescribeDuration(result.Duration) : "-",
+            EffectsText = DescribeEffects(result.StageTransitions, result.EmittedEventTypes),
+        };
     }
+
+    private static readonly Dictionary<string, string> SignalNames = new(StringComparer.Ordinal)
+    {
+        ["automationId"] = "AutomationId",
+        ["nearbyLabels"] = "rótulo",
+        ["controlType"] = "tipo",
+        ["name"] = "nome",
+        ["ancestors"] = "estrutura",
+        ["className"] = "classe",
+        ["relativeBounds"] = "posição",
+        ["frameworkId"] = "framework",
+    };
+
+    private static string DescribeSignals(IReadOnlyDictionary<string, int>? signals, int? lead)
+    {
+        if (signals is null || signals.Count == 0)
+        {
+            return "-";
+        }
+
+        var text = string.Join(", ", signals
+            .OrderByDescending(signal => signal.Value)
+            .ThenBy(signal => signal.Key, StringComparer.Ordinal)
+            .Select(signal => $"{SignalNames.GetValueOrDefault(signal.Key, signal.Key)} ({signal.Value})"));
+        return lead is { } margin ? $"{text}; margem {margin}" : text;
+    }
+
+    private static string DescribeDuration(TimeSpan duration) =>
+        duration <= TimeSpan.Zero ? "-" : $"{Math.Round(duration.TotalMilliseconds, MidpointRounding.AwayFromZero):0} ms";
+
+    private static string DescribeEffects(IReadOnlyList<string> transitions, IReadOnlyList<string> events)
+    {
+        var parts = transitions.Select(stage => $"etapa → {stage}").Concat(events.Select(type => $"evento {type}")).ToArray();
+        return parts.Length == 0 ? "-" : string.Join("; ", parts);
+    }
+
+    private static string DescribeWarning(SelectorFragilityWarning warning) => warning switch
+    {
+        SelectorFragilityWarning.MissingAutomationId =>
+            "Sem AutomationId: o campo é reconhecido pelo rótulo, nome ou estrutura, que a aplicação pode mudar.",
+        SelectorFragilityWarning.LowConfidence =>
+            "Confiança abaixo de 80%: parte dos sinais gravados não corresponde mais. Considere selecionar o campo novamente.",
+        SelectorFragilityWarning.NarrowLead =>
+            "Pouca margem sobre outro elemento parecido: uma pequena mudança na tela pode tornar a seleção ambígua.",
+        SelectorFragilityWarning.PositionDependent =>
+            "Reconhecido só pela posição e estrutura: mudanças de layout podem quebrar a seleção.",
+        _ => warning.ToString(),
+    };
 
     /// <summary>
     /// Maps a stable, value-free failure code to actionable Portuguese text for the

@@ -95,7 +95,16 @@ public sealed class DesktopStructuralSelectorWalkthroughTests : IDisposable
             await WaitForTextAsync(agent, "TestStatusText", "Pronto.");
             Press(agent, "RunTestButton");
             await PressUntilAsync(target, ["AddButton"], () => Text(agent, "TestStatusText").StartsWith("Teste concluído", StringComparison.Ordinal));
-            Assert.Contains(AllTexts(agent), text => text == "Valor lido: nota-teste");
+            var testTexts = AllTexts(agent);
+            Assert.Contains(testTexts, text => text == "Valor lido: nota-teste");
+
+            // Evidence (spec §8): matched signals and timing for each field, and a fragility
+            // warning only for the field that has no AutomationId.
+            Assert.Contains(testTexts, text => text.StartsWith("Sinais: AutomationId (40)", StringComparison.Ordinal));
+            Assert.Contains(testTexts, text => text.StartsWith("Sinais: rótulo (20)", StringComparison.Ordinal));
+            Assert.Single(testTexts, text => text.StartsWith("Aviso: Sem AutomationId", StringComparison.Ordinal));
+            Assert.Contains(testTexts, text => text.StartsWith("Tempo: ", StringComparison.Ordinal) && text.EndsWith(" ms", StringComparison.Ordinal));
+            Assert.Contains(testTexts, text => text == "Efeitos: evento item_added");
             Press(agent, "ApproveButton");
             await WaitForTextAsync(agent, "ApprovalStateText", "Aprovada em");
 
