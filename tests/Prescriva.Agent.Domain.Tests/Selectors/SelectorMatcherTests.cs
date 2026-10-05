@@ -204,6 +204,23 @@ public sealed class SelectorMatcherTests
         RelativeBounds: bounds);
 
     [Fact]
+    public void The_runner_up_score_is_reported_so_the_lead_can_be_shown()
+    {
+        var weights = new SelectorWeights();
+        var selector = UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05));
+
+        var contested = matcher.Match(selector,
+        [
+            new ElementCandidate("notes", UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05))),
+            new ElementCandidate("batch", UnlabeledEdit("Lote", new(0.1, 0.6, 0.4, 0.05))),
+        ], weights);
+        var alone = matcher.Match(selector, [new ElementCandidate("notes", UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05)))], weights);
+
+        Assert.Equal(weights.ControlType + weights.ClassName + weights.FrameworkId + weights.Ancestors, contested.RunnerUpScore);
+        Assert.Null(alone.RunnerUpScore);
+    }
+
+    [Fact]
     public void A_control_without_AutomationId_is_found_by_its_label_and_structure()
     {
         var selector = UnlabeledEdit("Observações", new(0.1, 0.5, 0.4, 0.05));

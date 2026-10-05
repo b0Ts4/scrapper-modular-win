@@ -46,6 +46,68 @@ public sealed class IntegrationTestRunnerTests
     }
 
     [Fact]
+    public async Task A_found_field_reports_the_matched_signals_the_lead_the_duration_and_no_warning_when_strong()
+    {
+        var evidence = System.Collections.Immutable.ImmutableDictionary<string, int>.Empty.Add("automationId", 40).Add("controlType", 15);
+        var resolver = new FakeSelectorResolver(
+            new() { [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 1.0, evidence, lead: 55) },
+            delay: TimeSpan.FromMilliseconds(60));
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, "Dipirona", "uia", 1.0, TimeSpan.FromMilliseconds(5), []),
+        });
+        var triggerProvider = new FakeTriggerProvider();
+        triggerProvider.FireOnce(TriggerId);
+
+        var field = Assert.Single((await new IntegrationTestRunner(resolver, captureProvider, triggerProvider).RunAsync(BuildConfiguration())).FieldResults);
+
+        Assert.Equal(evidence, field.Signals);
+        Assert.Equal(55, field.Lead);
+        Assert.True(field.Duration >= TimeSpan.FromMilliseconds(50), $"Duration {field.Duration} does not include the resolution.");
+        Assert.Empty(field.Warnings);
+    }
+
+    [Fact]
+    public async Task A_field_found_without_AutomationId_and_with_a_narrow_lead_reports_fragility_warnings()
+    {
+        var evidence = System.Collections.Immutable.ImmutableDictionary<string, int>.Empty.Add("nearbyLabels", 20).Add("controlType", 15).Add("ancestors", 6);
+        var resolver = new FakeSelectorResolver(new() { [string.Empty] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.9, evidence, lead: 12) });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, "nota", "uia", 1.0, TimeSpan.Zero, []),
+        });
+        var triggerProvider = new FakeTriggerProvider();
+        triggerProvider.FireOnce(TriggerId);
+        var configuration = BuildConfiguration();
+        var labelOnly = new ElementFingerprint("Fake.TestApp", "Fake Test Window", ControlType: "ControlType.Edit", NearbyLabels: ["Observações:"]);
+        configuration = configuration with { Fields = [configuration.Fields[0] with { Selector = labelOnly }] };
+
+        var field = Assert.Single((await new IntegrationTestRunner(resolver, captureProvider, triggerProvider).RunAsync(configuration)).FieldResults);
+
+        Assert.Equal(FieldCheckOutcome.Found, field.Outcome);
+        Assert.Equal([SelectorFragilityWarning.MissingAutomationId, SelectorFragilityWarning.NarrowLead], field.Warnings.ToArray());
+    }
+
+    [Fact]
+    public async Task A_trigger_reports_how_long_it_took_to_be_detected()
+    {
+        var resolver = new FakeSelectorResolver(new() { [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 1.0) });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, "Dipirona", "uia", 1.0, TimeSpan.Zero, []),
+        });
+        var triggerProvider = new FakeTriggerProvider();
+
+        var run = new IntegrationTestRunner(resolver, captureProvider, triggerProvider).RunAsync(BuildConfiguration());
+        await Task.Delay(200);
+        triggerProvider.FireOnce(TriggerId);
+        var trigger = Assert.Single((await run).TriggerResults);
+
+        Assert.Equal(TriggerCheckOutcome.Detected, trigger.Outcome);
+        Assert.InRange(trigger.Duration, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
     public async Task A_found_field_whose_value_cannot_be_read_fails_the_test_with_a_typed_code()
     {
         var resolver = new FakeSelectorResolver(new() { [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95) });
@@ -271,14 +333,15 @@ public sealed class IntegrationTestRunnerTests
     private static ElementFingerprint Fingerprint(string automationId) =>
         new("Fake.TestApp", "Fake Test Window", AutomationId: automationId);
 
-    private sealed class FakeSelectorResolver(Dictionary<string, SelectorResolution> resolutionsByAutomationId) : ISelectorResolver
+    private sealed class FakeSelectorResolver(Dictionary<string, SelectorResolution> resolutionsByAutomationId, TimeSpan? delay = null) : ISelectorResolver
     {
-        public Task<SelectorResolution> ResolveAsync(ElementFingerprint fingerprint, CancellationToken cancellationToken)
+        public async Task<SelectorResolution> ResolveAsync(ElementFingerprint fingerprint, CancellationToken cancellationToken)
         {
+            if (delay is { } wait) await Task.Delay(wait, cancellationToken);
             var key = fingerprint.AutomationId ?? string.Empty;
-            return Task.FromResult(resolutionsByAutomationId.TryGetValue(key, out var resolution)
+            return resolutionsByAutomationId.TryGetValue(key, out var resolution)
                 ? resolution
-                : SelectorResolution.NotFound("no fake resolution configured"));
+                : SelectorResolution.NotFound("no fake resolution configured");
         }
     }
 
