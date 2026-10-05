@@ -6,11 +6,13 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using Prescriva.Agent.Application.Capture;
 using Prescriva.Agent.Application.Events;
 using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Domain.Events;
 using Prescriva.Agent.Domain.Sessions;
+using Prescriva.Agent.Infrastructure.Events;
 
 namespace Prescriva.Agent.Desktop.Monitoring;
 
@@ -59,12 +61,29 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     private long _eventReadsStarted;
     private long _newestAppliedEventRead;
 
+    private readonly OutboxCapacityPolicy _capacityPolicy;
+    private readonly Func<CancellationToken, Task>? _clearLocalData;
+    private readonly IAttachmentStore? _attachments;
+    private OutboxCapacityAssessment? _capacity;
+    private IntegrationHealthTracker? _health;
+
     private CancellationTokenSource? _activationCts;
     private Task<ActivationResult>? _activation;
     private bool _isMonitoring;
     private string _statusText = "Inativo.";
 
-    public RuntimeMonitorViewModel(AgentRuntime runtime, IEventOutbox outbox, Dispatcher? dispatcher = null)
+    /// <param name="capacityPolicy">Thresholds for the pending-events alert (defaults: 1000 warning, 5000 critical).</param>
+    /// <param name="clearLocalData">
+    /// The operator's explicit "clear local data" action (deletes the event queue and the
+    /// technical log). Null when the host offers no such action.
+    /// </param>
+    public RuntimeMonitorViewModel(
+        AgentRuntime runtime,
+        IEventOutbox outbox,
+        Dispatcher? dispatcher = null,
+        OutboxCapacityPolicy? capacityPolicy = null,
+        Func<CancellationToken, Task>? clearLocalData = null,
+        IAttachmentStore? attachments = null)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(outbox);
@@ -72,6 +91,9 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         _runtime = runtime;
         _outbox = outbox;
         _dispatcher = dispatcher;
+        _capacityPolicy = capacityPolicy ?? new OutboxCapacityPolicy();
+        _clearLocalData = clearLocalData;
+        _attachments = attachments;
         _runtime.DiagnosticPublished += OnDiagnosticPublished;
     }
 
@@ -80,6 +102,86 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     public bool IsMonitoring => _isMonitoring;
 
     public string StatusText => _statusText;
+
+    /// <summary>
+    /// A visible Portuguese alert once pending events reach the warning threshold, or null.
+    /// Alerting never deletes anything: pending events stay until confirmed or until the
+    /// operator explicitly clears local data.
+    /// </summary>
+    public string? CapacityAlert
+    {
+        get
+        {
+            var capacity = Volatile.Read(ref _capacity);
+            return capacity?.Status switch
+            {
+                OutboxCapacityStatus.Warning =>
+                    $"Atenção: {capacity.PendingCount} eventos pendentes na fila local (alerta a partir de {capacity.WarningThreshold}). Eles não serão apagados automaticamente.",
+                OutboxCapacityStatus.Critical =>
+                    $"Limite crítico: {capacity.PendingCount} eventos pendentes na fila local (crítico a partir de {capacity.CriticalThreshold}). Nada é apagado automaticamente; exporte ou limpe os dados locais.",
+                _ => null,
+            };
+        }
+    }
+
+    /// <summary>The active integration's health, or null when nothing has been activated.</summary>
+    public IntegrationHealthState? HealthState
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _health?.Current.State;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The integration's health with every reason (spec §8), in Portuguese: empty before
+    /// any activation. Built only from IDs and confidence - never from a captured value.
+    /// </summary>
+    public string HealthText
+    {
+        get
+        {
+            IntegrationHealth? health;
+            lock (_gate)
+            {
+                health = _health?.Current;
+            }
+
+            return health is null ? string.Empty : Describe(health);
+        }
+    }
+
+    /// <summary>True when pending events reached the critical threshold.</summary>
+    public bool IsCapacityCritical => Volatile.Read(ref _capacity)?.Status == OutboxCapacityStatus.Critical;
+
+    /// <summary>
+    /// Deletes local business data (event queue and technical log) through the host's
+    /// action. Refused - returning false with an explanation - while a configuration is
+    /// being monitored, or when the host offers no such action.
+    /// </summary>
+    public async Task<bool> ClearLocalDataAsync(CancellationToken cancellationToken = default)
+    {
+        if (_clearLocalData is null)
+        {
+            SetStatus(_isMonitoring, "A limpeza de dados locais não está disponível.");
+            return false;
+        }
+
+        if (_activation is not null)
+        {
+            SetStatus(true, "Pare o monitoramento antes de apagar os dados locais.");
+            return false;
+        }
+
+        await _clearLocalData(cancellationToken).ConfigureAwait(false);
+        await RefreshEventsAsync(cancellationToken).ConfigureAwait(false);
+        AddDiagnostic(new DiagnosticDisplay(DateTimeOffset.UtcNow, false, "Dados locais apagados pelo operador."));
+        SetStatus(false, "Dados locais apagados: fila de eventos e log técnico.");
+        return true;
+    }
 
     /// <summary>
     /// The most recent diagnostics, oldest first (bounded). Always read under the lock
@@ -124,6 +226,11 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
             throw new InvalidOperationException("Uma configuração já está ativa. Pare o monitoramento antes de ativar outra.");
         }
 
+        lock (_gate)
+        {
+            _health = new IntegrationHealthTracker(configuration);
+        }
+
         var cts = new CancellationTokenSource();
         var activation = _runtime.ActivateAsync(configuration, approval, cts.Token);
 
@@ -135,6 +242,12 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
             var result = await activation.ConfigureAwait(false);
             if (result.Status == ActivationStatus.NotTested)
             {
+                lock (_gate)
+                {
+                    _health = null;
+                }
+
+                RunOnDispatcher(NotifyHealthChanged);
                 SetStatus(false, "Ativação recusada: esta configuração não passou no modo de teste ou foi alterada depois do último teste. Execute o teste e aprove-a novamente.");
             }
 
@@ -189,7 +302,8 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         // started earlier must never replace the result of one that started later.
         var read = Interlocked.Increment(ref _eventReadsStarted);
         var pending = await _outbox.ReadPendingAsync(cancellationToken).ConfigureAwait(false);
-        var events = pending.Select(ToDisplay).ToArray();
+        var attachmentNames = await DescribeAttachmentsAsync(pending, cancellationToken).ConfigureAwait(false);
+        var events = pending.Select(domainEvent => ToDisplay(domainEvent, attachmentNames)).ToArray();
         lock (_gate)
         {
             if (read < _newestAppliedEventRead)
@@ -199,9 +313,15 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
 
             _newestAppliedEventRead = read;
             _events = events;
+            _capacity = _capacityPolicy.Evaluate(events.Length);
         }
 
-        RunOnDispatcher(() => OnPropertyChanged(nameof(Events)));
+        RunOnDispatcher(() =>
+        {
+            OnPropertyChanged(nameof(Events));
+            OnPropertyChanged(nameof(CapacityAlert));
+            OnPropertyChanged(nameof(IsCapacityCritical));
+        });
     }
 
     private async Task ObserveActivationAsync(Task<ActivationResult> activation)
@@ -226,6 +346,13 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
 
     private void OnDiagnosticPublished(object? sender, RuntimeDiagnostic diagnostic)
     {
+        lock (_gate)
+        {
+            _health?.Apply(diagnostic);
+        }
+
+        RunOnDispatcher(NotifyHealthChanged);
+
         AddDiagnostic(new DiagnosticDisplay(
             diagnostic.Timestamp,
             diagnostic.Severity == RuntimeDiagnosticSeverity.Error,
@@ -275,6 +402,35 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         _ => $"Diagnóstico {diagnostic.Code}.",
     };
 
+    internal static string Describe(IntegrationHealth health)
+    {
+        if (health.State == IntegrationHealthState.Healthy)
+        {
+            return "Integração saudável.";
+        }
+
+        var reasons = string.Join(" ", health.Issues.Select(issue => issue.Kind switch
+        {
+            IntegrationIssueKind.FieldUnreadable =>
+                $"Não foi possível ler o campo '{issue.FieldId}' (ausente, ambíguo ou ilegível): ajuste o seletor e teste novamente.",
+            IntegrationIssueKind.TriggerUnwatchable =>
+                $"O gatilho '{issue.TriggerId}' não pode ser monitorado.",
+            IntegrationIssueKind.LowConfidenceMatch =>
+                $"O campo '{issue.FieldId}' foi encontrado com confiança baixa ({issue.Confidence:P0}): revise o seletor.",
+            _ => issue.Kind.ToString(),
+        }));
+
+        return health.State == IntegrationHealthState.Broken
+            ? $"Integração quebrada. {reasons}"
+            : $"Integração degradada. {reasons}";
+    }
+
+    private void NotifyHealthChanged()
+    {
+        OnPropertyChanged(nameof(HealthState));
+        OnPropertyChanged(nameof(HealthText));
+    }
+
     private static string DescribeFailure(SessionFailureCode? code, string? fieldId) => code switch
     {
         SessionFailureCode.MissingRequiredField => $"o campo obrigatório '{fieldId}' está vazio.",
@@ -283,13 +439,33 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         _ => $"falha {code}.",
     };
 
-    private static EventDisplay ToDisplay(DomainEvent domainEvent) => new(
+    /// <summary>Display text for every attachment the events reference (file name, size, origin) - never the raw reference.</summary>
+    private async Task<IReadOnlyDictionary<string, string>> DescribeAttachmentsAsync(IReadOnlyList<DomainEvent> events, CancellationToken cancellationToken)
+    {
+        var descriptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var references = events
+            .SelectMany(domainEvent => domainEvent.Payload.Fields.Values)
+            .Where(AttachmentReference.IsReference)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var reference in references)
+        {
+            var info = _attachments is null ? null : await _attachments.GetInfoAsync(reference, cancellationToken).ConfigureAwait(false);
+            descriptions[reference] = info is null
+                ? "arquivo (indisponível)"
+                : $"arquivo {info.FileName} ({Math.Max(1, (info.Size + 1023) / 1024)} KB, {(info.Source == AttachmentSource.File ? "cópia do arquivo" : "imagem da tela")})";
+        }
+
+        return descriptions;
+    }
+
+    private static EventDisplay ToDisplay(DomainEvent domainEvent, IReadOnlyDictionary<string, string> attachmentNames) => new(
         domainEvent.Sequence,
         domainEvent.Type,
         domainEvent.SessionId,
         domainEvent.Timestamp,
         domainEvent.Payload.Items.IsDefault ? 0 : domainEvent.Payload.Items.Length,
-        string.Join("; ", domainEvent.Payload.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")));
+        string.Join("; ", domainEvent.Payload.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => $"{pair.Key}={(attachmentNames.TryGetValue(pair.Value, out var name) ? name : pair.Value)}")));
 
     private void AddDiagnostic(DiagnosticDisplay display)
     {

@@ -1,3 +1,5 @@
+using Prescriva.Agent.Application.Capture;
+using Prescriva.Agent.Application.Selection;
 using System.Collections.Immutable;
 using Prescriva.Agent.Domain.Configuration;
 
@@ -14,6 +16,9 @@ public enum FieldCheckOutcome
 
     /// <summary>No candidate scored high enough, the target window was missing, or resolution timed out.</summary>
     NotFound,
+
+    /// <summary>The control was found, but its value (or file) could not be captured - see <see cref="FieldCheckResult.CaptureOutcome"/>.</summary>
+    Unreadable,
 }
 
 /// <summary>
@@ -35,9 +40,16 @@ public sealed record FieldCheckResult(
     string? ProviderId,
     double Confidence,
     string? FailureCode,
-    string? Value = null)
+    string? Value = null,
+    CapturedAttachment? Attachment = null,
+    CaptureOutcome? CaptureOutcome = null,
+    ImmutableDictionary<string, int>? Signals = null,
+    int? Lead = null,
+    TimeSpan Duration = default,
+    ImmutableArray<SelectorFragilityWarning> Warnings = default)
 {
     public const string FieldNotFoundCode = "FIELD_NOT_FOUND";
+    public const string FieldUnreadableCode = "FIELD_UNREADABLE";
     public const string FieldAmbiguousCode = "FIELD_AMBIGUOUS";
 }
 
@@ -63,7 +75,8 @@ public sealed record TriggerCheckResult(
     TriggerCheckOutcome Outcome,
     ImmutableArray<string> StageTransitions,
     ImmutableArray<string> EmittedEventTypes,
-    string? FailureCode)
+    string? FailureCode,
+    TimeSpan Duration = default)
 {
     public const string TriggerTimedOutCode = "TRIGGER_TIMED_OUT";
 }

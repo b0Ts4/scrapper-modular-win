@@ -68,6 +68,173 @@ public sealed class SessionCoordinatorTests
     }
 
     [Fact]
+    public async Task Persisted_events_carry_the_content_revision_of_the_running_configuration()
+    {
+        var outbox = new FakeEventOutbox();
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [NameFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+            [NoteFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [NameFieldId] = Captured("Dipirona", NameFieldId),
+            [NoteFieldId] = Captured("Take with food", NoteFieldId),
+        });
+        var triggerProvider = new FakeTriggerProvider(new()
+        {
+            [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)],
+        });
+
+        await CreateCoordinator(triggerProvider, resolver, captureProvider, outbox, new FakeTechnicalLog()).RunAsync(CancellationToken.None);
+
+        var expected = Prescriva.Agent.Application.Testing.ConfigurationFingerprint.Compute(BuildConfiguration(requireName: true, requireNote: true));
+        Assert.Equal(expected, Assert.Single(outbox.Appended).ConfigurationRevision);
+    }
+
+    [Fact]
+    public async Task A_field_not_found_on_the_first_attempt_is_retried_and_captured()
+    {
+        var resolver = new SequencedSelectorResolver(new()
+        {
+            [NameFieldId] = [SelectorResolution.NotFound("not yet"), SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+            [NoteFieldId] = [SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+        });
+        var (outbox, log, _) = await RunAddAsync(resolver, new CountingCaptureProvider(new()
+        {
+            [NameFieldId] = [Captured("Dipirona", NameFieldId)],
+            [NoteFieldId] = [Captured("nota", NoteFieldId)],
+        }));
+
+        Assert.Equal("Dipirona", Assert.Single(outbox.Appended).Payload.Fields[NameFieldId]);
+        Assert.Equal(2, resolver.Calls(NameFieldId));
+        var retried = Assert.Single(log.Entries, entry => entry.Code == "field_capture_retried");
+        Assert.Equal(NameFieldId, retried.FieldId);
+        Assert.DoesNotContain("Dipirona", retried.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_element_temporarily_unavailable_for_reading_is_retried_and_captured()
+    {
+        var capture = new CountingCaptureProvider(new()
+        {
+            [NameFieldId] = [new CaptureResult(CaptureOutcome.ElementUnavailable, null, "uia", 0, TimeSpan.Zero, []), Captured("Dipirona", NameFieldId)],
+            [NoteFieldId] = [Captured("nota", NoteFieldId)],
+        });
+        var (outbox, _, _) = await RunAddAsync(FoundResolver(), capture);
+
+        Assert.Equal("Dipirona", Assert.Single(outbox.Appended).Payload.Fields[NameFieldId]);
+        Assert.Equal(2, capture.Calls(NameFieldId));
+    }
+
+    [Fact]
+    public async Task An_ambiguous_selector_is_never_retried()
+    {
+        var resolver = new SequencedSelectorResolver(new()
+        {
+            [NameFieldId] = [SelectorResolution.Ambiguous(0.5), SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+            [NoteFieldId] = [SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+        });
+        var (outbox, _, diagnostics) = await RunAddAsync(resolver, FoundCapture());
+
+        Assert.Empty(outbox.Appended);
+        Assert.Equal(1, resolver.Calls(NameFieldId));
+        var rejection = Assert.Single(diagnostics, d => d.Code == RuntimeDiagnosticCode.SessionRejected);
+        Assert.Equal(SessionFailureCode.CaptureFailed, rejection.FailureCode);
+        Assert.Equal(NameFieldId, rejection.FieldId);
+    }
+
+    [Fact]
+    public async Task A_file_over_the_limit_is_never_retried()
+    {
+        var capture = new CountingCaptureProvider(new()
+        {
+            [NameFieldId] = [new CaptureResult(CaptureOutcome.TooLarge, null, "uia", 0, TimeSpan.Zero, []), Captured("Dipirona", NameFieldId)],
+            [NoteFieldId] = [Captured("nota", NoteFieldId)],
+        });
+        var (outbox, _, _) = await RunAddAsync(FoundResolver(), capture);
+
+        Assert.Empty(outbox.Appended);
+        Assert.Equal(1, capture.Calls(NameFieldId));
+    }
+
+    [Fact]
+    public async Task A_field_that_stays_missing_exhausts_the_bounded_attempts_and_is_rejected_visibly()
+    {
+        var resolver = new SequencedSelectorResolver(new()
+        {
+            [NameFieldId] = [SelectorResolution.NotFound("gone")],
+            [NoteFieldId] = [SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+        });
+        var (outbox, _, diagnostics) = await RunAddAsync(resolver, FoundCapture());
+
+        Assert.Empty(outbox.Appended);
+        Assert.Equal(CaptureRetryPolicy.Default.MaxAttempts, resolver.Calls(NameFieldId));
+        var rejection = Assert.Single(diagnostics, d => d.Code == RuntimeDiagnosticCode.SessionRejected);
+        Assert.Equal(SessionFailureCode.CaptureFailed, rejection.FailureCode);
+        Assert.Equal(NameFieldId, rejection.FieldId);
+    }
+
+    [Fact]
+    public async Task Cancellation_interrupts_the_wait_between_attempts()
+    {
+        var resolver = new SequencedSelectorResolver(new()
+        {
+            [NameFieldId] = [SelectorResolution.NotFound("gone")],
+            [NoteFieldId] = [SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+        });
+        var outbox = new FakeEventOutbox();
+        var coordinator = CreateCoordinator(
+            new FakeTriggerProvider(new() { [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)] }),
+            resolver, FoundCapture(), outbox, new FakeTechnicalLog(),
+            captureRetry: new CaptureRetryPolicy(3, [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5)]));
+        using var cancellation = new CancellationTokenSource();
+
+        var run = coordinator.RunAsync(cancellation.Token);
+        await WaitUntilAsync(() => resolver.Calls(NameFieldId) == 1);
+        var cancelledAt = DateTime.UtcNow;
+        cancellation.Cancel();
+        try
+        {
+            await run.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        Assert.True(DateTime.UtcNow - cancelledAt < TimeSpan.FromSeconds(5), "The retry wait ignored cancellation.");
+        Assert.Equal(1, resolver.Calls(NameFieldId));
+        Assert.Empty(outbox.Appended);
+    }
+
+    private static SequencedSelectorResolver FoundResolver() => new(new()
+    {
+        [NameFieldId] = [SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+        [NoteFieldId] = [SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95)],
+    });
+
+    private static CountingCaptureProvider FoundCapture() => new(new()
+    {
+        [NameFieldId] = [Captured("Dipirona", NameFieldId)],
+        [NoteFieldId] = [Captured("nota", NoteFieldId)],
+    });
+
+    private static async Task<(FakeEventOutbox Outbox, FakeTechnicalLog Log, ConcurrentQueue<RuntimeDiagnostic> Diagnostics)> RunAddAsync(
+        ISelectorResolver resolver,
+        ICaptureProvider capture)
+    {
+        var outbox = new FakeEventOutbox();
+        var log = new FakeTechnicalLog();
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        var coordinator = CreateCoordinator(
+            new FakeTriggerProvider(new() { [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)] }),
+            resolver, capture, outbox, log);
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+        await coordinator.RunAsync(CancellationToken.None);
+        return (outbox, log, diagnostics);
+    }
+
+    [Fact]
     public async Task Add_with_missing_required_field_is_rejected_and_never_appended()
     {
         // The required "name" field resolves and reads cleanly (no typed CaptureFailure) but
@@ -333,6 +500,123 @@ public sealed class SessionCoordinatorTests
         Assert.Single(outbox.Appended);
     }
 
+    [Fact]
+    public async Task A_watch_failure_followed_by_the_session_ending_within_the_retry_delay_is_not_reported()
+    {
+        // The application closing makes its elements disappear a moment before the
+        // instance source reports the process gone; that is not a failure to show.
+        var log = new FakeTechnicalLog();
+        var triggerProvider = new FakeTriggerProvider(new(), failingTriggerId: FinishTriggerId);
+        var coordinator = CreateCoordinator(
+            triggerProvider, new FakeSelectorResolver(new()), new FakeCaptureProvider(new()), new FakeEventOutbox(), log,
+            triggerRetryDelay: TimeSpan.FromSeconds(5));
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        using var cts = new CancellationTokenSource();
+        var run = coordinator.RunAsync(cts.Token);
+        await WaitUntilAsync(() => triggerProvider.FailedAttempts >= 1);
+        await coordinator.CloseAsync();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == RuntimeDiagnosticCode.TriggerWatchFailed);
+        Assert.Contains(diagnostics, d => d.Code == RuntimeDiagnosticCode.SessionClosed);
+        Assert.DoesNotContain(log.Entries, entry => entry.Level == TechnicalLogLevel.Error);
+    }
+
+    [Fact]
+    public async Task A_file_field_stores_its_attachment_before_the_event_that_references_it()
+    {
+        var outbox = new FakeEventOutbox();
+        var attachments = new InMemoryAttachmentStore(outbox);
+        var content = new byte[] { 0x25, 0x50, 0x44, 0x46 };
+        var coordinator = CreateFileCoordinator(
+            new CaptureResult(CaptureOutcome.Captured, null, CaptureResult.UiaProviderId, 1.0, TimeSpan.Zero, [],
+                new CapturedAttachment(content, "receita.pdf", "application/pdf", AttachmentSource.File)),
+            outbox, attachments);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        var persisted = Assert.Single(outbox.Appended);
+        var reference = persisted.Payload.Fields["prescription"];
+        Assert.True(AttachmentReference.IsReference(reference));
+        Assert.Equal(content, await attachments.ReadAsync(reference, CancellationToken.None));
+        Assert.True(attachments.SavedBeforeAnyEvent, "The attachment must be stored before the event referencing it is appended.");
+    }
+
+    [Theory]
+    [InlineData(CaptureOutcome.TooLarge)]
+    [InlineData(CaptureOutcome.Obscured)]
+    [InlineData(CaptureOutcome.FileUnavailable)]
+    public async Task A_file_that_cannot_be_captured_rejects_the_occurrence_and_stores_nothing(CaptureOutcome outcome)
+    {
+        var outbox = new FakeEventOutbox();
+        var attachments = new InMemoryAttachmentStore(outbox);
+        var coordinator = CreateFileCoordinator(new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, TimeSpan.Zero, []), outbox, attachments);
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        Assert.Empty(outbox.Appended);
+        Assert.Equal(0, attachments.Count);
+        var rejected = Assert.Single(diagnostics, d => d.Code == RuntimeDiagnosticCode.SessionRejected);
+        Assert.Equal(SessionFailureCode.CaptureFailed, rejected.FailureCode);
+        Assert.Equal("prescription", rejected.FieldId);
+    }
+
+    private static SessionCoordinator CreateFileCoordinator(CaptureResult capture, FakeEventOutbox outbox, InMemoryAttachmentStore attachments)
+    {
+        var configuration = new IntegrationConfiguration(
+            IntegrationConfiguration.CurrentSchemaVersion,
+            "file-config",
+            "File configuration",
+            new ApplicationDefinition("Prescriva.Agent.TestTarget", "Prescriva Agent Test Target"),
+            [new FieldDefinition("prescription", StageId, "Receita", Required: true, Selector: Fingerprint("prescription"), Kind: FieldKind.File)],
+            [new StageDefinition(StageId, "Entry")],
+            [new TriggerDefinition(AddTriggerId, StageId, Fingerprint("AddButton"), "Invoke",
+                [new CaptureFieldsAction(["prescription"]), new EmitEventAction("item_added")])]);
+
+        return new SessionCoordinator(
+            SessionId,
+            StageId,
+            configuration,
+            new FakeTriggerProvider(new() { [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)] }),
+            new FakeSelectorResolver(new() { ["prescription"] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95) }),
+            new FakeCaptureProvider(new() { ["prescription"] = capture }),
+            outbox,
+            new FakeTechnicalLog(),
+            clock: () => Now,
+            attachments: attachments);
+    }
+
+    private sealed class InMemoryAttachmentStore(FakeEventOutbox outbox) : IAttachmentStore
+    {
+        private readonly ConcurrentDictionary<string, byte[]> _content = new();
+
+        public bool SavedBeforeAnyEvent { get; private set; }
+
+        public int Count => _content.Count;
+
+        public Task<AttachmentInfo> SaveAsync(CapturedAttachment attachment, CancellationToken cancellationToken)
+        {
+            SavedBeforeAnyEvent = outbox.Appended.Count == 0;
+            var reference = AttachmentReference.For(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(attachment.Content)));
+            _content[reference] = attachment.Content;
+            return Task.FromResult(new AttachmentInfo(reference, attachment.FileName, attachment.ContentType, attachment.Content.Length, attachment.Source));
+        }
+
+        public Task<AttachmentInfo?> GetInfoAsync(string reference, CancellationToken cancellationToken) => Task.FromResult<AttachmentInfo?>(null);
+
+        public Task<byte[]?> ReadAsync(string reference, CancellationToken cancellationToken) =>
+            Task.FromResult(_content.TryGetValue(reference, out var content) ? content : null);
+
+        public Task<int> DeleteUnreferencedAsync(IReadOnlyCollection<string> referenced, CancellationToken cancellationToken) => Task.FromResult(0);
+
+        public Task<int> DeleteAllAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
@@ -346,12 +630,14 @@ public sealed class SessionCoordinatorTests
 
     private static SessionCoordinator CreateCoordinator(
         FakeTriggerProvider triggerProvider,
-        FakeSelectorResolver resolver,
-        FakeCaptureProvider captureProvider,
+        ISelectorResolver resolver,
+        ICaptureProvider captureProvider,
         FakeEventOutbox outbox,
         FakeTechnicalLog log,
         bool requireName = true,
-        bool requireNote = true)
+        bool requireNote = true,
+        TimeSpan? triggerRetryDelay = null,
+        CaptureRetryPolicy? captureRetry = null)
     {
         var configuration = BuildConfiguration(requireName, requireNote);
         var eventIds = new Queue<Guid>(Enumerable.Range(0, 8).Select(_ => Guid.NewGuid()));
@@ -366,7 +652,8 @@ public sealed class SessionCoordinatorTests
             log,
             eventIdFactory: () => eventIds.Dequeue(),
             clock: () => Now,
-            triggerRetryDelay: TimeSpan.FromMilliseconds(10));
+            triggerRetryDelay: triggerRetryDelay ?? TimeSpan.FromMilliseconds(10),
+            captureRetry: captureRetry ?? new CaptureRetryPolicy(CaptureRetryPolicy.Default.MaxAttempts, [TimeSpan.Zero, TimeSpan.Zero]));
     }
 
     private static IntegrationConfiguration BuildConfiguration(bool requireName, bool requireNote) => new(
@@ -454,6 +741,38 @@ public sealed class SessionCoordinatorTests
             Task.FromResult(resultsByFieldId.TryGetValue(field.Id, out var result)
                 ? result
                 : new CaptureResult(CaptureOutcome.ElementUnavailable, null, "fake", 0, TimeSpan.Zero, []));
+    }
+
+    /// <summary>Returns each field's resolutions in order, repeating the last one.</summary>
+    private sealed class SequencedSelectorResolver(Dictionary<string, SelectorResolution[]> resolutionsByAutomationId) : ISelectorResolver
+    {
+        private readonly ConcurrentDictionary<string, int> _calls = new(StringComparer.Ordinal);
+
+        public int Calls(string automationId) => _calls.GetValueOrDefault(automationId);
+
+        public Task<SelectorResolution> ResolveAsync(ElementFingerprint fingerprint, CancellationToken cancellationToken)
+        {
+            var key = fingerprint.AutomationId ?? string.Empty;
+            var call = _calls.AddOrUpdate(key, 1, (_, count) => count + 1);
+            return Task.FromResult(resolutionsByAutomationId.TryGetValue(key, out var sequence)
+                ? sequence[Math.Min(call, sequence.Length) - 1]
+                : SelectorResolution.NotFound("no fake resolution configured"));
+        }
+    }
+
+    /// <summary>Returns each field's capture results in order, repeating the last one.</summary>
+    private sealed class CountingCaptureProvider(Dictionary<string, CaptureResult[]> resultsByFieldId) : ICaptureProvider
+    {
+        private readonly ConcurrentDictionary<string, int> _calls = new(StringComparer.Ordinal);
+
+        public int Calls(string fieldId) => _calls.GetValueOrDefault(fieldId);
+
+        public Task<CaptureResult> CaptureAsync(ResolvedElementHandle handle, FieldDefinition field, CancellationToken cancellationToken)
+        {
+            var call = _calls.AddOrUpdate(field.Id, 1, (_, count) => count + 1);
+            var sequence = resultsByFieldId[field.Id];
+            return Task.FromResult(sequence[Math.Min(call, sequence.Length) - 1]);
+        }
     }
 
     private sealed class FakeResolvedElementHandle : ResolvedElementHandle

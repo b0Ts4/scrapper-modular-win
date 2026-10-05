@@ -21,6 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Reports the name of any test running longer than 60 s, so a hang is attributable. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Prescriva.Agent.TestTarget\Prescriva.Agent.TestTarget.csproj" />
     <ProjectReference Include="..\..\src\Prescriva.Agent.Windows\Prescriva.Agent.Windows.csproj" />
     <ProjectReference Include="..\..\src\Prescriva.Agent.Desktop\Prescriva.Agent.Desktop.csproj" />

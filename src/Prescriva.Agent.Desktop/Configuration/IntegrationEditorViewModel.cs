@@ -99,6 +99,10 @@ public sealed class IntegrationEditorViewModel
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var current = RequireConfiguration();
+        if (current.Stages.Any(stage => stage.Id == id))
+        {
+            throw new InvalidOperationException($"A stage with ID '{id}' already exists.");
+        }
 
         Configuration = current with { Stages = current.Stages.Add(new StageDefinition(id, name)) };
         MarkDirty();
@@ -109,15 +113,19 @@ public sealed class IntegrationEditorViewModel
     /// <c>InspectionState.Fingerprint</c>. Rejects an invalid semantic ID before touching
     /// the configuration - it is never partially applied.
     /// </summary>
-    public void AddField(string semanticId, string stageId, string meaning, bool required, ElementFingerprint selector)
+    public void AddField(string semanticId, string stageId, string meaning, bool required, ElementFingerprint selector, FieldKind kind = FieldKind.Text)
     {
         ValidateSemanticId(semanticId);
         ArgumentException.ThrowIfNullOrWhiteSpace(stageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(meaning);
         ArgumentNullException.ThrowIfNull(selector);
         var current = RequireConfiguration();
+        if (current.Fields.Any(field => field.Id == semanticId))
+        {
+            throw new InvalidOperationException($"A field with semantic ID '{semanticId}' already exists. Remove it first to replace its selector.");
+        }
 
-        var field = new FieldDefinition(semanticId, stageId, meaning, required, selector);
+        var field = new FieldDefinition(semanticId, stageId, meaning, required, selector, kind);
         Configuration = current with { Fields = current.Fields.Add(field) };
         MarkDirty();
     }
@@ -138,9 +146,99 @@ public sealed class IntegrationEditorViewModel
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentException.ThrowIfNullOrWhiteSpace(observedEvent);
         var current = RequireConfiguration();
+        if (current.Triggers.Any(trigger => trigger.Id == semanticId))
+        {
+            throw new InvalidOperationException($"A trigger with semantic ID '{semanticId}' already exists. Replace its actions or remove it first.");
+        }
 
         var trigger = new TriggerDefinition(semanticId, stageId, selector, observedEvent, actions);
         Configuration = current with { Triggers = current.Triggers.Add(trigger) };
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Removes a field. Refused - leaving the configuration untouched - while any trigger
+    /// still captures it, naming those triggers, so an edit never leaves a dangling
+    /// reference. Any handle resolved for the field is forgotten.
+    /// </summary>
+    public void RemoveField(string fieldId)
+    {
+        var current = RequireConfiguration();
+        var field = FindField(fieldId);
+        var users = current.Triggers
+            .Where(trigger => trigger.Actions.OfType<CaptureFieldsAction>().Any(capture => capture.FieldIds.Contains(fieldId)))
+            .Select(trigger => trigger.Id)
+            .ToArray();
+        if (users.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Field '{fieldId}' is captured by trigger(s) {string.Join(", ", users.Select(id => $"'{id}'"))}. Change or remove those triggers first.");
+        }
+
+        Configuration = current with { Fields = current.Fields.Remove(field) };
+        _resolvedHandles.Remove(fieldId);
+        MarkDirty();
+    }
+
+    /// <summary>Changes a field's meaning and whether it is required; its stage and selector are kept.</summary>
+    public void UpdateField(string fieldId, string meaning, bool required)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(meaning);
+        var current = RequireConfiguration();
+        var field = FindField(fieldId);
+
+        Configuration = current with { Fields = current.Fields.Replace(field, field with { Meaning = meaning, Required = required }) };
+        MarkDirty();
+    }
+
+    /// <summary>Removes a trigger.</summary>
+    public void RemoveTrigger(string triggerId)
+    {
+        var current = RequireConfiguration();
+        var trigger = FindTrigger(triggerId);
+
+        Configuration = current with { Triggers = current.Triggers.Remove(trigger) };
+        MarkDirty();
+    }
+
+    /// <summary>Replaces a trigger's ordered action list; its stage, selector and observed event are kept.</summary>
+    public void ReplaceTriggerActions(string triggerId, ImmutableArray<TriggerActionDefinition> actions)
+    {
+        if (actions.IsDefaultOrEmpty)
+        {
+            throw new ArgumentException("A trigger needs at least one action.", nameof(actions));
+        }
+
+        var current = RequireConfiguration();
+        var trigger = FindTrigger(triggerId);
+
+        Configuration = current with { Triggers = current.Triggers.Replace(trigger, trigger with { Actions = actions }) };
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Removes a stage. Refused while any field or trigger belongs to it, or any trigger
+    /// transitions to it, naming them.
+    /// </summary>
+    public void RemoveStage(string stageId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stageId);
+        var current = RequireConfiguration();
+        var stage = current.Stages.FirstOrDefault(candidate => candidate.Id == stageId)
+            ?? throw new InvalidOperationException($"No stage with ID '{stageId}' exists in the current configuration.");
+
+        var users = current.Fields.Where(field => field.StageId == stageId).Select(field => field.Id)
+            .Concat(current.Triggers
+                .Where(trigger => trigger.StageId == stageId || trigger.Actions.OfType<TransitionStageAction>().Any(transition => transition.StageId == stageId))
+                .Select(trigger => trigger.Id))
+            .ToArray();
+        if (users.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Stage '{stageId}' is still used by {string.Join(", ", users.Select(id => $"'{id}'"))}. Remove or change them first.");
+        }
+
+        Configuration = current with { Stages = current.Stages.Remove(stage) };
         MarkDirty();
     }
 
@@ -233,6 +331,13 @@ public sealed class IntegrationEditorViewModel
         }
 
         throw new InvalidOperationException($"No field with semantic ID '{fieldId}' exists in the current configuration.");
+    }
+
+    private TriggerDefinition FindTrigger(string triggerId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(triggerId);
+        return RequireConfiguration().Triggers.FirstOrDefault(trigger => trigger.Id == triggerId)
+            ?? throw new InvalidOperationException($"No trigger with semantic ID '{triggerId}' exists in the current configuration.");
     }
 
     private IntegrationConfiguration RequireConfiguration()

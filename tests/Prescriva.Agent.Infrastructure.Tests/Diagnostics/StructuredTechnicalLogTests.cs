@@ -81,4 +81,35 @@ public sealed class StructuredTechnicalLogTests
             }
         }
     }
+
+    [Fact]
+    public void Clear_empties_the_log_file_and_later_entries_are_still_written()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "prescriva-technical-log-tests-" + Guid.NewGuid().ToString("N"));
+        var filePath = Path.Combine(directory, "technical.log");
+        try
+        {
+            using (var log = new StructuredTechnicalLog(filePath))
+            {
+                log.Log(new TechnicalLogEntry(TechnicalLogLevel.Info, "before", "before clear", DateTimeOffset.UtcNow));
+                log.Log(new TechnicalLogEntry(TechnicalLogLevel.Info, "before", "before clear", DateTimeOffset.UtcNow));
+
+                log.Clear();
+                Assert.Equal(0, new FileInfo(filePath).Length);
+
+                log.Log(new TechnicalLogEntry(TechnicalLogLevel.Info, "after", "after clear", DateTimeOffset.UtcNow));
+            }
+
+            var lines = File.ReadAllLines(filePath);
+            var line = Assert.Single(lines);
+            Assert.Contains("after", line);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
 }

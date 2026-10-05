@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using Prescriva.Agent.Domain.Selectors;
+
 namespace Prescriva.Agent.Application.Inspection;
 
 /// <summary>
@@ -23,7 +26,11 @@ public sealed record ElementSnapshot(
     BoundingRectangle BoundingRectangle,
     int ProcessId,
     string ProcessName,
-    string? WindowTitle);
+    string? WindowTitle,
+    ImmutableArray<AncestorFingerprint> Ancestors = default,
+    ImmutableArray<string> NearbyLabels = default,
+    RelativeBounds? RelativeBounds = null,
+    string? FrameworkId = null);
 
 /// <summary>
 /// A plain bounding rectangle in screen coordinates.

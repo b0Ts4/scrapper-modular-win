@@ -40,6 +40,8 @@ public sealed class SessionCoordinator
     private readonly Func<DateTimeOffset> _clock;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly TimeSpan _triggerRetryDelay;
+    private readonly IAttachmentStore? _attachments;
+    private readonly CaptureRetryPolicy _captureRetry;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _failingTriggers = new(StringComparer.Ordinal);
 
     private CaptureSession _session;
@@ -55,7 +57,9 @@ public sealed class SessionCoordinator
         ITechnicalLog log,
         Func<Guid>? eventIdFactory = null,
         Func<DateTimeOffset>? clock = null,
-        TimeSpan? triggerRetryDelay = null)
+        TimeSpan? triggerRetryDelay = null,
+        IAttachmentStore? attachments = null,
+        CaptureRetryPolicy? captureRetry = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(initialStageId);
@@ -66,7 +70,7 @@ public sealed class SessionCoordinator
         ArgumentNullException.ThrowIfNull(log);
 
         _configuration = configuration;
-        _engine = new SessionEngine(configuration);
+        _engine = new SessionEngine(configuration, Testing.ConfigurationFingerprint.Compute(configuration));
         _session = CaptureSession.Start(sessionId, initialStageId);
         _triggerProvider = triggerProvider;
         _resolver = resolver;
@@ -76,6 +80,9 @@ public sealed class SessionCoordinator
         _eventIdFactory = eventIdFactory ?? Guid.NewGuid;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _triggerRetryDelay = triggerRetryDelay ?? DefaultTriggerRetryDelay;
+        _attachments = attachments;
+        _captureRetry = captureRetry ?? CaptureRetryPolicy.Default;
+        if (_captureRetry.MaxAttempts < 1) throw new ArgumentOutOfRangeException(nameof(captureRetry), "At least one attempt is required.");
         _triggerProvider.WatchEstablished += OnWatchEstablished;
     }
 
@@ -154,9 +161,10 @@ public sealed class SessionCoordinator
     /// Watches one trigger until cancelled. A watch that fails for any other reason (its
     /// element cannot be resolved yet, or disappears - e.g. the button belongs to a screen
     /// the application is not showing right now) never faults <see cref="RunAsync"/>: the
-    /// first failure of a streak is reported as a typed
-    /// <see cref="RuntimeDiagnosticCode.TriggerWatchFailed"/> error, the watch is retried
-    /// every <see cref="_triggerRetryDelay"/> until cancelled, and a recovered watch is
+    /// first failure of a streak that outlives <see cref="_triggerRetryDelay"/> is reported
+    /// as a typed <see cref="RuntimeDiagnosticCode.TriggerWatchFailed"/> error (a session
+    /// ended within that delay - the application closing - reports nothing), the watch is
+    /// retried every <see cref="_triggerRetryDelay"/> until cancelled, and a recovered watch is
     /// announced again through <see cref="RuntimeDiagnosticCode.TriggerWatchStarted"/>.
     /// The session's other triggers keep being observed throughout.
     /// </summary>
@@ -185,13 +193,17 @@ public sealed class SessionCoordinator
             }
             catch (Exception exception)
             {
+                // Report only once the failure outlives the retry delay: when the
+                // application closes, its elements vanish a moment before the session is
+                // ended, and that must not surface as an error.
+                await Task.Delay(_triggerRetryDelay, cancellationToken).ConfigureAwait(false);
                 if (_failingTriggers.TryAdd(trigger.Id, true))
                 {
                     PublishTriggerWatchFailed(trigger, exception);
                 }
-            }
 
-            await Task.Delay(_triggerRetryDelay, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
         }
     }
 
@@ -389,6 +401,38 @@ public sealed class SessionCoordinator
     private async Task<CapturedFieldValue> CaptureFieldAsync(TriggerDefinition trigger, string fieldId, CancellationToken cancellationToken)
     {
         var field = _configuration.Fields.First(candidate => candidate.Id == fieldId);
+        for (var attempt = 1; ; attempt++)
+        {
+            var (value, transient) = await CaptureFieldOnceAsync(trigger, field, cancellationToken).ConfigureAwait(false);
+            if (!transient || attempt >= _captureRetry.MaxAttempts)
+            {
+                return value;
+            }
+
+            var delay = _captureRetry.DelayBefore(attempt);
+            _log.Log(new TechnicalLogEntry(
+                TechnicalLogLevel.Info,
+                "field_capture_retried",
+                $"Field '{fieldId}' was temporarily unavailable ({value.Failure}); retrying (attempt {attempt + 1} of {_captureRetry.MaxAttempts}).",
+                _clock(),
+                SessionId: _session.Id,
+                TriggerId: trigger.Id,
+                FieldId: fieldId,
+                Elapsed: delay));
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// One resolve-and-read attempt. <c>transient</c> is true only for outcomes that may clear
+    /// on their own within moments (see <see cref="CaptureRetryPolicy"/>).
+    /// </summary>
+    private async Task<(CapturedFieldValue Value, bool Transient)> CaptureFieldOnceAsync(TriggerDefinition trigger, FieldDefinition field, CancellationToken cancellationToken)
+    {
+        var fieldId = field.Id;
         var fieldElapsed = Stopwatch.StartNew();
 
         var resolution = await _resolver.ResolveAsync(field.Selector, cancellationToken).ConfigureAwait(false);
@@ -412,7 +456,7 @@ public sealed class SessionCoordinator
                 Confidence: resolution.Confidence,
                 Elapsed: fieldElapsed.Elapsed));
 
-            return new CapturedFieldValue(null, failure);
+            return (new CapturedFieldValue(null, failure), resolution.Status != SelectorResolutionStatus.Ambiguous);
         }
 
         if (resolution.Confidence < FallbackConfidenceThreshold)
@@ -440,14 +484,61 @@ public sealed class SessionCoordinator
             var failure = captureResult.Outcome switch
             {
                 CaptureOutcome.UnsupportedPattern => CaptureFailure.UnsupportedProvider,
-                CaptureOutcome.TimedOut => CaptureFailure.Unreadable,
+                CaptureOutcome.TimedOut or CaptureOutcome.TooLarge => CaptureFailure.Unreadable,
                 _ => CaptureFailure.Unavailable
             };
+            var transient = captureResult.Outcome is CaptureOutcome.ElementUnavailable or CaptureOutcome.TimedOut or CaptureOutcome.Obscured;
 
-            return new CapturedFieldValue(null, failure);
+            return (new CapturedFieldValue(null, failure), transient);
         }
 
-        return new CapturedFieldValue(captureResult.Value);
+        if (field.Kind == FieldKind.File)
+        {
+            return (await StoreAttachmentAsync(trigger, field, captureResult, cancellationToken).ConfigureAwait(false), false);
+        }
+
+        return (new CapturedFieldValue(captureResult.Value), false);
+    }
+
+    /// <summary>
+    /// A file field's value is the reference of its stored attachment. The attachment is
+    /// stored here - before the session engine runs and long before the event referencing it
+    /// is appended - so a persisted event never points at missing content. Any problem
+    /// becomes a typed capture failure, which rejects the occurrence visibly.
+    /// </summary>
+    private async Task<CapturedFieldValue> StoreAttachmentAsync(
+        TriggerDefinition trigger,
+        FieldDefinition field,
+        CaptureResult captureResult,
+        CancellationToken cancellationToken)
+    {
+        if (captureResult.Attachment is not { } attachment)
+        {
+            return new CapturedFieldValue(null, CaptureFailure.Unavailable);
+        }
+
+        if (_attachments is null)
+        {
+            return new CapturedFieldValue(null, CaptureFailure.UnsupportedProvider);
+        }
+
+        try
+        {
+            var info = await _attachments.SaveAsync(attachment, cancellationToken).ConfigureAwait(false);
+            _log.Log(new TechnicalLogEntry(
+                TechnicalLogLevel.Debug,
+                "attachment_stored",
+                $"Field '{field.Id}' attachment stored ({info.Size} bytes, source {info.Source}).",
+                _clock(),
+                SessionId: _session.Id,
+                TriggerId: trigger.Id,
+                FieldId: field.Id));
+            return new CapturedFieldValue(info.Reference);
+        }
+        catch (AttachmentTooLargeException)
+        {
+            return new CapturedFieldValue(null, CaptureFailure.Unreadable);
+        }
     }
 
     private void PublishSelectorFallback(TriggerDefinition trigger, string fieldId, double confidence, TimeSpan elapsed)

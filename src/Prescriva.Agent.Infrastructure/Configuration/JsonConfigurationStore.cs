@@ -101,6 +101,7 @@ public sealed class JsonConfigurationStore : IConfigurationStore
             TypeInfoResolver = resolver
         };
         options.Converters.Add(new ImmutableArrayConverterFactory());
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         return options;
     }
 

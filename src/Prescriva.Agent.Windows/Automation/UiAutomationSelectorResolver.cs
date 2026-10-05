@@ -96,6 +96,7 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
                 $"No window found for process '{fingerprint.ProcessIdentity}' matching window rule '{fingerprint.WindowRule}'.");
 
         var descendants = AutomationWindowLocator.FindDescendants(window);
+        var windowBounds = window.Current.BoundingRectangle;
 
         var elementsById = new Dictionary<string, AutomationElement>(StringComparer.Ordinal);
         var candidates = new List<ElementCandidate>(descendants.Count);
@@ -104,7 +105,7 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
             var descendant = descendants[index];
             var id = index.ToString(CultureInfo.InvariantCulture);
             elementsById[id] = descendant;
-            candidates.Add(new ElementCandidate(id, CreateCandidateFingerprint(fingerprint, descendant)));
+            candidates.Add(new ElementCandidate(id, CreateCandidateFingerprint(fingerprint, descendant, windowBounds)));
         }
 
         var match = _matcher.Match(fingerprint, candidates, _weights);
@@ -112,23 +113,37 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
         {
             SelectorMatchStatus.Found => SelectorResolution.Found(
                 new UiaResolvedElementHandle(elementsById[match.CandidateId!]),
-                match.Confidence),
+                match.Confidence,
+                match.Evidence,
+                match.RunnerUpScore is { } runnerUp ? match.Score - runnerUp : null),
             SelectorMatchStatus.Ambiguous => SelectorResolution.Ambiguous(match.Confidence),
             _ => SelectorResolution.NotFound("No matching element was found."),
         };
     }
 
-    private static ElementFingerprint CreateCandidateFingerprint(ElementFingerprint selector, AutomationElement element)
+    /// <summary>
+    /// A candidate's fingerprint. Structural signals cost extra UI Automation calls per
+    /// element, so each is computed only when the selector itself carries that signal and
+    /// the candidate is of the selector's control type (no other candidate could win).
+    /// </summary>
+    private static ElementFingerprint CreateCandidateFingerprint(ElementFingerprint selector, AutomationElement element, System.Windows.Rect windowBounds)
     {
         var current = element.Current;
+        var controlType = current.ControlType?.ProgrammaticName;
+        var worthStructure = string.IsNullOrWhiteSpace(selector.ControlType) ||
+            string.Equals(selector.ControlType, controlType, StringComparison.OrdinalIgnoreCase);
+
         return new ElementFingerprint(
             selector.ProcessIdentity,
             selector.WindowRule,
             NullIfEmpty(current.AutomationId),
             NullIfEmpty(current.Name),
-            current.ControlType?.ProgrammaticName,
+            controlType,
             NullIfEmpty(current.ClassName),
-            NullIfEmpty(current.FrameworkId));
+            NullIfEmpty(current.FrameworkId),
+            worthStructure && !selector.Ancestors.IsDefaultOrEmpty ? StructuralSignals.Ancestors(element) : default,
+            worthStructure && !selector.NearbyLabels.IsDefaultOrEmpty ? StructuralSignals.NearbyLabels(element) : default,
+            worthStructure && selector.RelativeBounds is not null ? StructuralSignals.Relative(current.BoundingRectangle, windowBounds) : null);
     }
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;

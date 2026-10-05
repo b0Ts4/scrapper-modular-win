@@ -127,6 +127,33 @@ public sealed class AgentRuntimeTests
     }
 
     [Fact]
+    public async Task Stopping_by_cancelling_the_activation_token_is_a_normal_end_even_if_the_source_throws_on_cancellation()
+    {
+        // The fake source throws OperationCanceledException on cancellation (as a real source
+        // does when cancellation lands outside its own polling wait): stopping monitoring is
+        // still a clean end, with every session closed.
+        var source = new FakeApplicationInstanceSource();
+        var runtime = new AgentRuntime(
+            source,
+            triggerProviderFactory: (_, sessionId) => new FakeTriggerProvider(sessionId),
+            selectorResolverFactory: _ => new UnusedSelectorResolver(),
+            captureProviderFactory: _ => new UnusedCaptureProvider(),
+            new FakeEventOutbox(),
+            new FakeTechnicalLog());
+        var configuration = BuildConfiguration();
+        var approval = new ConfigurationApproval(configuration.Id, ConfigurationFingerprint.Compute(configuration), DateTimeOffset.UtcNow);
+        using var activationCts = new CancellationTokenSource();
+
+        var activation = runtime.ActivateAsync(configuration, approval, activationCts.Token);
+        source.Enqueue(new ApplicationInstanceChange(new ApplicationInstance(Guid.NewGuid(), ProcessId: 1001), ApplicationInstanceChangeKind.Started));
+        await WaitUntilAsync(() => runtime.ActiveSessions.Count == 1, TimeSpan.FromSeconds(5));
+        activationCts.Cancel();
+
+        Assert.Equal(ActivationStatus.Activated, (await activation.WaitAsync(TimeSpan.FromSeconds(10))).Status);
+        Assert.Empty(runtime.ActiveSessions);
+    }
+
+    [Fact]
     public async Task ActivateAsync_returns_NotTested_and_never_watches_instances_when_approval_is_missing()
     {
         var source = new NeverWatchedApplicationInstanceSource();

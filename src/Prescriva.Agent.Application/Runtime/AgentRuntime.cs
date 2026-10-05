@@ -79,6 +79,7 @@ public sealed class AgentRuntime
     private readonly Func<Guid> _sessionIdFactory;
     private readonly Func<Guid> _eventIdFactory;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly IAttachmentStore? _attachments;
 
     private readonly object _gate = new();
     private readonly Dictionary<Guid, ActiveInstance> _active = new();
@@ -92,7 +93,8 @@ public sealed class AgentRuntime
         ITechnicalLog log,
         Func<Guid>? sessionIdFactory = null,
         Func<Guid>? eventIdFactory = null,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        IAttachmentStore? attachments = null)
     {
         ArgumentNullException.ThrowIfNull(instanceSource);
         ArgumentNullException.ThrowIfNull(triggerProviderFactory);
@@ -110,6 +112,7 @@ public sealed class AgentRuntime
         _sessionIdFactory = sessionIdFactory ?? Guid.NewGuid;
         _eventIdFactory = eventIdFactory ?? Guid.NewGuid;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _attachments = attachments;
     }
 
     /// <summary>Raised for every diagnostic any active session's coordinator publishes.</summary>
@@ -181,6 +184,11 @@ public sealed class AgentRuntime
                 }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Cancelling the activation token is how monitoring is stopped: a normal end,
+            // whether the source noticed it inside its polling wait or elsewhere.
+        }
         finally
         {
             await CloseAllAsync().ConfigureAwait(false);
@@ -206,7 +214,8 @@ public sealed class AgentRuntime
             _outbox,
             _log,
             _eventIdFactory,
-            _clock);
+            _clock,
+            attachments: _attachments);
         coordinator.DiagnosticPublished += OnDiagnosticPublished;
 
         var instanceCts = CancellationTokenSource.CreateLinkedTokenSource(outerCancellationToken);

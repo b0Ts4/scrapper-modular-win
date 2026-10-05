@@ -12,6 +12,7 @@ using Prescriva.Agent.Desktop.Monitoring;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Domain.Events;
 using Prescriva.Agent.Domain.Selectors;
+using Prescriva.Agent.Infrastructure.Events;
 
 namespace Prescriva.Agent.Application.Tests.Monitoring;
 
@@ -112,6 +113,128 @@ public sealed class RuntimeMonitorViewModelTests
         await harness.ViewModel.StopAsync();
     }
 
+    [Fact]
+    public async Task Pending_events_reaching_the_capacity_thresholds_raise_a_visible_alert_and_are_kept()
+    {
+        var harness = new Harness(capacityPolicy: new OutboxCapacityPolicy(warningThreshold: 2, criticalThreshold: 3));
+        var configuration = Configuration();
+        await harness.ViewModel.StartAsync(configuration, Approve(configuration));
+        harness.InstanceSource.Start(new ApplicationInstance(Guid.NewGuid(), 4242));
+        await WaitUntilAsync(() => harness.ViewModel.Diagnostics.Any(d => d.Message.StartsWith("Monitorando", StringComparison.Ordinal)));
+        Assert.Null(harness.ViewModel.CapacityAlert);
+
+        harness.Capture.Value = "Dipirona";
+        for (var count = 1; count <= 3; count++)
+        {
+            harness.Triggers.Fire("add_item");
+            var expected = count;
+            await WaitUntilAsync(() => harness.ViewModel.Events.Count == expected);
+            await Task.Delay(600); // past the double-click de-duplication window
+
+            if (count == 1)
+            {
+                Assert.Null(harness.ViewModel.CapacityAlert);
+            }
+            else if (count == 2)
+            {
+                Assert.Contains("2 eventos pendentes", harness.ViewModel.CapacityAlert, StringComparison.Ordinal);
+                Assert.False(harness.ViewModel.IsCapacityCritical);
+            }
+        }
+
+        Assert.True(harness.ViewModel.IsCapacityCritical);
+        Assert.Contains("crítico", harness.ViewModel.CapacityAlert, StringComparison.Ordinal);
+        Assert.Equal(3, harness.Outbox.Count); // alerting never deletes pending events
+
+        await harness.ViewModel.StopAsync();
+    }
+
+    [Fact]
+    public async Task Clearing_local_data_is_refused_while_monitoring_and_empties_the_queue_when_stopped()
+    {
+        var cleared = 0;
+        var harness = new Harness(clearLocalData: _ =>
+        {
+            cleared++;
+            return Task.CompletedTask;
+        });
+        var configuration = Configuration();
+        await harness.ViewModel.StartAsync(configuration, Approve(configuration));
+
+        Assert.False(await harness.ViewModel.ClearLocalDataAsync());
+        Assert.Equal(0, cleared);
+        Assert.Contains("Pare o monitoramento", harness.ViewModel.StatusText, StringComparison.Ordinal);
+
+        await harness.ViewModel.StopAsync();
+        Assert.True(await harness.ViewModel.ClearLocalDataAsync());
+
+        Assert.Equal(1, cleared);
+        Assert.Contains("Dados locais apagados", harness.ViewModel.StatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Integration_health_is_shown_with_its_reason_and_recovers()
+    {
+        var harness = new Harness();
+        var configuration = Configuration();
+        Assert.Equal(string.Empty, harness.ViewModel.HealthText);
+
+        await harness.ViewModel.StartAsync(configuration, Approve(configuration));
+        Assert.Contains("Integração saudável", harness.ViewModel.HealthText, StringComparison.Ordinal);
+
+        harness.InstanceSource.Start(new ApplicationInstance(Guid.NewGuid(), 4242));
+        await WaitUntilAsync(() => harness.ViewModel.Diagnostics.Any(d => d.Message.StartsWith("Monitorando", StringComparison.Ordinal)));
+
+        harness.Capture.Unavailable = true;
+        harness.Triggers.Fire("add_item");
+        await WaitUntilAsync(() => harness.ViewModel.HealthState == IntegrationHealthState.Broken);
+        Assert.Contains("Integração quebrada", harness.ViewModel.HealthText, StringComparison.Ordinal);
+        Assert.Contains("medication", harness.ViewModel.HealthText, StringComparison.Ordinal);
+
+        await Task.Delay(600); // past the double-click de-duplication window
+        harness.Capture.Unavailable = false;
+        harness.Capture.Value = "Dipirona";
+        harness.Triggers.Fire("add_item");
+        await WaitUntilAsync(() => harness.ViewModel.HealthState == IntegrationHealthState.Healthy);
+        Assert.Contains("Integração saudável", harness.ViewModel.HealthText, StringComparison.Ordinal);
+
+        await harness.ViewModel.StopAsync();
+    }
+
+    [Fact]
+    public async Task A_persisted_attachment_is_listed_by_file_name_never_by_its_raw_reference()
+    {
+        var reference = AttachmentReference.For(new string('A', 64));
+        var attachments = new SingleAttachmentStore(new AttachmentInfo(reference, "receita.pdf", "application/pdf", 4096, AttachmentSource.File));
+        var outbox = new InMemoryOutbox();
+        await outbox.AppendAsync(new DomainEvent(Guid.NewGuid(), "monitor-config", 1, Guid.NewGuid(), 1, DateTimeOffset.UtcNow, "item_added",
+            new DomainEventPayload(
+                System.Collections.Immutable.ImmutableDictionary<string, string>.Empty.Add("prescription", reference),
+                System.Collections.Immutable.ImmutableArray<System.Collections.Immutable.ImmutableDictionary<string, string>>.Empty)), CancellationToken.None);
+        var runtime = new AgentRuntime(new FakeInstanceSource(), (_, id) => new FakeTriggers(Task.CompletedTask).ForSession(id), _ => new FoundResolver(), _ => new FakeCapture(), outbox, new NullLog());
+        var viewModel = new RuntimeMonitorViewModel(runtime, outbox, attachments: attachments);
+
+        await viewModel.RefreshEventsAsync();
+
+        var shown = Assert.Single(viewModel.Events).FieldsText;
+        Assert.Contains("prescription=arquivo receita.pdf (4 KB, cópia do arquivo)", shown, StringComparison.Ordinal);
+        Assert.DoesNotContain(reference, shown, StringComparison.Ordinal);
+    }
+
+    private sealed class SingleAttachmentStore(AttachmentInfo info) : IAttachmentStore
+    {
+        public Task<AttachmentInfo> SaveAsync(CapturedAttachment attachment, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<AttachmentInfo?> GetInfoAsync(string reference, CancellationToken cancellationToken) =>
+            Task.FromResult(reference == info.Reference ? info : null);
+
+        public Task<byte[]?> ReadAsync(string reference, CancellationToken cancellationToken) => Task.FromResult<byte[]?>(null);
+
+        public Task<int> DeleteUnreferencedAsync(IReadOnlyCollection<string> referenced, CancellationToken cancellationToken) => Task.FromResult(0);
+
+        public Task<int> DeleteAllAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+    }
+
     private static IntegrationConfiguration Configuration(int extraTriggers = 0) => new(
         IntegrationConfiguration.CurrentSchemaVersion,
         "monitor-config",
@@ -150,7 +273,10 @@ public sealed class RuntimeMonitorViewModelTests
 
     private sealed class Harness
     {
-        public Harness(Task? watchGate = null)
+        public Harness(
+            Task? watchGate = null,
+            OutboxCapacityPolicy? capacityPolicy = null,
+            Func<CancellationToken, Task>? clearLocalData = null)
         {
             Triggers = new FakeTriggers(watchGate ?? Task.CompletedTask);
             var runtime = new AgentRuntime(
@@ -160,7 +286,7 @@ public sealed class RuntimeMonitorViewModelTests
                 _ => Capture,
                 Outbox,
                 new NullLog());
-            ViewModel = new RuntimeMonitorViewModel(runtime, Outbox);
+            ViewModel = new RuntimeMonitorViewModel(runtime, Outbox, capacityPolicy: capacityPolicy, clearLocalData: clearLocalData);
         }
 
         public FakeInstanceSource InstanceSource { get; } = new();
@@ -262,13 +388,19 @@ public sealed class RuntimeMonitorViewModelTests
     {
         public string? Value { get; set; }
 
+        public bool Unavailable { get; set; }
+
         public Task<CaptureResult> CaptureAsync(ResolvedElementHandle handle, FieldDefinition field, CancellationToken cancellationToken) =>
-            Task.FromResult(new CaptureResult(CaptureOutcome.Captured, Value, CaptureResult.UiaProviderId, 1.0, TimeSpan.Zero, []));
+            Task.FromResult(Unavailable
+                ? new CaptureResult(CaptureOutcome.ElementUnavailable, null, CaptureResult.UiaProviderId, 0, TimeSpan.Zero, [])
+                : new CaptureResult(CaptureOutcome.Captured, Value, CaptureResult.UiaProviderId, 1.0, TimeSpan.Zero, []));
     }
 
     private sealed class InMemoryOutbox : IEventOutbox
     {
         private readonly ConcurrentQueue<DomainEvent> _events = new();
+
+        public int Count => _events.Count;
 
         public Task AppendAsync(DomainEvent domainEvent, CancellationToken cancellationToken)
         {

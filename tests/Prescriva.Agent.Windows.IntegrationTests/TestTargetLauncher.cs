@@ -34,7 +34,9 @@ internal sealed class TestTargetLauncher : IDisposable
 
         try
         {
-            var window = WaitForMainWindow(process, timeout ?? TimeSpan.FromSeconds(15));
+            // Generous: the first start of a freshly built executable on a CI runner (JIT,
+            // antivirus scan of the new binary) has exceeded 15 s; success returns at once.
+            var window = WaitForMainWindow(process, timeout ?? TimeSpan.FromSeconds(45));
             return new TestTargetLauncher(process, window);
         }
         catch
@@ -97,7 +99,28 @@ internal sealed class TestTargetLauncher : IDisposable
         }
     }
 
+    /// <summary>
+    /// The TestTarget to launch: PRESCRIVA_TESTTARGET_EXE when set (CI uses it to run the
+    /// suite against a 32-bit build), otherwise the solution's own build output.
+    /// </summary>
     internal static string ResolveExecutablePath()
+    {
+        var overridden = Environment.GetEnvironmentVariable("PRESCRIVA_TESTTARGET_EXE");
+        if (string.IsNullOrEmpty(overridden))
+        {
+            return ResolveBuiltExecutablePath();
+        }
+
+        if (!File.Exists(overridden))
+        {
+            throw new FileNotFoundException("PRESCRIVA_TESTTARGET_EXE does not point to an existing file.", overridden);
+        }
+
+        return overridden;
+    }
+
+    /// <summary>The TestTarget produced by building the solution (src/.../bin/{configuration}/net10.0-windows).</summary>
+    internal static string ResolveBuiltExecutablePath()
     {
         var repoRoot = FindRepositoryRoot(AppContext.BaseDirectory);
         var configuration = FindConfigurationSegment(AppContext.BaseDirectory);

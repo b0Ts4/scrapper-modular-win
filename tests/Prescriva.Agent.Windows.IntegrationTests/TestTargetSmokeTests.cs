@@ -38,4 +38,23 @@ public class TestTargetSmokeTests
             Assert.True(element is not null, $"Expected to find an element with AutomationId '{automationId}'.");
         }
     }
+
+    /// <summary>
+    /// Proves which build the suite actually exercised: 64-bit by default, 32-bit when CI
+    /// sets PRESCRIVA_TESTTARGET_EXPECTED_BITNESS=32 for its x86 pass (so the x86 job
+    /// cannot silently fall back to the x64 TestTarget).
+    /// </summary>
+    [Fact]
+    public void Launched_TestTarget_runs_with_the_expected_bitness()
+    {
+        var expected = Environment.GetEnvironmentVariable("PRESCRIVA_TESTTARGET_EXPECTED_BITNESS") is { Length: > 0 } value ? value : "64";
+        using var target = TestTargetLauncher.Launch();
+        using var process = System.Diagnostics.Process.GetProcessById(target.Window.Current.ProcessId);
+
+        Assert.True(IsWow64Process(process.Handle, out var isWow64));
+        Assert.Equal(expected, isWow64 ? "32" : "64");
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool IsWow64Process(IntPtr process, out bool wow64Process);
 }

@@ -219,6 +219,131 @@ public sealed class IntegrationEditorViewModelTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => viewModel.ReadFieldValueAsync("medication_name"));
     }
 
+    [Fact]
+    public async Task RemoveField_removes_an_unreferenced_field_and_marks_the_configuration_unsaved()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        AddValidStageAndField(viewModel);
+        viewModel.AddField("note", "intake", "Note", required: false, Fingerprint("NoteTextBox"));
+        await viewModel.SaveAsync();
+
+        viewModel.RemoveField("note");
+
+        Assert.DoesNotContain(viewModel.Configuration!.Fields, field => field.Id == "note");
+        Assert.True(viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void RemoveField_is_refused_while_a_trigger_captures_it_and_names_that_trigger()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        AddValidStageAndField(viewModel);
+        viewModel.AddTrigger("add_item", "intake", Fingerprint("AddButton"), "Invoke",
+            [new CaptureFieldsAction(["medication_name"]), new EmitEventAction("item_added")]);
+        var before = viewModel.Configuration;
+
+        var error = Assert.Throws<InvalidOperationException>(() => viewModel.RemoveField("medication_name"));
+
+        Assert.Contains("add_item", error.Message, StringComparison.Ordinal);
+        Assert.Same(before, viewModel.Configuration);
+    }
+
+    [Fact]
+    public async Task RemoveField_forgets_a_resolved_handle_so_a_re_added_field_must_be_resolved_again()
+    {
+        var viewModel = CreateViewModel(out _, out var resolver, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        AddValidStageAndField(viewModel);
+        viewModel.AddField("note", "intake", "Note", required: false, Fingerprint("NoteTextBox"));
+        resolver.NextResult = SelectorResolution.Found(new FakeResolvedElementHandle(), 0.95);
+        await viewModel.ResolveFieldAsync("note");
+
+        viewModel.RemoveField("note");
+        viewModel.AddField("note", "intake", "Note", required: false, Fingerprint("OtherNoteTextBox"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => viewModel.ReadFieldValueAsync("note"));
+    }
+
+    [Fact]
+    public void UpdateField_changes_meaning_and_required_but_keeps_the_selector()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        var selector = AddValidStageAndField(viewModel);
+
+        viewModel.UpdateField("medication_name", "Nome do medicamento", required: false);
+
+        var field = Assert.Single(viewModel.Configuration!.Fields);
+        Assert.Equal("Nome do medicamento", field.Meaning);
+        Assert.False(field.Required);
+        Assert.Same(selector, field.Selector);
+    }
+
+    [Fact]
+    public void RemoveTrigger_and_ReplaceTriggerActions_edit_the_named_trigger_only()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        AddValidStageAndField(viewModel);
+        viewModel.AddTrigger("add_item", "intake", Fingerprint("AddButton"), "Invoke",
+            [new CaptureFieldsAction(["medication_name"]), new EmitEventAction("item_added")]);
+
+        viewModel.ReplaceTriggerActions("add_item", [new EmitEventAction("item_added"), new ClearStateAction()]);
+        viewModel.RemoveTrigger("next_trigger");
+
+        var trigger = Assert.Single(viewModel.Configuration!.Triggers);
+        Assert.Equal("add_item", trigger.Id);
+        Assert.Collection(
+            trigger.Actions,
+            action => Assert.IsType<EmitEventAction>(action),
+            action => Assert.IsType<ClearStateAction>(action));
+    }
+
+    [Fact]
+    public void RemoveStage_is_refused_while_a_field_trigger_or_transition_uses_it()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        AddValidStageAndField(viewModel);
+        viewModel.AddStage("review", "Review");
+        viewModel.ReplaceTriggerActions("next_trigger", [new TransitionStageAction("review")]);
+
+        Assert.Contains("medication_name", Assert.Throws<InvalidOperationException>(() => viewModel.RemoveStage("intake")).Message, StringComparison.Ordinal);
+        Assert.Contains("next_trigger", Assert.Throws<InvalidOperationException>(() => viewModel.RemoveStage("review")).Message, StringComparison.Ordinal);
+
+        viewModel.ReplaceTriggerActions("next_trigger", [new FinishSessionAction()]);
+        viewModel.RemoveStage("review");
+        Assert.DoesNotContain(viewModel.Configuration!.Stages, stage => stage.Id == "review");
+    }
+
+    [Fact]
+    public void Duplicate_ids_are_refused_on_add()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        AddValidStageAndField(viewModel);
+
+        Assert.Throws<InvalidOperationException>(() => viewModel.AddStage("intake", "Again"));
+        Assert.Throws<InvalidOperationException>(() => viewModel.AddField("medication_name", "intake", "Again", required: true, Fingerprint("Other")));
+        Assert.Throws<InvalidOperationException>(() => viewModel.AddTrigger("next_trigger", "intake", Fingerprint("Other"), "Invoke", [new FinishSessionAction()]));
+    }
+
+    [Fact]
+    public void Editing_unknown_ids_is_refused()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.CreateIntegration("integration-1", "Integration 1", Application());
+        AddValidStageAndField(viewModel);
+
+        Assert.Throws<InvalidOperationException>(() => viewModel.RemoveField("missing"));
+        Assert.Throws<InvalidOperationException>(() => viewModel.UpdateField("missing", "x", required: true));
+        Assert.Throws<InvalidOperationException>(() => viewModel.RemoveTrigger("missing"));
+        Assert.Throws<InvalidOperationException>(() => viewModel.ReplaceTriggerActions("missing", [new FinishSessionAction()]));
+        Assert.Throws<InvalidOperationException>(() => viewModel.RemoveStage("missing"));
+    }
+
     private sealed class FakeConfigurationStore : IConfigurationStore
     {
         public List<IntegrationConfiguration> SavedConfigurations { get; } = [];

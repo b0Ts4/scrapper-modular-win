@@ -29,6 +29,15 @@
                                 <TextBlock Text="{Binding ProviderText, Mode=OneWay, StringFormat='Provedor: {0}'}" FontSize="11" />
                                 <TextBlock Text="{Binding ConfidenceText, Mode=OneWay, StringFormat='Confiança: {0}'}" FontSize="11" />
                                 <TextBlock Text="{Binding ValueText, Mode=OneWay, StringFormat='Valor lido: {0}'}" FontSize="11" />
+                                <TextBlock Text="{Binding SignalsText, Mode=OneWay, StringFormat='Sinais: {0}'}" FontSize="11" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding DurationText, Mode=OneWay, StringFormat='Tempo: {0}'}" FontSize="11" />
+                                <ItemsControl ItemsSource="{Binding Warnings, Mode=OneWay}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Mode=OneWay, StringFormat='Aviso: {0}'}" Foreground="DarkOrange" TextWrapping="Wrap" FontSize="11" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                                 <TextBlock Text="{Binding FailureMessage, Mode=OneWay}" Foreground="DarkRed" TextWrapping="Wrap" FontSize="11" />
                             </StackPanel>
                         </Border>
@@ -47,6 +56,8 @@
                                     <Run Text=" - " />
                                     <Run Text="{Binding StatusText, Mode=OneWay}" />
                                 </TextBlock>
+                                <TextBlock Text="{Binding EffectsText, Mode=OneWay, StringFormat='Efeitos: {0}'}" FontSize="11" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding DurationText, Mode=OneWay, StringFormat='Tempo: {0}'}" FontSize="11" />
                                 <TextBlock Text="{Binding FailureMessage, Mode=OneWay}" Foreground="DarkRed" TextWrapping="Wrap" FontSize="11" />
                             </StackPanel>
                         </Border>

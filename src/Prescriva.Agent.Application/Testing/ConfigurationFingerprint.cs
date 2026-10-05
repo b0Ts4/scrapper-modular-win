@@ -70,7 +70,16 @@ public static class ConfigurationFingerprint
                     .Append("id=").Append(field?.Id)
                     .Append(",stageId=").Append(field?.StageId)
                     .Append(",meaning=").Append(field?.Meaning)
-                    .Append(",required=").Append(field?.Required)
+                    .Append(",required=").Append(field?.Required);
+
+                // Appended only for non-text fields, so every configuration written before
+                // field kinds existed keeps the exact hash its approval is bound to.
+                if (field is not null && field.Kind != FieldKind.Text)
+                {
+                    sb.Append(",kind=").Append(field.Kind);
+                }
+
+                sb
                     .Append(",selector=");
                 AppendSelector(sb, field?.Selector);
                 sb.Append('}');

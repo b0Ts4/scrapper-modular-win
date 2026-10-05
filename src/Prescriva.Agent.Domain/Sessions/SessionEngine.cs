@@ -7,13 +7,16 @@ namespace Prescriva.Agent.Domain.Sessions;
 public sealed class SessionEngine
 {
     private readonly IntegrationConfiguration configuration;
+    private readonly string? revision;
 
-    public SessionEngine(IntegrationConfiguration configuration)
+    /// <param name="revision">Content revision stamped on every emitted event (see <see cref="DomainEvent.ConfigurationRevision"/>).</param>
+    public SessionEngine(IntegrationConfiguration configuration, string? revision = null)
     {
         var validation = ConfigurationValidator.Validate(configuration);
         if (!validation.IsValid)
             throw new ConfigurationValidationException(validation.Errors);
         this.configuration = configuration;
+        this.revision = revision;
     }
 
     /// <summary>
@@ -71,7 +74,7 @@ public sealed class SessionEngine
                 ConfirmedItems = type == "item_added" ? current.ConfirmedItems.Add(current.Values) : current.ConfirmedItems
             };
             events.Add(new(id, configuration.Id, configuration.SchemaVersion, session.Id,
-                current.LastSequence, now, type, new(current.Values, current.ConfirmedItems)));
+                current.LastSequence, now, type, new(current.Values, current.ConfirmedItems), revision));
             return null;
         }
 

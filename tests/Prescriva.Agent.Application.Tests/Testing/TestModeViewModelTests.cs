@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Prescriva.Agent.Application.Capture;
+using Prescriva.Agent.Application.Configuration;
 using Prescriva.Agent.Application.Selection;
 using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Application.Triggers;
@@ -47,6 +48,41 @@ public sealed class TestModeViewModelTests
         Assert.Null(trigger.FailureMessage);
 
         Assert.True(viewModel.CanApprove);
+    }
+
+    [Fact]
+    public void A_field_result_is_shown_with_its_signals_lead_duration_and_fragility_warnings()
+    {
+        var result = new FieldCheckResult(
+            "notes", FieldCheckOutcome.Found, "uia", 1.0, FailureCode: null, Value: "nota",
+            Signals: System.Collections.Immutable.ImmutableDictionary<string, int>.Empty.Add("controlType", 15).Add("nearbyLabels", 20),
+            Lead: 12,
+            Duration: TimeSpan.FromMilliseconds(34.4),
+            Warnings: [SelectorFragilityWarning.MissingAutomationId, SelectorFragilityWarning.NarrowLead]);
+
+        var display = TestModeViewModel.ToDisplay(result);
+
+        Assert.Equal("rótulo (20), tipo (15); margem 12", display.SignalsText);
+        Assert.Equal("34 ms", display.DurationText);
+        Assert.Equal(2, display.Warnings.Count);
+        Assert.Contains("AutomationId", display.Warnings[0], StringComparison.Ordinal);
+        Assert.Contains("margem", display.Warnings[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_strong_field_has_no_warning_and_a_trigger_shows_its_duration_transitions_and_events()
+    {
+        var field = TestModeViewModel.ToDisplay(new FieldCheckResult(
+            "medication", FieldCheckOutcome.Found, "uia", 1.0, FailureCode: null,
+            Signals: System.Collections.Immutable.ImmutableDictionary<string, int>.Empty.Add("automationId", 40),
+            Duration: TimeSpan.FromMilliseconds(5), Warnings: []));
+        var trigger = TestModeViewModel.ToDisplay(new TriggerCheckResult(
+            "add", TriggerCheckOutcome.Detected, ["review"], ["item_added"], FailureCode: null, Duration: TimeSpan.FromMilliseconds(1250)));
+
+        Assert.Empty(field.Warnings);
+        Assert.Equal("AutomationId (40)", field.SignalsText);
+        Assert.Equal("1250 ms", trigger.DurationText);
+        Assert.Equal("etapa → review; evento item_added", trigger.EffectsText);
     }
 
     [Fact]
@@ -158,6 +194,44 @@ public sealed class TestModeViewModelTests
         Assert.Null(viewModel.LastApproval);
     }
 
+    [Fact]
+    public async Task ApproveAsync_records_the_approval_so_it_survives_a_restart()
+    {
+        var configuration = BuildPassingConfiguration();
+        var store = new InMemoryApprovalStore();
+        var viewModel = new TestModeViewModel(BuildRunner(passing: true), approvals: new ApprovalService(store));
+
+        await viewModel.RunAsync(configuration);
+        var approval = await viewModel.ApproveAsync();
+
+        Assert.Same(approval, viewModel.LastApproval);
+        var afterRestart = await new ApprovalService(store).GetStatusAsync(configuration);
+        Assert.Equal(ApprovalState.Approved, afterRestart.State);
+        Assert.Equal(approval, afterRestart.Approval);
+    }
+
+    [Fact]
+    public async Task ApproveAsync_after_a_failed_run_records_nothing()
+    {
+        var store = new InMemoryApprovalStore();
+        var viewModel = new TestModeViewModel(BuildRunner(passing: false), approvals: new ApprovalService(store));
+
+        await viewModel.RunAsync(BuildFailingConfiguration());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => viewModel.ApproveAsync());
+        Assert.Equal(ApprovalState.NotTested, (await new ApprovalService(store).GetStatusAsync(BuildFailingConfiguration())).State);
+    }
+
+    [Fact]
+    public void A_captured_file_is_shown_by_name_size_and_origin()
+    {
+        var file = TestModeViewModel.DescribeAttachment(new CapturedAttachment(new byte[2048], "receita.pdf", "application/pdf", AttachmentSource.File));
+        var screen = TestModeViewModel.DescribeAttachment(new CapturedAttachment(new byte[100], "receita.png", "image/png", AttachmentSource.Screen));
+
+        Assert.Equal("arquivo receita.pdf (2 KB, cópia do arquivo)", file);
+        Assert.Equal("arquivo receita.png (1 KB, imagem da tela)", screen);
+    }
+
     private static IntegrationTestRunner BuildRunner(bool passing)
     {
         var resolver = passing
@@ -258,6 +332,26 @@ public sealed class TestModeViewModelTests
                     yield return signal;
                 }
             }
+        }
+    }
+
+    private sealed class InMemoryApprovalStore : IApprovalStore
+    {
+        private readonly Dictionary<string, ConfigurationApproval> _approvals = new();
+
+        public Task SaveAsync(ConfigurationApproval approval, CancellationToken cancellationToken)
+        {
+            _approvals[approval.ConfigurationId] = approval;
+            return Task.CompletedTask;
+        }
+
+        public Task<ConfigurationApproval?> LoadAsync(string configurationId, CancellationToken cancellationToken) =>
+            Task.FromResult(_approvals.TryGetValue(configurationId, out var approval) ? approval : null);
+
+        public Task DeleteAsync(string configurationId, CancellationToken cancellationToken)
+        {
+            _approvals.Remove(configurationId);
+            return Task.CompletedTask;
         }
     }
 }

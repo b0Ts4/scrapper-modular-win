@@ -33,14 +33,64 @@
 - **Desktop**: trigger actions (capture, emit, clear, transition, finish/cancel) via `TriggerActionsBuilder`; configuration summary; test mode hosted (`Prepare Test`), shows values read; Activate/Stop through `RuntimeMonitorViewModel` with Portuguese diagnostics and persisted events; data in `%LOCALAPPDATA%\Prescriva\Agent` (`PRESCRIVA_AGENT_DATA` override); retention applied at start-up.
 - **Docs**: `docs/architecture/*`, `docs/roadmap.md`, `docs/testing/milestone-1-manual.md`, README, setup, testing.
 
+### Second round (same day): closing the remaining acceptance gaps
+
+- **Spec §10 gaps closed**: visible pending-events alert (`OutboxCapacityPolicy` in the monitor, thresholds 1000/5000, `PRESCRIVA_AGENT_OUTBOX_WARNING`/`_CRITICAL`) and explicit, confirmed *Clear Local Data* (all events + `VACUUM`, technical log emptied, configurations kept; refused while monitoring).
+- **Fix**: closing the monitored application no longer shows a red `TriggerWatchFailed` — a watch failure is reported only if it outlives the 2 s retry delay (RED observed on CI run 37215833760, GREEN 37215836025).
+- **Fix**: preparing a new test resets the test-mode status, so a previous verdict is never shown for the new run.
+- **Automation of the remaining manual rows**: `DesktopResilienceWalkthroughTests` (restart + reload, approval re-earned, empty required field rejected, capacity alert, app closed mid-session, cleanup, moved layout, ambiguity); the hover step now asserts the overlay window is within 2 px of the control and saves screenshots (reviewed: outline around the text box and the Add button).
+- **x86**: CI publishes a self-contained `win-x86` TestTarget and re-runs 30 integration tests against it (bitness asserted) — all pass.
+- Evidence: run 37216735104 — Domain 58, Infrastructure 31, Application 76, Windows 15, integration 37 (217 total) + 30 on x86, all passing.
+
+### Plan 4 — Configuration lifecycle (2026-10-04)
+
+Plan: `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`. All 5 tasks implemented, each with its test first (RED observed on CI for Tasks 2, 3 and 4: runs on f22b877, e36812a, 6076fa6).
+
+- `IApprovalStore` / `JsonApprovalStore` (approvals persisted next to configurations; corrupt/foreign files never approve) and `ApprovalService` (`NotTested` / `Approved` / `ChangedSinceTest` for the current content hash).
+- `IntegrationEditorViewModel`: `RemoveField` (refused while captured, forgets the resolved handle — closes the plan-2 stale-handle limitation), `UpdateField`, `RemoveTrigger`, `ReplaceTriggerActions`, `RemoveStage` (refused while used), duplicate IDs refused on add.
+- Desktop: approval state line, Approve records through the service, Activate uses the stored approval for the current content, edit buttons with refusals shown.
+- Evidence: run 37221107495 (push) and 37221111403 (PR) on 18a463c — Domain 58, Infrastructure 43, Application 90, Windows 15, integration 38 (244) + 30 x86, all passing; `DesktopConfigurationLifecycleTests` passed first time.
+- Observed once (PR run 37220266848): the x86 pass hung 5 min in `ElementInspectionTests` (TimedOut or Cancelled test; TestTarget alive). Not reproduced in 6 following runs. xUnit long-running-test diagnostics are now on so a repeat names the test. Suspect an unbounded cross-process UIA call made directly on the test thread (those tests call `target.Window.Current` with no timeout); not yet root-caused.
+
+### Plan 5 — Selector resilience (2026-10-04)
+
+Plan: `docs/superpowers/plans/2026-10-04-selector-resilience.md`. Tasks 1–4 implemented, each test first (RED: Domain locally; structural integration tests on CI run 37225379923; health on fdfde7f).
+
+- Weights v2 (version 2) and confidence relative to the selector's own signals — fixes a spurious `SelectorFallback` on every capture (a full AutomationId+ControlType match was 0.65).
+- `StructuralSignals`: label (LabeledBy / preceding sibling Text), ancestors, relative bounds — recorded by the inspector (plus FrameworkId) and computed for resolution candidates. Controls without AutomationId are now found by their label, also after moving; duplicate labels are ambiguous.
+- TestTarget: labelled, unnamed fields "Observações:" / "Lote:" (swapped by `alternate`), `duplicate-labels` variant.
+- `IntegrationHealthTracker` + monitor line: Healthy / Degraded / Broken with reasons.
+- The Agent's hover/confirmed text shows the detected label.
+- Evidence: run 37226388696 (push) / 37226391838 (PR) on 955f124 — Domain 66, Infrastructure 43, Application 97, Windows 15, integration 42 (263) + 30 x86, all passing.
+
+### Plan 6 — File and image fields (2026-10-05)
+
+Plan: `docs/superpowers/plans/2026-10-05-file-and-image-fields.md`, from the user's decisions (path box, displayed image, drag-and-drop; keep a copy of the original file; 10 MB). All 5 tasks implemented, tests first (RED: field kind locally; capture on CI run of 8804d06; runtime/test mode/GC on 34fef91).
+
+- `FieldDefinition.Kind` (`Text`/`File`); text-only configurations keep their content hash (characterization test), so existing approvals stay valid.
+- `IAttachmentStore` / `SqliteAttachmentStore`: encrypted content and file name, SHA-256 de-duplication, 10 MB limit, garbage collection, cleanup.
+- `FileFieldCapture`: path → exact copy; image/drop zone → PNG of the control's rectangle, refused if covered.
+- Runtime stores the attachment before the event; test mode and monitor show files by name/size/origin; Desktop "Field type" selector.
+- TestTarget: "Receita (arquivo):" path box with "Procurar...", image drop zone with a deterministic sample.
+- Evidence: run 37347134594 on 58e64da — Domain 66, Infrastructure 55, Application 105, Windows 15, integration 48 (289) + 30 x86, all passing; `DesktopFileFieldWalkthroughTests` passed first time.
+- Limit (accepted): a dropped image's original file is not exposed by UI Automation; the on-screen image is captured instead and marked `screen`. Real Explorer drag-and-drop is not automated (the sample button stands in for it).
+
+### Plan 7 — Spec gap closure and start with Windows (2026-10-05)
+
+Plan: `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md`, after the user asked whether the Agent starts with the PC (it did not) and whether OCR works (it did not exist; it is the next plan). Tasks 1–5 implemented, tests first (RED observed: domain/engine and coordinator locally; outbox migration and Desktop on CI).
+
+- **Content revision in events** (spec §9): `DomainEvent.ConfigurationRevision` = the configuration's content hash; outbox schema v2 (`configuration_revision`), v1 queues migrated in place.
+- **Bounded retry** (spec §11): `CaptureRetryPolicy` — 3 attempts (100/200 ms), cancellable, full re-resolution each time; never for ambiguity, unsupported controls, too-large or missing files.
+- **Test-mode evidence** (spec §8): matched signals with weights, lead over the runner-up (`SelectorMatch.RunnerUpScore`), duration per field and trigger, `SelectorFragility` warnings (no AutomationId, confidence < 80%, narrow lead, position-only), trigger effects.
+- **Fix (found by CI)**: stopping monitoring could surface `OperationCanceledException` from `ActivateAsync` when the cancellation landed outside the instance poll's wait (MilestoneFlowTests on run 37356461035); cancellation is now always a normal end.
+- **Start with Windows**: opt-in *Iniciar com o Windows* (per-user Run key, `--background`); tray icon (show / stop / exit, monitoring tooltip, notifications); closing while monitoring hides to the tray; one Agent per data directory (a second start shows the running window); `--background` resumes only the integration left active (`monitoring.json`, written on Activate, cleared by Stop) and only while it is approved for its content.
+- Evidence: run 37358301438 on 77da6cb — Domain 68, Infrastructure 62, Application 130, Windows 18, integration 51 (329) + 30 x86, all passing; `DesktopStartWithWindowsTests` (3) passed first time.
+- Not automated: a real Windows sign-in, the tray icon/menu/notification rendering (manual rows 24–25).
+
 ### Not verified / known issues
 
-- **Person-driven walkthrough on Windows 10/11**: not performed. Open rows in `docs/testing/milestone-1-manual.md`: overlay outline drawn on the right control, reload after restarting the Agent, rejected-field message / moved layout / ambiguity seen through the Desktop UI. CI ran on Windows Server 2025, not a Windows 10/11 client.
-- Approvals live in memory: after restarting the Agent the configuration must be tested again before activation.
-- When the monitored application closes, the trigger liveness check can report one `TriggerWatchFailed` error before the session is closed (≤ instance poll interval, 500 ms). Cosmetic but red.
-- No explicit "clear local data" command and no visible capacity alert in the Desktop yet (Infrastructure `OutboxCapacityPolicy` exists).
-- The configurator cannot remove/edit fields or triggers; fields are added to the stage in the Stage box.
-- The plan's x86 verification remains open (no x86 sample exists).
+- **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
+- Edits are by typed ID (no list selection yet); a field's selector can only be replaced by removing and re-adding it.
 - Older limitations below remain unless marked resolved.
 
 ### Important files
@@ -49,8 +99,9 @@
 
 ### Exact next action
 
-1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop and records the result in its table; fix anything it finds (with a test first).
-2. Then use the branch-finishing workflow to integrate the branch, and pick the next plan from `docs/roadmap.md` (operator data controls are the first candidate).
+1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
+2. Review/merge PR #2 (milestone 1 + plans 4–7).
+3. Next plan: OCR (requested by the user) — "text via OCR" field type with the offline Windows OCR over the control's image; then dispatcher recovery or event transport (`docs/roadmap.md`).
 
 ---
 

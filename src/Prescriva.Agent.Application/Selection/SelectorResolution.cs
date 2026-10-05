@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Prescriva.Agent.Application.Selection;
 
 /// <summary>
@@ -28,10 +30,14 @@ public sealed record SelectorResolution(
     SelectorResolutionStatus Status,
     ResolvedElementHandle? Handle = null,
     double Confidence = 0,
-    string? FailureReason = null)
+    string? FailureReason = null,
+    ImmutableDictionary<string, int>? Evidence = null,
+    int? Lead = null)
 {
-    public static SelectorResolution Found(ResolvedElementHandle handle, double confidence) =>
-        new(SelectorResolutionStatus.Found, handle, confidence);
+    /// <param name="evidence">The signals that matched, with the weight each contributed.</param>
+    /// <param name="lead">Score margin over the next best candidate; null when it was the only candidate.</param>
+    public static SelectorResolution Found(ResolvedElementHandle handle, double confidence, ImmutableDictionary<string, int>? evidence = null, int? lead = null) =>
+        new(SelectorResolutionStatus.Found, handle, confidence, Evidence: evidence, Lead: lead);
 
     public static SelectorResolution Ambiguous(double confidence) =>
         new(SelectorResolutionStatus.Ambiguous, Confidence: confidence);
