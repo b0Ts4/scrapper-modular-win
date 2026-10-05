@@ -15,7 +15,7 @@ dotnet build Prescriva.Agent.slnx --configuration Release
 dotnet test Prescriva.Agent.slnx --configuration Release --no-build
 ```
 
-Para usar o Agent: abra `Prescriva.Agent.TestTarget.exe` e `Prescriva.Agent.Desktop.exe` (pastas `bin\Release\net10.0-windows`) e siga o [roteiro do milestone](docs/testing/milestone-1-manual.md).
+Para usar o Agent: abra `Prescriva.Agent.TestTarget.exe` e `Prescriva.Agent.Desktop.exe` (pastas `bin\Release\net10.0-windows` e `bin\Release\net10.0-windows10.0.19041.0`, respectivamente) e siga o [roteiro do milestone](docs/testing/milestone-1-manual.md).
 
 Consulte [setup](docs/setup.md) para os pré-requisitos e [testing](docs/testing.md) para a estratégia de testes. As decisões arquiteturais estão em `docs/decisions/`, e o estado atual em [current-state](docs/handoffs/current-state.md).
 

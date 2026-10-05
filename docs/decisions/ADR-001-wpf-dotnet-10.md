@@ -15,3 +15,7 @@ Usar C# com .NET 10 LTS. Bibliotecas independentes de Windows terão `net10.0`; 
 
 WPF reduz o risco de integração com APIs desktop maduras e permite evoluir a interface em XAML. O projeto aceita uma aparência menos nativa do WinUI em troca de menor complexidade inicial. Recursos modernos do Windows poderão ser incorporados pontualmente sem migrar o núcleo.
 
+
+## Atualização (2026-10-05)
+
+`Prescriva.Agent.Windows`, `Prescriva.Agent.Desktop` e os projetos de teste que os referenciam passam a mirar `net10.0-windows10.0.19041.0` (Windows 10 2004 ou superior) para usar as projeções WinRT do OCR nativo (`Windows.Media.Ocr`, plano 8). `Domain`, `Application` e `Infrastructure` continuam `net10.0`; o TestTarget continua `net10.0-windows`.

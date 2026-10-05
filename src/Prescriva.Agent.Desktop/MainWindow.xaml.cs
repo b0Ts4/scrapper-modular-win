@@ -338,7 +338,12 @@ public partial class MainWindow : Window
                 FieldMeaningBox.Text.Trim(),
                 FieldRequiredBox.IsChecked == true,
                 fingerprint,
-                FieldKindBox.SelectedIndex == 1 ? FieldKind.File : FieldKind.Text);
+                FieldKindBox.SelectedIndex switch
+                {
+                    1 => FieldKind.File,
+                    2 => FieldKind.OcrText,
+                    _ => FieldKind.Text,
+                });
             SetStatus($"Added field '{FieldSemanticIdBox.Text.Trim()}'. Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
         }
         catch (ArgumentException ex)
@@ -682,7 +687,7 @@ public partial class MainWindow : Window
         }
 
         var stages = string.Join(", ", configuration.Stages.Select(stage => stage.Id));
-        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}{(field.Kind == FieldKind.File ? "[file]" : "")}"));
+        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}{field.Kind switch { FieldKind.File => "[file]", FieldKind.OcrText => "[ocr]", _ => "" }}"));
         var triggers = string.Join(" | ", configuration.Triggers.Select(trigger =>
             $"{trigger.Id}@{trigger.StageId}: {string.Join(" > ", trigger.Actions.Select(DescribeAction))}"));
         ConfigurationSummaryText.Text =

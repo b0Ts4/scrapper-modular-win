@@ -14,6 +14,13 @@ public enum FieldKind
     /// content is stored separately and protected at rest.
     /// </summary>
     File = 1,
+
+    /// <summary>
+    /// Text read by optical character recognition from the image the control shows - for
+    /// text that UI Automation does not expose (drawn text, a scanned document shown as an
+    /// image). The captured value is plain text, like <see cref="Text"/>.
+    /// </summary>
+    OcrText = 2,
 }
 
 public sealed record FieldDefinition(

@@ -101,7 +101,9 @@ public static class ConfigurationValidator
         string kind,
         List<ConfigurationValidationError> errors)
     {
-        var ids = new HashSet<string>(StringComparer.Ordinal);
+        // Case-insensitive: IDs that differ only in letter case name the same thing to a
+        // person and the same file on Windows.
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (items.IsDefaultOrEmpty)
         {
             errors.Add(new($"MISSING_{kind.ToUpperInvariant()}S", kind + "s", $"At least one {kind} is required."));

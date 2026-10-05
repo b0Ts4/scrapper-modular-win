@@ -20,3 +20,5 @@ Plan 5 — `docs/superpowers/plans/2026-10-04-selector-resilience.md` (structura
 Plan 6 — `docs/superpowers/plans/2026-10-05-file-and-image-fields.md` (file/image fields, encrypted attachments) — Tasks 1–5 implemented and verified on Windows CI (289 tests + 30 x86, 2026-10-05).
 
 Plan 7 — `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md` (content revision, bounded retry, test-mode evidence, tray, single instance, start with Windows) — Tasks 1–5 implemented; verified on Windows CI (see handoff). Next: OCR plan.
+
+Plan 8 — `docs/superpowers/plans/2026-10-05-ocr-text-fields.md` (OCR text fields), plus the pending items closed in the same session (x86 hang root cause, dispatcher recovery, weights version on approvals, case-insensitive IDs, typed not-found) — see handoff.

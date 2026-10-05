@@ -86,6 +86,18 @@ public sealed class TestModeViewModelTests
     }
 
     [Fact]
+    public void An_OCR_field_without_an_OCR_language_tells_the_operator_how_to_install_one()
+    {
+        var display = TestModeViewModel.ToDisplay(new FieldCheckResult(
+            "scanned", FieldCheckOutcome.Unreadable, "windows-ocr", 1.0, FieldCheckResult.FieldUnreadableCode,
+            CaptureOutcome: Prescriva.Agent.Application.Capture.CaptureOutcome.OcrUnavailable));
+
+        Assert.False(display.Passed);
+        Assert.Contains("OCR", display.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("idioma", display.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunAsync_shows_the_value_read_from_a_found_field_and_none_for_a_failed_one()
     {
         var runner = BuildRunner(passing: false);

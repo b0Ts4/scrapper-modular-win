@@ -29,3 +29,7 @@ Consequences, each covered by `SelectorMatcherTests`: an `AutomationId` alone is
 **Resolution.** `UiAutomationSelectorResolver` locates the application window with `AutomationWindowLocator` (optionally scoped to one process ID), enumerates descendants on the `AutomationDispatcher` STA thread and returns an opaque `ResolvedElementHandle` for a `Found` match. `ProcessIdentity.ToProcessName` lets `Erp.exe` and `Erp` name the same process.
 
 **Known limits.** Labels are detected only as `LabeledBy` or a preceding sibling `Text` (not labels above a field in a different container); the weights version is not yet stored with each configuration.
+
+**Approvals and weights.** An approval records the `SelectorWeights.Version` it was tested under; when the weights change, existing approvals stop activating until the integration is tested again (approval files written before the version was recorded load as the current version).
+
+**Dispatcher.** All UI Automation runs on one STA thread (`AutomationDispatcher`). A call still running after 30 s (a hung target application) is abandoned on the next call: queued work moves to a fresh STA thread, and the old thread ends when its stuck call returns.

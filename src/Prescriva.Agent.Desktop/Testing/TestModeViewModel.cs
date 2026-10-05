@@ -254,7 +254,7 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
             statusText,
             passed ? result.ProviderId ?? "-" : "-",
             passed ? $"{result.Confidence:P0}" : "-",
-            passed ? null : DescribeFieldFailure(result.FailureCode),
+            passed ? null : DescribeFieldFailure(result.FailureCode, result.CaptureOutcome),
             !passed ? "-"
                 : result.Attachment is { } attachment ? DescribeAttachment(attachment)
                 : !string.IsNullOrEmpty(result.Value) ? result.Value : "-")
@@ -347,8 +347,10 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
         return $"arquivo {attachment.FileName} ({kilobytes} KB, {origin})";
     }
 
-    private static string DescribeFieldFailure(string? failureCode) => failureCode switch
+    private static string DescribeFieldFailure(string? failureCode, CaptureOutcome? captureOutcome) => failureCode switch
     {
+        FieldCheckResult.FieldUnreadableCode when captureOutcome == CaptureOutcome.OcrUnavailable =>
+            "OCR indisponível neste computador: instale o reconhecimento de texto (OCR) do idioma português em Configurações > Hora e idioma > Idioma e região, e teste novamente.",
         FieldCheckResult.FieldUnreadableCode =>
             "Campo encontrado, mas o valor não pôde ser lido: arquivo inexistente ou acima de 10 MB, imagem coberta por outra janela, ou controle sem conteúdo. Corrija e teste novamente.",
         FieldCheckResult.FieldNotFoundCode =>

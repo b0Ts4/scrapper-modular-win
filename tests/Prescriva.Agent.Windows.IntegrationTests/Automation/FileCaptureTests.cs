@@ -88,6 +88,8 @@ public sealed class FileCaptureTests : IDisposable
     public async Task An_image_only_control_yields_a_png_of_exactly_that_control()
     {
         using var target = TestTargetLauncher.Launch();
+        // Wherever Windows first places the window, the whole control must be on screen.
+        ((TransformPattern)target.Window.GetCurrentPattern(TransformPattern.Pattern)).Move(0, 0);
         Press(target, "ShowSampleImageButton");
         await Task.Delay(300);
 

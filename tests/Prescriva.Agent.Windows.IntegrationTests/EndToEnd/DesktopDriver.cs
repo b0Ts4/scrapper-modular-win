@@ -444,7 +444,7 @@ internal static class DesktopDriver
                 var binDirectory = Path.GetDirectoryName(testTargetPath)!;
                 return Path.GetFullPath(Path.Combine(
                     binDirectory, "..", "..", "..", "..", "Prescriva.Agent.Desktop", "bin",
-                    new DirectoryInfo(binDirectory).Parent!.Name, "net10.0-windows", "Prescriva.Agent.Desktop.exe"));
+                    new DirectoryInfo(binDirectory).Parent!.Name, "net10.0-windows10.0.19041.0", "Prescriva.Agent.Desktop.exe"));
             }
         }
 

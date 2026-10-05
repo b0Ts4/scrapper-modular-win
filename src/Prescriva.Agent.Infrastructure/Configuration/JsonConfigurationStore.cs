@@ -22,6 +22,11 @@ public sealed class JsonConfigurationStore : IConfigurationStore
     public async Task<IntegrationConfiguration> LoadAsync(string id, CancellationToken cancellationToken)
     {
         var path = PathFor(id);
+        if (!File.Exists(path))
+        {
+            throw new ConfigurationValidationException([new("CONFIGURATION_NOT_FOUND", "id", $"No saved configuration has the ID '{id}'.")]);
+        }
+
         IntegrationConfiguration? configuration;
         try
         {
@@ -47,6 +52,13 @@ public sealed class JsonConfigurationStore : IConfigurationStore
 
         var path = PathFor(configuration.Id);
         Directory.CreateDirectory(_directory);
+        var fileName = Path.GetFileName(path);
+        if (Directory.EnumerateFiles(_directory, "*.json").Select(Path.GetFileName)
+            .Any(existing => string.Equals(existing, fileName, StringComparison.OrdinalIgnoreCase) && !string.Equals(existing, fileName, StringComparison.Ordinal)))
+        {
+            throw new ConfigurationValidationException([new("CONFIGURATION_ID_CONFLICT", "id", "Another saved configuration has the same ID in different letter case.")]);
+        }
+
         var temporaryPath = Path.Combine(_directory, "." + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
