@@ -46,6 +46,48 @@ public sealed class IntegrationTestRunnerTests
     }
 
     [Fact]
+    public async Task A_found_field_whose_value_cannot_be_read_fails_the_test_with_a_typed_code()
+    {
+        var resolver = new FakeSelectorResolver(new() { [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95) });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.TooLarge, null, "uia", 0, TimeSpan.Zero, []),
+        });
+        var triggerProvider = new FakeTriggerProvider();
+        triggerProvider.FireOnce(TriggerId);
+
+        var report = await new IntegrationTestRunner(resolver, captureProvider, triggerProvider, triggerTimeout: TimeSpan.FromSeconds(2)).RunAsync(BuildConfiguration());
+
+        var field = Assert.Single(report.FieldResults);
+        Assert.Equal(FieldCheckOutcome.Unreadable, field.Outcome);
+        Assert.Equal(FieldCheckResult.FieldUnreadableCode, field.FailureCode);
+        Assert.Equal(CaptureOutcome.TooLarge, field.CaptureOutcome);
+        Assert.False(report.AllPassed);
+    }
+
+    [Fact]
+    public async Task A_file_field_reports_the_captured_attachment_kept_in_memory()
+    {
+        var resolver = new FakeSelectorResolver(new() { [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95) });
+        var attachment = new CapturedAttachment([1, 2, 3], "receita.pdf", "application/pdf", AttachmentSource.File);
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, null, "uia", 1.0, TimeSpan.Zero, [], attachment),
+        });
+        var triggerProvider = new FakeTriggerProvider();
+        triggerProvider.FireOnce(TriggerId);
+        var configuration = BuildConfiguration();
+        configuration = configuration with { Fields = [configuration.Fields[0] with { Kind = FieldKind.File }] };
+
+        var report = await new IntegrationTestRunner(resolver, captureProvider, triggerProvider, triggerTimeout: TimeSpan.FromSeconds(2)).RunAsync(configuration);
+
+        var field = Assert.Single(report.FieldResults);
+        Assert.Equal(FieldCheckOutcome.Found, field.Outcome);
+        Assert.Same(attachment, field.Attachment);
+        Assert.True(report.AllPassed);
+    }
+
+    [Fact]
     public async Task A_not_found_field_reports_the_not_found_failure_code_and_never_calls_capture()
     {
         var resolver = new FakeSelectorResolver(new()

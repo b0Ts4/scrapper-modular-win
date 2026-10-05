@@ -358,6 +358,98 @@ public sealed class SessionCoordinatorTests
         Assert.DoesNotContain(log.Entries, entry => entry.Level == TechnicalLogLevel.Error);
     }
 
+    [Fact]
+    public async Task A_file_field_stores_its_attachment_before_the_event_that_references_it()
+    {
+        var outbox = new FakeEventOutbox();
+        var attachments = new InMemoryAttachmentStore(outbox);
+        var content = new byte[] { 0x25, 0x50, 0x44, 0x46 };
+        var coordinator = CreateFileCoordinator(
+            new CaptureResult(CaptureOutcome.Captured, null, CaptureResult.UiaProviderId, 1.0, TimeSpan.Zero, [],
+                new CapturedAttachment(content, "receita.pdf", "application/pdf", AttachmentSource.File)),
+            outbox, attachments);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        var persisted = Assert.Single(outbox.Appended);
+        var reference = persisted.Payload.Fields["prescription"];
+        Assert.True(AttachmentReference.IsReference(reference));
+        Assert.Equal(content, await attachments.ReadAsync(reference, CancellationToken.None));
+        Assert.True(attachments.SavedBeforeAnyEvent, "The attachment must be stored before the event referencing it is appended.");
+    }
+
+    [Theory]
+    [InlineData(CaptureOutcome.TooLarge)]
+    [InlineData(CaptureOutcome.Obscured)]
+    [InlineData(CaptureOutcome.FileUnavailable)]
+    public async Task A_file_that_cannot_be_captured_rejects_the_occurrence_and_stores_nothing(CaptureOutcome outcome)
+    {
+        var outbox = new FakeEventOutbox();
+        var attachments = new InMemoryAttachmentStore(outbox);
+        var coordinator = CreateFileCoordinator(new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, TimeSpan.Zero, []), outbox, attachments);
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        Assert.Empty(outbox.Appended);
+        Assert.Equal(0, attachments.Count);
+        var rejected = Assert.Single(diagnostics, d => d.Code == RuntimeDiagnosticCode.SessionRejected);
+        Assert.Equal(SessionFailureCode.CaptureFailed, rejected.FailureCode);
+        Assert.Equal("prescription", rejected.FieldId);
+    }
+
+    private static SessionCoordinator CreateFileCoordinator(CaptureResult capture, FakeEventOutbox outbox, InMemoryAttachmentStore attachments)
+    {
+        var configuration = new IntegrationConfiguration(
+            IntegrationConfiguration.CurrentSchemaVersion,
+            "file-config",
+            "File configuration",
+            new ApplicationDefinition("Prescriva.Agent.TestTarget", "Prescriva Agent Test Target"),
+            [new FieldDefinition("prescription", StageId, "Receita", Required: true, Selector: Fingerprint("prescription"), Kind: FieldKind.File)],
+            [new StageDefinition(StageId, "Entry")],
+            [new TriggerDefinition(AddTriggerId, StageId, Fingerprint("AddButton"), "Invoke",
+                [new CaptureFieldsAction(["prescription"]), new EmitEventAction("item_added")])]);
+
+        return new SessionCoordinator(
+            SessionId,
+            StageId,
+            configuration,
+            new FakeTriggerProvider(new() { [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now)] }),
+            new FakeSelectorResolver(new() { ["prescription"] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95) }),
+            new FakeCaptureProvider(new() { ["prescription"] = capture }),
+            outbox,
+            new FakeTechnicalLog(),
+            clock: () => Now,
+            attachments: attachments);
+    }
+
+    private sealed class InMemoryAttachmentStore(FakeEventOutbox outbox) : IAttachmentStore
+    {
+        private readonly ConcurrentDictionary<string, byte[]> _content = new();
+
+        public bool SavedBeforeAnyEvent { get; private set; }
+
+        public int Count => _content.Count;
+
+        public Task<AttachmentInfo> SaveAsync(CapturedAttachment attachment, CancellationToken cancellationToken)
+        {
+            SavedBeforeAnyEvent = outbox.Appended.Count == 0;
+            var reference = AttachmentReference.For(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(attachment.Content)));
+            _content[reference] = attachment.Content;
+            return Task.FromResult(new AttachmentInfo(reference, attachment.FileName, attachment.ContentType, attachment.Content.Length, attachment.Source));
+        }
+
+        public Task<AttachmentInfo?> GetInfoAsync(string reference, CancellationToken cancellationToken) => Task.FromResult<AttachmentInfo?>(null);
+
+        public Task<byte[]?> ReadAsync(string reference, CancellationToken cancellationToken) =>
+            Task.FromResult(_content.TryGetValue(reference, out var content) ? content : null);
+
+        public Task<int> DeleteUnreferencedAsync(IReadOnlyCollection<string> referenced, CancellationToken cancellationToken) => Task.FromResult(0);
+
+        public Task<int> DeleteAllAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);

@@ -187,6 +187,16 @@ public sealed class TestModeViewModelTests
         Assert.Equal(ApprovalState.NotTested, (await new ApprovalService(store).GetStatusAsync(BuildFailingConfiguration())).State);
     }
 
+    [Fact]
+    public void A_captured_file_is_shown_by_name_size_and_origin()
+    {
+        var file = TestModeViewModel.DescribeAttachment(new CapturedAttachment(new byte[2048], "receita.pdf", "application/pdf", AttachmentSource.File));
+        var screen = TestModeViewModel.DescribeAttachment(new CapturedAttachment(new byte[100], "receita.png", "image/png", AttachmentSource.Screen));
+
+        Assert.Equal("arquivo receita.pdf (2 KB, cópia do arquivo)", file);
+        Assert.Equal("arquivo receita.png (1 KB, imagem da tela)", screen);
+    }
+
     private static IntegrationTestRunner BuildRunner(bool passing)
     {
         var resolver = passing
