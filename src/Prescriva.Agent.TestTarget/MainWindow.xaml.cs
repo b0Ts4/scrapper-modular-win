@@ -121,5 +121,58 @@ public partial class MainWindow : Window
         DynamicField.IsEnabled = !DynamicField.IsEnabled;
     }
 
+    private void BrowsePrescriptionButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Receitas (*.pdf;*.jpg;*.jpeg;*.png)|*.pdf;*.jpg;*.jpeg;*.png|Todos os arquivos (*.*)|*.*",
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            PrescriptionFileTextBox.Text = dialog.FileName;
+        }
+    }
+
+    private void PrescriptionDropZone_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files)
+        {
+            try
+            {
+                PrescriptionImage.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(files[0]));
+            }
+            catch (Exception)
+            {
+                // Not an image: leave the zone as it was.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Shows a deterministic 160x100 image: left half solid red (#FF0000), right half solid
+    /// blue (#0000FF), so tests can recognise it in a screen capture.
+    /// </summary>
+    private void ShowSampleImageButton_Click(object sender, RoutedEventArgs e)
+    {
+        const int width = 160;
+        const int height = 100;
+        var pixels = new byte[width * height * 4];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var i = (y * width + x) * 4;
+                var red = x < width / 2;
+                pixels[i] = red ? (byte)0 : (byte)255;     // B
+                pixels[i + 1] = 0;                          // G
+                pixels[i + 2] = red ? (byte)255 : (byte)0; // R
+                pixels[i + 3] = 255;                        // A
+            }
+        }
+
+        PrescriptionImage.Source = System.Windows.Media.Imaging.BitmapSource.Create(
+            width, height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, width * 4);
+    }
+
     private sealed record GridRow(string Medication, string Concentration, string Quantity);
 }
