@@ -159,6 +159,24 @@ public sealed class SessionCoordinatorTests
     }
 
     [Fact]
+    public async Task An_OCR_field_on_a_machine_without_an_OCR_language_is_rejected_visibly_and_not_retried()
+    {
+        var capture = new CountingCaptureProvider(new()
+        {
+            [NameFieldId] = [new CaptureResult(CaptureOutcome.OcrUnavailable, null, "windows-ocr", 0, TimeSpan.Zero, [])],
+            [NoteFieldId] = [Captured("nota", NoteFieldId)],
+        });
+        var (outbox, log, diagnostics) = await RunAddAsync(FoundResolver(), capture);
+
+        Assert.Empty(outbox.Appended);
+        Assert.Equal(1, capture.Calls(NameFieldId));
+        var rejection = Assert.Single(diagnostics, d => d.Code == RuntimeDiagnosticCode.SessionRejected);
+        Assert.Equal(SessionFailureCode.CaptureFailed, rejection.FailureCode);
+        Assert.Equal(NameFieldId, rejection.FieldId);
+        Assert.Contains(log.Entries, entry => entry.Code == "field_capture_attempted" && entry.Message.Contains("OcrUnavailable", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_field_that_stays_missing_exhausts_the_bounded_attempts_and_is_rejected_visibly()
     {
         var resolver = new SequencedSelectorResolver(new()

@@ -483,7 +483,7 @@ public sealed class SessionCoordinator
         {
             var failure = captureResult.Outcome switch
             {
-                CaptureOutcome.UnsupportedPattern => CaptureFailure.UnsupportedProvider,
+                CaptureOutcome.UnsupportedPattern or CaptureOutcome.OcrUnavailable => CaptureFailure.UnsupportedProvider,
                 CaptureOutcome.TimedOut or CaptureOutcome.TooLarge => CaptureFailure.Unreadable,
                 _ => CaptureFailure.Unavailable
             };

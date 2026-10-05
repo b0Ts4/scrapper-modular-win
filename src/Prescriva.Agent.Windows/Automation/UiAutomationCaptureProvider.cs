@@ -61,6 +61,11 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
             return await CaptureFileAsync(uiaHandle, field, cancellationToken).ConfigureAwait(false);
         }
 
+        if (field.Kind == FieldKind.OcrText)
+        {
+            return await CaptureOcrAsync(uiaHandle, cancellationToken).ConfigureAwait(false);
+        }
+
         var stopwatch = Stopwatch.StartNew();
         try
         {
@@ -129,6 +134,46 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
         {
             var outcome = failure.Kind == ElementInspectionFailureKind.TimedOut ? CaptureOutcome.TimedOut : CaptureOutcome.ElementUnavailable;
             return new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("File", false, failure.Message)]);
+        }
+    }
+
+    /// <summary>
+    /// An OCR field: the control's image is taken on the dispatcher thread (refused when
+    /// covered); recognition runs off it. A control that shows nothing reads as empty text.
+    /// </summary>
+    private async Task<CaptureResult> CaptureOcrAsync(UiaResolvedElementHandle handle, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var probe = await _dispatcher.RunAsync(
+                _ => FileFieldCapture.ProbeScreenOnDispatcherThread(handle.Element),
+                _timeout,
+                cancellationToken).ConfigureAwait(false);
+
+            if (probe.Failure is CaptureOutcome.FileUnavailable)
+            {
+                return new CaptureResult(CaptureOutcome.Captured, string.Empty, OcrFieldCapture.ProviderId, 1.0, stopwatch.Elapsed, [new PatternAttempt("ocr", true, probe.Detail)]);
+            }
+
+            if (probe.Failure is { } failure)
+            {
+                return new CaptureResult(failure, null, OcrFieldCapture.ProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("ocr", false, probe.Detail)]);
+            }
+
+            var reading = await OcrFieldCapture.RecognizeAsync(probe.Png!, cancellationToken).ConfigureAwait(false);
+            return reading.Language is null
+                ? new CaptureResult(CaptureOutcome.OcrUnavailable, null, OcrFieldCapture.ProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("ocr", false, "No OCR recognizer language is installed.")])
+                : new CaptureResult(CaptureOutcome.Captured, reading.Text, OcrFieldCapture.ProviderId, 1.0, stopwatch.Elapsed, [new PatternAttempt("ocr:" + reading.Language, true)]);
+        }
+        catch (ElementInspectionFailure failure) when (failure.Kind == ElementInspectionFailureKind.Cancelled)
+        {
+            throw new OperationCanceledException(failure.Message, failure, cancellationToken);
+        }
+        catch (ElementInspectionFailure failure)
+        {
+            var outcome = failure.Kind == ElementInspectionFailureKind.TimedOut ? CaptureOutcome.TimedOut : CaptureOutcome.ElementUnavailable;
+            return new CaptureResult(outcome, null, OcrFieldCapture.ProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("ocr", false, failure.Message)]);
         }
     }
 

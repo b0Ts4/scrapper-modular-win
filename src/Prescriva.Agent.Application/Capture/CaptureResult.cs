@@ -23,6 +23,9 @@ public enum CaptureOutcome
 
     /// <summary>An image-only control is off screen or covered by another window, so it was not captured.</summary>
     Obscured,
+
+    /// <summary>An OCR field could not be read: no OCR recognizer language is installed on this machine.</summary>
+    OcrUnavailable,
 }
 
 /// <summary>

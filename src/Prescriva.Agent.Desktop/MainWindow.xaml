@@ -64,6 +64,7 @@
                 <ComboBox x:Name="FieldKindBox" SelectedIndex="0" Width="260">
                     <ComboBoxItem Content="Text" />
                     <ComboBoxItem Content="File / image (copy of the file, max 10 MB)" />
+                    <ComboBoxItem Content="Text via OCR (read from the control's image)" />
                 </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
