@@ -31,17 +31,18 @@ public sealed class SelectorMatcher
         }
 
         var best = scored[0];
+        int? runnerUp = scored.Length > 1 ? scored[1].score : null;
         if (best.score < weights.MinimumScore)
         {
-            return new SelectorMatch(SelectorMatchStatus.NotFound, null, best.score, best.evidence, available);
+            return new SelectorMatch(SelectorMatchStatus.NotFound, null, best.score, best.evidence, available, runnerUp);
         }
 
         if (scored.Length > 1 && best.score - scored[1].score < weights.MinimumLead)
         {
-            return new SelectorMatch(SelectorMatchStatus.Ambiguous, null, best.score, best.evidence, available);
+            return new SelectorMatch(SelectorMatchStatus.Ambiguous, null, best.score, best.evidence, available, runnerUp);
         }
 
-        return new SelectorMatch(SelectorMatchStatus.Found, best.candidate.Id, best.score, best.evidence, available);
+        return new SelectorMatch(SelectorMatchStatus.Found, best.candidate.Id, best.score, best.evidence, available, runnerUp);
     }
 
     private static ImmutableDictionary<string, int> Score(

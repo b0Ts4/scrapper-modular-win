@@ -92,7 +92,16 @@ public sealed class IntegrationTestRunner
 
     private async Task<FieldCheckResult> CheckFieldAsync(FieldDefinition field, CancellationToken cancellationToken)
     {
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        var result = await CheckFieldCoreAsync(field, cancellationToken).ConfigureAwait(false);
+        return result with { Duration = elapsed.Elapsed };
+    }
+
+    private async Task<FieldCheckResult> CheckFieldCoreAsync(FieldDefinition field, CancellationToken cancellationToken)
+    {
         var resolution = await _resolver.ResolveAsync(field.Selector, cancellationToken).ConfigureAwait(false);
+        var signals = resolution.Evidence;
+        var warnings = SelectorFragility.Assess(field.Selector, resolution);
 
         if (resolution.Status == SelectorResolutionStatus.Found && resolution.Handle is not null)
         {
@@ -100,8 +109,8 @@ public sealed class IntegrationTestRunner
             var readable = capture.Outcome == CaptureOutcome.Captured &&
                 (field.Kind != FieldKind.File || capture.Attachment is not null);
             return readable
-                ? new FieldCheckResult(field.Id, FieldCheckOutcome.Found, capture.ProviderId, capture.Confidence, FailureCode: null, Value: capture.Value, Attachment: capture.Attachment, CaptureOutcome: capture.Outcome)
-                : new FieldCheckResult(field.Id, FieldCheckOutcome.Unreadable, capture.ProviderId, resolution.Confidence, FieldCheckResult.FieldUnreadableCode, CaptureOutcome: capture.Outcome);
+                ? new FieldCheckResult(field.Id, FieldCheckOutcome.Found, capture.ProviderId, capture.Confidence, FailureCode: null, Value: capture.Value, Attachment: capture.Attachment, CaptureOutcome: capture.Outcome, Signals: signals, Lead: resolution.Lead, Warnings: warnings)
+                : new FieldCheckResult(field.Id, FieldCheckOutcome.Unreadable, capture.ProviderId, resolution.Confidence, FieldCheckResult.FieldUnreadableCode, CaptureOutcome: capture.Outcome, Signals: signals, Lead: resolution.Lead, Warnings: warnings);
         }
 
         var outcome = resolution.Status == SelectorResolutionStatus.Ambiguous
@@ -111,7 +120,7 @@ public sealed class IntegrationTestRunner
             ? FieldCheckResult.FieldAmbiguousCode
             : FieldCheckResult.FieldNotFoundCode;
 
-        return new FieldCheckResult(field.Id, outcome, ProviderId: null, resolution.Confidence, failureCode);
+        return new FieldCheckResult(field.Id, outcome, ProviderId: null, resolution.Confidence, failureCode, Signals: signals, Warnings: []);
     }
 
     private async Task<TriggerCheckResult> CheckTriggerAsync(TriggerDefinition trigger, CancellationToken cancellationToken)
@@ -123,6 +132,7 @@ public sealed class IntegrationTestRunner
             ? ImmutableArray<string>.Empty
             : trigger.Actions.OfType<EmitEventAction>().Select(action => action.EventType).ToImmutableArray();
 
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
         var detected = await WaitForTriggerAsync(trigger, cancellationToken).ConfigureAwait(false);
 
         return new TriggerCheckResult(
@@ -130,7 +140,8 @@ public sealed class IntegrationTestRunner
             detected ? TriggerCheckOutcome.Detected : TriggerCheckOutcome.TimedOut,
             transitions,
             events,
-            detected ? null : TriggerCheckResult.TriggerTimedOutCode);
+            detected ? null : TriggerCheckResult.TriggerTimedOutCode,
+            elapsed.Elapsed);
     }
 
     private async Task<bool> WaitForTriggerAsync(TriggerDefinition trigger, CancellationToken cancellationToken)

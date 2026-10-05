@@ -14,7 +14,8 @@ public sealed record SelectorMatch(
     string? CandidateId,
     int Score,
     ImmutableDictionary<string, int> Evidence,
-    int AvailableWeight = 100)
+    int AvailableWeight = 100,
+    int? RunnerUpScore = null)
 {
     /// <summary>
     /// The share of the selector's own signals that matched: <see cref="Score"/> divided by

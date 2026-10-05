@@ -113,7 +113,9 @@ public sealed class UiAutomationSelectorResolver : ISelectorResolver, IDisposabl
         {
             SelectorMatchStatus.Found => SelectorResolution.Found(
                 new UiaResolvedElementHandle(elementsById[match.CandidateId!]),
-                match.Confidence),
+                match.Confidence,
+                match.Evidence,
+                match.RunnerUpScore is { } runnerUp ? match.Score - runnerUp : null),
             SelectorMatchStatus.Ambiguous => SelectorResolution.Ambiguous(match.Confidence),
             _ => SelectorResolution.NotFound("No matching element was found."),
         };
