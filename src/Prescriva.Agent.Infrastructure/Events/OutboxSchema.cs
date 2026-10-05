@@ -3,12 +3,13 @@ using Microsoft.Data.Sqlite;
 namespace Prescriva.Agent.Infrastructure.Events;
 
 /// <summary>
-/// Creates and migrates the event outbox SQLite schema. Version 1 is the only version today; a future
-/// version bump must add a migration branch here rather than mutating the version 1 table shape in place.
+/// Creates and migrates the event outbox SQLite schema. Version 1 is the original table; version 2
+/// adds the nullable <c>configuration_revision</c> column in place (existing rows keep null). A future
+/// version bump must add another migration branch here rather than mutating an existing shape.
 /// </summary>
 internal static class OutboxSchema
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public static void EnsureCreated(SqliteConnection connection)
     {
@@ -27,6 +28,7 @@ internal static class OutboxSchema
                 id TEXT PRIMARY KEY,
                 configuration_id TEXT NOT NULL,
                 configuration_version INTEGER NOT NULL,
+                configuration_revision TEXT NULL,
                 session_id TEXT NOT NULL,
                 sequence INTEGER NOT NULL,
                 timestamp TEXT NOT NULL,
@@ -43,14 +45,36 @@ internal static class OutboxSchema
         command.ExecuteNonQuery();
 
         using var versionCheck = connection.CreateCommand();
-        versionCheck.CommandText = "SELECT COUNT(*) FROM schema_version;";
-        var existingRows = (long)versionCheck.ExecuteScalar()!;
-        if (existingRows == 0)
+        versionCheck.CommandText = "SELECT COALESCE(MAX(version), 0) FROM schema_version;";
+        var existingVersion = (long)versionCheck.ExecuteScalar()!;
+        if (existingVersion >= CurrentVersion)
         {
-            using var insertVersion = connection.CreateCommand();
-            insertVersion.CommandText = "INSERT INTO schema_version (version) VALUES ($version);";
-            insertVersion.Parameters.AddWithValue("$version", CurrentVersion);
-            insertVersion.ExecuteNonQuery();
+            return;
         }
+
+        using var transaction = connection.BeginTransaction();
+        if (!HasColumn(connection, transaction, "events", "configuration_revision"))
+        {
+            using var addRevision = connection.CreateCommand();
+            addRevision.Transaction = transaction;
+            addRevision.CommandText = "ALTER TABLE events ADD COLUMN configuration_revision TEXT NULL;";
+            addRevision.ExecuteNonQuery();
+        }
+
+        using var setVersion = connection.CreateCommand();
+        setVersion.Transaction = transaction;
+        setVersion.CommandText = "DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES ($version);";
+        setVersion.Parameters.AddWithValue("$version", CurrentVersion);
+        setVersion.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    private static bool HasColumn(SqliteConnection connection, SqliteTransaction transaction, string table, string column)
+    {
+        using var info = connection.CreateCommand();
+        info.Transaction = transaction;
+        info.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = $column;";
+        info.Parameters.AddWithValue("$column", column);
+        return (long)info.ExecuteScalar()! > 0;
     }
 }

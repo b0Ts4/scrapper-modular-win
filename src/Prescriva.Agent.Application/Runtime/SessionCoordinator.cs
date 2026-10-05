@@ -68,7 +68,7 @@ public sealed class SessionCoordinator
         ArgumentNullException.ThrowIfNull(log);
 
         _configuration = configuration;
-        _engine = new SessionEngine(configuration);
+        _engine = new SessionEngine(configuration, Testing.ConfigurationFingerprint.Compute(configuration));
         _session = CaptureSession.Start(sessionId, initialStageId);
         _triggerProvider = triggerProvider;
         _resolver = resolver;
