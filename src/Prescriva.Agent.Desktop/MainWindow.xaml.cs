@@ -166,11 +166,21 @@ public partial class MainWindow : Window
 
         if (decision.Kind == StartupDecisionKind.Activate)
         {
-            IntegrationIdBox.Text = decision.ConfigurationId;
-            await _editorViewModel.ReloadAsync(decision.ConfigurationId!);
-            await _monitorViewModel.StartAsync(decision.Configuration!, decision.Approval);
-            SetStatus(decision.Describe());
-            _trayIcon.Notify("Prescriva Agent", decision.Describe());
+            try
+            {
+                IntegrationIdBox.Text = decision.ConfigurationId;
+                await _editorViewModel.ReloadAsync(decision.ConfigurationId!);
+                await _monitorViewModel.StartAsync(decision.Configuration!, decision.Approval);
+                SetStatus(decision.Describe());
+                _trayIcon.Notify("Prescriva Agent", decision.Describe());
+            }
+            catch (Exception ex)
+            {
+                // Never fail silently at sign-in: the tray stays, with the reason.
+                var message = $"Iniciado com o Windows: não foi possível retomar '{decision.ConfigurationId}' ({ex.GetType().Name}); nada sendo monitorado.";
+                SetStatus(message);
+                _trayIcon.Notify("Prescriva Agent", message, warning: true);
+            }
         }
         else
         {
