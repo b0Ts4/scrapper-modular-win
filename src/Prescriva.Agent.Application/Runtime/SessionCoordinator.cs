@@ -41,6 +41,7 @@ public sealed class SessionCoordinator
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly TimeSpan _triggerRetryDelay;
     private readonly IAttachmentStore? _attachments;
+    private readonly CaptureRetryPolicy _captureRetry;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _failingTriggers = new(StringComparer.Ordinal);
 
     private CaptureSession _session;
@@ -57,7 +58,8 @@ public sealed class SessionCoordinator
         Func<Guid>? eventIdFactory = null,
         Func<DateTimeOffset>? clock = null,
         TimeSpan? triggerRetryDelay = null,
-        IAttachmentStore? attachments = null)
+        IAttachmentStore? attachments = null,
+        CaptureRetryPolicy? captureRetry = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(initialStageId);
@@ -79,6 +81,8 @@ public sealed class SessionCoordinator
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _triggerRetryDelay = triggerRetryDelay ?? DefaultTriggerRetryDelay;
         _attachments = attachments;
+        _captureRetry = captureRetry ?? CaptureRetryPolicy.Default;
+        if (_captureRetry.MaxAttempts < 1) throw new ArgumentOutOfRangeException(nameof(captureRetry), "At least one attempt is required.");
         _triggerProvider.WatchEstablished += OnWatchEstablished;
     }
 
