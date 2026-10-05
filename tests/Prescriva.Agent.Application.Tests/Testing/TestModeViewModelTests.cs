@@ -51,6 +51,41 @@ public sealed class TestModeViewModelTests
     }
 
     [Fact]
+    public void A_field_result_is_shown_with_its_signals_lead_duration_and_fragility_warnings()
+    {
+        var result = new FieldCheckResult(
+            "notes", FieldCheckOutcome.Found, "uia", 1.0, FailureCode: null, Value: "nota",
+            Signals: System.Collections.Immutable.ImmutableDictionary<string, int>.Empty.Add("controlType", 15).Add("nearbyLabels", 20),
+            Lead: 12,
+            Duration: TimeSpan.FromMilliseconds(34.4),
+            Warnings: [SelectorFragilityWarning.MissingAutomationId, SelectorFragilityWarning.NarrowLead]);
+
+        var display = TestModeViewModel.ToDisplay(result);
+
+        Assert.Equal("rótulo (20), tipo (15); margem 12", display.SignalsText);
+        Assert.Equal("34 ms", display.DurationText);
+        Assert.Equal(2, display.Warnings.Count);
+        Assert.Contains("AutomationId", display.Warnings[0], StringComparison.Ordinal);
+        Assert.Contains("margem", display.Warnings[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_strong_field_has_no_warning_and_a_trigger_shows_its_duration_transitions_and_events()
+    {
+        var field = TestModeViewModel.ToDisplay(new FieldCheckResult(
+            "medication", FieldCheckOutcome.Found, "uia", 1.0, FailureCode: null,
+            Signals: System.Collections.Immutable.ImmutableDictionary<string, int>.Empty.Add("automationId", 40),
+            Duration: TimeSpan.FromMilliseconds(5), Warnings: []));
+        var trigger = TestModeViewModel.ToDisplay(new TriggerCheckResult(
+            "add", TriggerCheckOutcome.Detected, ["review"], ["item_added"], FailureCode: null, Duration: TimeSpan.FromMilliseconds(1250)));
+
+        Assert.Empty(field.Warnings);
+        Assert.Equal("AutomationId (40)", field.SignalsText);
+        Assert.Equal("1250 ms", trigger.DurationText);
+        Assert.Equal("etapa → review; evento item_added", trigger.EffectsText);
+    }
+
+    [Fact]
     public async Task RunAsync_shows_the_value_read_from_a_found_field_and_none_for_a_failed_one()
     {
         var runner = BuildRunner(passing: false);
