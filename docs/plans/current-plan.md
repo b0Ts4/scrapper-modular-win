@@ -18,3 +18,5 @@ Plan 4 — `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md` (persi
 Plan 5 — `docs/superpowers/plans/2026-10-04-selector-resilience.md` (structural selector signals, weights v2, integration health) — Tasks 1–4 implemented and verified on Windows CI (263 tests + 30 x86, 2026-10-04). Next: see `docs/roadmap.md` (dispatcher recovery or transport are the next candidates).
 
 Plan 6 — `docs/superpowers/plans/2026-10-05-file-and-image-fields.md` (file/image fields, encrypted attachments) — Tasks 1–5 implemented and verified on Windows CI (289 tests + 30 x86, 2026-10-05).
+
+Plan 7 — `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md` (content revision, bounded retry, test-mode evidence, tray, single instance, start with Windows) — Tasks 1–5 implemented; verified on Windows CI (see handoff). Next: OCR plan.

@@ -75,6 +75,18 @@ Plan: `docs/superpowers/plans/2026-10-05-file-and-image-fields.md`, from the use
 - Evidence: run 37347134594 on 58e64da — Domain 66, Infrastructure 55, Application 105, Windows 15, integration 48 (289) + 30 x86, all passing; `DesktopFileFieldWalkthroughTests` passed first time.
 - Limit (accepted): a dropped image's original file is not exposed by UI Automation; the on-screen image is captured instead and marked `screen`. Real Explorer drag-and-drop is not automated (the sample button stands in for it).
 
+### Plan 7 — Spec gap closure and start with Windows (2026-10-05)
+
+Plan: `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md`, after the user asked whether the Agent starts with the PC (it did not) and whether OCR works (it did not exist; it is the next plan). Tasks 1–5 implemented, tests first (RED observed: domain/engine and coordinator locally; outbox migration and Desktop on CI).
+
+- **Content revision in events** (spec §9): `DomainEvent.ConfigurationRevision` = the configuration's content hash; outbox schema v2 (`configuration_revision`), v1 queues migrated in place.
+- **Bounded retry** (spec §11): `CaptureRetryPolicy` — 3 attempts (100/200 ms), cancellable, full re-resolution each time; never for ambiguity, unsupported controls, too-large or missing files.
+- **Test-mode evidence** (spec §8): matched signals with weights, lead over the runner-up (`SelectorMatch.RunnerUpScore`), duration per field and trigger, `SelectorFragility` warnings (no AutomationId, confidence < 80%, narrow lead, position-only), trigger effects.
+- **Fix (found by CI)**: stopping monitoring could surface `OperationCanceledException` from `ActivateAsync` when the cancellation landed outside the instance poll's wait (MilestoneFlowTests on run 37356461035); cancellation is now always a normal end.
+- **Start with Windows**: opt-in *Iniciar com o Windows* (per-user Run key, `--background`); tray icon (show / stop / exit, monitoring tooltip, notifications); closing while monitoring hides to the tray; one Agent per data directory (a second start shows the running window); `--background` resumes only the integration left active (`monitoring.json`, written on Activate, cleared by Stop) and only while it is approved for its content.
+- Evidence: see the CI run listed in the PR for the final commit of this plan.
+- Not automated: a real Windows sign-in, the tray icon/menu/notification rendering (manual rows 24–25).
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
@@ -88,7 +100,8 @@ Plan: `docs/superpowers/plans/2026-10-05-file-and-image-fields.md`, from the use
 ### Exact next action
 
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
-2. Review/merge PR #2 (milestone 1 + plans 4 and 5), then pick the next plan from `docs/roadmap.md` (dispatcher recovery for wedged UIA calls, or event transport).
+2. Review/merge PR #2 (milestone 1 + plans 4–7).
+3. Next plan: OCR (requested by the user) — "text via OCR" field type with the offline Windows OCR over the control's image; then dispatcher recovery or event transport (`docs/roadmap.md`).
 
 ---
 

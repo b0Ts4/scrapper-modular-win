@@ -30,6 +30,8 @@ End-to-end coverage of the milestone:
 
 - `Automation/StructuralSelectorTests` and `EndToEnd/DesktopStructuralSelectorWalkthroughTests` — TestTarget's labelled fields without AutomationId ("Observações:", "Lote:") are inspected with their label/ancestors/position, re-found and captured in the default and `alternate` layouts (also through the real Desktop UI), and reported ambiguous in the `duplicate-labels` layout.
 
+- `EndToEnd/DesktopStartWithWindowsTests` — start with Windows through the real Desktop executable: an approved integration activated by the operator is resumed by `--background` after the process is killed (no window, no click) and captures `item_added`; a second start hands over to the running instance (no duplicate events); an integration edited after its approval is not resumed; the option writes and removes the per-user Run value (isolated key via `PRESCRIVA_AGENT_RUN_KEY`).
+
 - `Automation/FileCaptureTests` and `EndToEnd/DesktopFileFieldWalkthroughTests` — file fields: a path box yields an exact copy (10 MB limit, missing file is a typed failure), an image control yields a PNG of exactly its rectangle (refused when another window covers it); through the real Desktop UI the attachments are stored encrypted, referenced by `item_added`, and read back byte-for-byte.
 
 Integration tests running longer than 60 s are named in the output (`xunit.runner.json`), so a hang is attributable.
