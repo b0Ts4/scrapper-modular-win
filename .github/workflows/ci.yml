@@ -19,6 +19,13 @@ jobs:
       - name: SDK version
         run: dotnet --version
 
+      - name: OCR languages available on the runner
+        shell: powershell
+        run: |
+          $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
+          "Recognizer languages: " + (([Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages | ForEach-Object { $_.LanguageTag }) -join ', ')
+          Get-WindowsCapability -Online -Name 'Language.OCR*' | Where-Object { $_.Name -match 'en-US|pt-BR' } | Format-Table Name, State -AutoSize | Out-String -Width 200
+
       - name: Restore
         run: dotnet restore Prescriva.Agent.slnx
 
