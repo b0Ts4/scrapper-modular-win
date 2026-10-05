@@ -184,6 +184,11 @@ public sealed class AgentRuntime
                 }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Cancelling the activation token is how monitoring is stopped: a normal end,
+            // whether the source noticed it inside its polling wait or elsewhere.
+        }
         finally
         {
             await CloseAllAsync().ConfigureAwait(false);

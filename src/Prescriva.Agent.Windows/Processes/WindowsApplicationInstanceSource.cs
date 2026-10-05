@@ -39,9 +39,8 @@ public sealed class WindowsApplicationInstanceSource : IApplicationInstanceSourc
 
         var known = new Dictionary<int, Guid>();
 
-        while (true)
+        while (!cancellationToken.IsCancellationRequested)
         {
-            cancellationToken.ThrowIfCancellationRequested();
 
             var seenThisPass = new HashSet<int>();
             foreach (var process in Process.GetProcessesByName(ProcessIdentity.ToProcessName(application.ProcessIdentity)))
