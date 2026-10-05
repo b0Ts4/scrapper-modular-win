@@ -182,7 +182,7 @@ public partial class MainWindow : Window
     private void ShowScannedText(string text)
     {
         const int width = 298;
-        const int height = 42;
+        const int height = 34;
         var visual = new System.Windows.Media.DrawingVisual();
         using (var context = visual.RenderOpen())
         {
@@ -192,7 +192,7 @@ public partial class MainWindow : Window
                 System.Globalization.CultureInfo.InvariantCulture,
                 FlowDirection.LeftToRight,
                 new System.Windows.Media.Typeface("Arial"),
-                24,
+                22,
                 System.Windows.Media.Brushes.Black,
                 1.0);
             context.DrawText(formatted, new Point(8, (height - formatted.Height) / 2));
