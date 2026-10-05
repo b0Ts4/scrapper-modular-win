@@ -58,7 +58,14 @@
                 <TextBlock Text="Meaning:" VerticalAlignment="Center" />
                 <TextBox x:Name="FieldMeaningBox" Text="Medication name" Margin="2" />
             </UniformGrid>
-            <CheckBox x:Name="FieldRequiredBox" Content="Required" IsChecked="True" Margin="0,4,0,0" />
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <CheckBox x:Name="FieldRequiredBox" Content="Required" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="Field type:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <ComboBox x:Name="FieldKindBox" SelectedIndex="0" Width="260">
+                    <ComboBoxItem Content="Text" />
+                    <ComboBoxItem Content="File / image (copy of the file, max 10 MB)" />
+                </ComboBox>
+            </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                 <Button x:Name="AddFieldButton" Content="Add Field From Confirmed Selection" Click="AddFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
                 <Button x:Name="UpdateFieldButton" Content="Update Meaning/Required" Click="UpdateFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />

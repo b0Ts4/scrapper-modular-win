@@ -77,14 +77,17 @@ public partial class MainWindow : Window
         _runtimeFactories = new UiAutomationRuntimeFactories(_automationDispatcher);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "logs"));
         _technicalLog = new StructuredTechnicalLog(Path.Combine(DataDirectory, "logs", "technical.jsonl"));
-        var outbox = new SqliteEventOutbox(Path.Combine(DataDirectory, "events.db"), new DpapiPayloadProtector());
+        var protector = new DpapiPayloadProtector();
+        var outbox = new SqliteEventOutbox(Path.Combine(DataDirectory, "events.db"), protector);
+        var attachments = new SqliteAttachmentStore(Path.Combine(DataDirectory, "events.db"), protector);
         var runtime = new AgentRuntime(
             new WindowsApplicationInstanceSource(),
             _runtimeFactories.CreateTriggerProvider,
             _runtimeFactories.CreateSelectorResolver,
             _runtimeFactories.CreateCaptureProvider,
             outbox,
-            _technicalLog);
+            _technicalLog,
+            attachments: attachments);
         _monitorViewModel = new RuntimeMonitorViewModel(
             runtime,
             outbox,
@@ -93,10 +96,12 @@ public partial class MainWindow : Window
             async cancellationToken =>
             {
                 await outbox.DeleteAllAsync(cancellationToken);
+                await attachments.DeleteAllAsync(cancellationToken);
                 _technicalLog.Clear();
-            });
+            },
+            attachments);
         _monitorViewModel.PropertyChanged += (_, _) => RefreshMonitor();
-        Loaded += async (_, _) => await ApplyRetentionAsync(outbox);
+        Loaded += async (_, _) => await ApplyRetentionAsync(outbox, attachments);
 
         _pointerPollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -198,7 +203,8 @@ public partial class MainWindow : Window
                 StageIdBox.Text.Trim(),
                 FieldMeaningBox.Text.Trim(),
                 FieldRequiredBox.IsChecked == true,
-                fingerprint);
+                fingerprint,
+                FieldKindBox.SelectedIndex == 1 ? FieldKind.File : FieldKind.Text);
             SetStatus($"Added field '{FieldSemanticIdBox.Text.Trim()}'. Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
         }
         catch (ArgumentException ex)
@@ -494,11 +500,12 @@ public partial class MainWindow : Window
         CapacityAlertText.Visibility = alert is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private async Task ApplyRetentionAsync(SqliteEventOutbox outbox)
+    private async Task ApplyRetentionAsync(SqliteEventOutbox outbox, SqliteAttachmentStore attachments)
     {
         try
         {
             await new RetentionService(outbox).ApplyAsync(System.Threading.CancellationToken.None);
+            await LocalDataMaintenance.CollectAttachmentGarbageAsync(outbox, attachments, System.Threading.CancellationToken.None);
             await _monitorViewModel.RefreshEventsAsync();
         }
         catch (Exception ex)
@@ -533,7 +540,7 @@ public partial class MainWindow : Window
         }
 
         var stages = string.Join(", ", configuration.Stages.Select(stage => stage.Id));
-        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}"));
+        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}{(field.Kind == FieldKind.File ? "[file]" : "")}"));
         var triggers = string.Join(" | ", configuration.Triggers.Select(trigger =>
             $"{trigger.Id}@{trigger.StageId}: {string.Join(" > ", trigger.Actions.Select(DescribeAction))}"));
         ConfigurationSummaryText.Text =

@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using Prescriva.Agent.Application.Capture;
 using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Domain.Configuration;
 
@@ -224,6 +225,7 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
         {
             FieldCheckOutcome.Found => "Encontrado",
             FieldCheckOutcome.Ambiguous => "Ambíguo",
+            FieldCheckOutcome.Unreadable => "Ilegível",
             _ => "Não encontrado",
         };
 
@@ -234,7 +236,9 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
             passed ? result.ProviderId ?? "-" : "-",
             passed ? $"{result.Confidence:P0}" : "-",
             passed ? null : DescribeFieldFailure(result.FailureCode),
-            passed && !string.IsNullOrEmpty(result.Value) ? result.Value : "-");
+            !passed ? "-"
+                : result.Attachment is { } attachment ? DescribeAttachment(attachment)
+                : !string.IsNullOrEmpty(result.Value) ? result.Value : "-");
     }
 
     private static TriggerResultDisplay ToDisplay(TriggerCheckResult result)
@@ -257,8 +261,19 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
     /// Portuguese text" rule targets. Technical logs never go through here: they keep only
     /// the code itself plus IDs/metadata (see <see cref="Application.Diagnostics.ITechnicalLog"/>).
     /// </summary>
+    /// <summary>How a captured file is shown to the operator: name, size, and whether it is the original file or the on-screen image.</summary>
+    public static string DescribeAttachment(CapturedAttachment attachment)
+    {
+        ArgumentNullException.ThrowIfNull(attachment);
+        var kilobytes = Math.Max(1, (attachment.Content.LongLength + 1023) / 1024);
+        var origin = attachment.Source == AttachmentSource.File ? "cópia do arquivo" : "imagem da tela";
+        return $"arquivo {attachment.FileName} ({kilobytes} KB, {origin})";
+    }
+
     private static string DescribeFieldFailure(string? failureCode) => failureCode switch
     {
+        FieldCheckResult.FieldUnreadableCode =>
+            "Campo encontrado, mas o valor não pôde ser lido: arquivo inexistente ou acima de 10 MB, imagem coberta por outra janela, ou controle sem conteúdo. Corrija e teste novamente.",
         FieldCheckResult.FieldNotFoundCode =>
             "Campo não encontrado. Verifique se o elemento ainda está visível na tela e se o seletor configurado continua correto.",
         FieldCheckResult.FieldAmbiguousCode =>

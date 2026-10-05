@@ -97,7 +97,11 @@ public sealed class IntegrationTestRunner
         if (resolution.Status == SelectorResolutionStatus.Found && resolution.Handle is not null)
         {
             var capture = await _captureProvider.CaptureAsync(resolution.Handle, field, cancellationToken).ConfigureAwait(false);
-            return new FieldCheckResult(field.Id, FieldCheckOutcome.Found, capture.ProviderId, capture.Confidence, FailureCode: null, Value: capture.Value);
+            var readable = capture.Outcome == CaptureOutcome.Captured &&
+                (field.Kind != FieldKind.File || capture.Attachment is not null);
+            return readable
+                ? new FieldCheckResult(field.Id, FieldCheckOutcome.Found, capture.ProviderId, capture.Confidence, FailureCode: null, Value: capture.Value, Attachment: capture.Attachment, CaptureOutcome: capture.Outcome)
+                : new FieldCheckResult(field.Id, FieldCheckOutcome.Unreadable, capture.ProviderId, resolution.Confidence, FieldCheckResult.FieldUnreadableCode, CaptureOutcome: capture.Outcome);
         }
 
         var outcome = resolution.Status == SelectorResolutionStatus.Ambiguous

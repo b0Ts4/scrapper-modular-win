@@ -40,6 +40,7 @@ public sealed class SessionCoordinator
     private readonly Func<DateTimeOffset> _clock;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly TimeSpan _triggerRetryDelay;
+    private readonly IAttachmentStore? _attachments;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _failingTriggers = new(StringComparer.Ordinal);
 
     private CaptureSession _session;
@@ -55,7 +56,8 @@ public sealed class SessionCoordinator
         ITechnicalLog log,
         Func<Guid>? eventIdFactory = null,
         Func<DateTimeOffset>? clock = null,
-        TimeSpan? triggerRetryDelay = null)
+        TimeSpan? triggerRetryDelay = null,
+        IAttachmentStore? attachments = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(initialStageId);
@@ -76,6 +78,7 @@ public sealed class SessionCoordinator
         _eventIdFactory = eventIdFactory ?? Guid.NewGuid;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _triggerRetryDelay = triggerRetryDelay ?? DefaultTriggerRetryDelay;
+        _attachments = attachments;
         _triggerProvider.WatchEstablished += OnWatchEstablished;
     }
 
@@ -445,14 +448,60 @@ public sealed class SessionCoordinator
             var failure = captureResult.Outcome switch
             {
                 CaptureOutcome.UnsupportedPattern => CaptureFailure.UnsupportedProvider,
-                CaptureOutcome.TimedOut => CaptureFailure.Unreadable,
+                CaptureOutcome.TimedOut or CaptureOutcome.TooLarge => CaptureFailure.Unreadable,
                 _ => CaptureFailure.Unavailable
             };
 
             return new CapturedFieldValue(null, failure);
         }
 
+        if (field.Kind == FieldKind.File)
+        {
+            return await StoreAttachmentAsync(trigger, field, captureResult, cancellationToken).ConfigureAwait(false);
+        }
+
         return new CapturedFieldValue(captureResult.Value);
+    }
+
+    /// <summary>
+    /// A file field's value is the reference of its stored attachment. The attachment is
+    /// stored here - before the session engine runs and long before the event referencing it
+    /// is appended - so a persisted event never points at missing content. Any problem
+    /// becomes a typed capture failure, which rejects the occurrence visibly.
+    /// </summary>
+    private async Task<CapturedFieldValue> StoreAttachmentAsync(
+        TriggerDefinition trigger,
+        FieldDefinition field,
+        CaptureResult captureResult,
+        CancellationToken cancellationToken)
+    {
+        if (captureResult.Attachment is not { } attachment)
+        {
+            return new CapturedFieldValue(null, CaptureFailure.Unavailable);
+        }
+
+        if (_attachments is null)
+        {
+            return new CapturedFieldValue(null, CaptureFailure.UnsupportedProvider);
+        }
+
+        try
+        {
+            var info = await _attachments.SaveAsync(attachment, cancellationToken).ConfigureAwait(false);
+            _log.Log(new TechnicalLogEntry(
+                TechnicalLogLevel.Debug,
+                "attachment_stored",
+                $"Field '{field.Id}' attachment stored ({info.Size} bytes, source {info.Source}).",
+                _clock(),
+                SessionId: _session.Id,
+                TriggerId: trigger.Id,
+                FieldId: field.Id));
+            return new CapturedFieldValue(info.Reference);
+        }
+        catch (AttachmentTooLargeException)
+        {
+            return new CapturedFieldValue(null, CaptureFailure.Unreadable);
+        }
     }
 
     private void PublishSelectorFallback(TriggerDefinition trigger, string fieldId, double confidence, TimeSpan elapsed)

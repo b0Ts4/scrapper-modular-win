@@ -145,6 +145,44 @@ public sealed class SqliteEventOutbox : IEventOutbox
         return results;
     }
 
+    /// <summary>
+    /// Every attachment reference held by a pending or confirmed event (as a field value or
+    /// inside a confirmed item). A payload that cannot be decrypted is skipped here - it
+    /// cannot be shown or delivered either.
+    /// </summary>
+    public async Task<IReadOnlySet<string>> ReadReferencedAttachmentsAsync(CancellationToken cancellationToken)
+    {
+        using var connection = OpenConnection();
+        using var select = connection.CreateCommand();
+        select.CommandText = "SELECT payload_ciphertext FROM events WHERE status IN ($pending, $confirmed);";
+        select.Parameters.AddWithValue("$pending", StatusPending);
+        select.Parameters.AddWithValue("$confirmed", StatusConfirmed);
+
+        var references = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            DomainEventPayload? payload;
+            try
+            {
+                payload = JsonSerializer.Deserialize<DomainEventPayload>(Encoding.UTF8.GetString(_protector.Unprotect((byte[])reader[0])), PayloadJsonOptions);
+            }
+            catch (Exception exception) when (exception is System.Security.Cryptography.CryptographicException or FormatException or JsonException)
+            {
+                continue;
+            }
+
+            if (payload is null) continue;
+            var values = payload.Fields.Values.Concat(payload.Items.IsDefault ? [] : payload.Items.SelectMany(item => item.Values));
+            foreach (var value in values.Where(Application.Capture.AttachmentReference.IsReference))
+            {
+                references.Add(value);
+            }
+        }
+
+        return references;
+    }
+
     public async Task MarkConfirmedAsync(Guid eventId, CancellationToken cancellationToken)
     {
         using var connection = OpenConnection();

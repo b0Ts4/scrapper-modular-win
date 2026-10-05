@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using Prescriva.Agent.Application.Capture;
 using Prescriva.Agent.Application.Events;
 using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Domain.Configuration;
@@ -62,6 +63,7 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
 
     private readonly OutboxCapacityPolicy _capacityPolicy;
     private readonly Func<CancellationToken, Task>? _clearLocalData;
+    private readonly IAttachmentStore? _attachments;
     private OutboxCapacityAssessment? _capacity;
     private IntegrationHealthTracker? _health;
 
@@ -80,7 +82,8 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         IEventOutbox outbox,
         Dispatcher? dispatcher = null,
         OutboxCapacityPolicy? capacityPolicy = null,
-        Func<CancellationToken, Task>? clearLocalData = null)
+        Func<CancellationToken, Task>? clearLocalData = null,
+        IAttachmentStore? attachments = null)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(outbox);
@@ -90,6 +93,7 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         _dispatcher = dispatcher;
         _capacityPolicy = capacityPolicy ?? new OutboxCapacityPolicy();
         _clearLocalData = clearLocalData;
+        _attachments = attachments;
         _runtime.DiagnosticPublished += OnDiagnosticPublished;
     }
 
@@ -298,7 +302,8 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         // started earlier must never replace the result of one that started later.
         var read = Interlocked.Increment(ref _eventReadsStarted);
         var pending = await _outbox.ReadPendingAsync(cancellationToken).ConfigureAwait(false);
-        var events = pending.Select(ToDisplay).ToArray();
+        var attachmentNames = await DescribeAttachmentsAsync(pending, cancellationToken).ConfigureAwait(false);
+        var events = pending.Select(domainEvent => ToDisplay(domainEvent, attachmentNames)).ToArray();
         lock (_gate)
         {
             if (read < _newestAppliedEventRead)
@@ -434,13 +439,33 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
         _ => $"falha {code}.",
     };
 
-    private static EventDisplay ToDisplay(DomainEvent domainEvent) => new(
+    /// <summary>Display text for every attachment the events reference (file name, size, origin) - never the raw reference.</summary>
+    private async Task<IReadOnlyDictionary<string, string>> DescribeAttachmentsAsync(IReadOnlyList<DomainEvent> events, CancellationToken cancellationToken)
+    {
+        var descriptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var references = events
+            .SelectMany(domainEvent => domainEvent.Payload.Fields.Values)
+            .Where(AttachmentReference.IsReference)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var reference in references)
+        {
+            var info = _attachments is null ? null : await _attachments.GetInfoAsync(reference, cancellationToken).ConfigureAwait(false);
+            descriptions[reference] = info is null
+                ? "arquivo (indisponível)"
+                : $"arquivo {info.FileName} ({Math.Max(1, (info.Size + 1023) / 1024)} KB, {(info.Source == AttachmentSource.File ? "cópia do arquivo" : "imagem da tela")})";
+        }
+
+        return descriptions;
+    }
+
+    private static EventDisplay ToDisplay(DomainEvent domainEvent, IReadOnlyDictionary<string, string> attachmentNames) => new(
         domainEvent.Sequence,
         domainEvent.Type,
         domainEvent.SessionId,
         domainEvent.Timestamp,
         domainEvent.Payload.Items.IsDefault ? 0 : domainEvent.Payload.Items.Length,
-        string.Join("; ", domainEvent.Payload.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")));
+        string.Join("; ", domainEvent.Payload.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => $"{pair.Key}={(attachmentNames.TryGetValue(pair.Value, out var name) ? name : pair.Value)}")));
 
     private void AddDiagnostic(DiagnosticDisplay display)
     {
