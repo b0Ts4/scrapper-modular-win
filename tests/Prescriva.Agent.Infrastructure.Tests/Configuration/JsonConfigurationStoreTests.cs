@@ -56,6 +56,32 @@ public sealed class JsonConfigurationStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Load_of_a_configuration_that_does_not_exist_fails_with_a_stable_code_and_no_file_path()
+    {
+        var error = await Assert.ThrowsAsync<ConfigurationValidationException>(() =>
+            new JsonConfigurationStore(_directory).LoadAsync("budget-flow", CancellationToken.None));
+
+        var notFound = Assert.Single(error.Errors);
+        Assert.Equal("CONFIGURATION_NOT_FOUND", notFound.Code);
+        Assert.DoesNotContain(_directory, error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Saving_an_id_that_differs_only_in_letter_case_from_an_existing_one_is_refused()
+    {
+        // On Windows both names are the same file: saving would silently replace the other integration.
+        var store = new JsonConfigurationStore(_directory);
+        var original = ValidConfiguration();
+        await store.SaveAsync(original, CancellationToken.None);
+
+        var error = await Assert.ThrowsAsync<ConfigurationValidationException>(() =>
+            store.SaveAsync(original with { Id = original.Id.ToUpperInvariant(), Name = "Other" }, CancellationToken.None));
+
+        Assert.Contains(error.Errors, item => item.Code == "CONFIGURATION_ID_CONFLICT");
+        Assert.Equal(original.Name, (await store.LoadAsync(original.Id, CancellationToken.None)).Name);
+    }
+
+    [Fact]
     public async Task Load_rejects_malformed_json_with_stable_code()
     {
         Directory.CreateDirectory(_directory);
