@@ -53,7 +53,7 @@ public sealed class AutomationDispatcher : IDisposable
             deadline.CancelAfter(timeout);
         }
 
-        var registration = deadline.Token.Register(() =>
+        void FailForDeadline()
         {
             var kind = cancellationToken.IsCancellationRequested
                 ? ElementInspectionFailureKind.Cancelled
@@ -62,7 +62,9 @@ public sealed class AutomationDispatcher : IDisposable
                 ? "The operation was cancelled."
                 : "The operation did not complete within the allotted timeout.";
             tcs.TrySetException(new ElementInspectionFailure(kind, message));
-        });
+        }
+
+        var registration = deadline.Token.Register(FailForDeadline);
 
         _queue.Add(() =>
         {
@@ -71,8 +73,13 @@ public sealed class AutomationDispatcher : IDisposable
 
             // If the deadline already fired while this item was still queued, the
             // operation must never run.
+            // Complete the task here rather than relying on the registration's callback:
+            // the token reports cancellation before its callbacks run, and disposing the
+            // registration on the way out could remove the callback before it ever ran,
+            // leaving the caller awaiting forever.
             if (deadline.IsCancellationRequested)
             {
+                FailForDeadline();
                 return;
             }
 
@@ -125,7 +132,12 @@ public sealed class AutomationDispatcher : IDisposable
 
         _disposed = true;
         _queue.CompleteAdding();
-        _thread.Join(TimeSpan.FromSeconds(5));
-        _queue.Dispose();
+
+        // A thread still inside a wedged UI Automation call keeps reading the queue when the
+        // call returns: dispose it only once the thread has finished, never under it.
+        if (_thread.Join(TimeSpan.FromSeconds(5)))
+        {
+            _queue.Dispose();
+        }
     }
 }
