@@ -34,7 +34,9 @@ internal sealed class TestTargetLauncher : IDisposable
 
         try
         {
-            var window = WaitForMainWindow(process, timeout ?? TimeSpan.FromSeconds(15));
+            // Generous: the first start of a freshly built executable on a CI runner (JIT,
+            // antivirus scan of the new binary) has exceeded 15 s; success returns at once.
+            var window = WaitForMainWindow(process, timeout ?? TimeSpan.FromSeconds(45));
             return new TestTargetLauncher(process, window);
         }
         catch

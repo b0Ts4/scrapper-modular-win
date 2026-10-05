@@ -475,7 +475,8 @@ internal static class DesktopDriver
 
         private AutomationElement WaitForWindow()
         {
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+            // Same allowance as TestTargetLauncher for a cold first start on CI.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
             while (DateTime.UtcNow < deadline)
             {
                 _process.Refresh();
