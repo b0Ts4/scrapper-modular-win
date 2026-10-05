@@ -401,6 +401,38 @@ public sealed class SessionCoordinator
     private async Task<CapturedFieldValue> CaptureFieldAsync(TriggerDefinition trigger, string fieldId, CancellationToken cancellationToken)
     {
         var field = _configuration.Fields.First(candidate => candidate.Id == fieldId);
+        for (var attempt = 1; ; attempt++)
+        {
+            var (value, transient) = await CaptureFieldOnceAsync(trigger, field, cancellationToken).ConfigureAwait(false);
+            if (!transient || attempt >= _captureRetry.MaxAttempts)
+            {
+                return value;
+            }
+
+            var delay = _captureRetry.DelayBefore(attempt);
+            _log.Log(new TechnicalLogEntry(
+                TechnicalLogLevel.Info,
+                "field_capture_retried",
+                $"Field '{fieldId}' was temporarily unavailable ({value.Failure}); retrying (attempt {attempt + 1} of {_captureRetry.MaxAttempts}).",
+                _clock(),
+                SessionId: _session.Id,
+                TriggerId: trigger.Id,
+                FieldId: fieldId,
+                Elapsed: delay));
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// One resolve-and-read attempt. <c>transient</c> is true only for outcomes that may clear
+    /// on their own within moments (see <see cref="CaptureRetryPolicy"/>).
+    /// </summary>
+    private async Task<(CapturedFieldValue Value, bool Transient)> CaptureFieldOnceAsync(TriggerDefinition trigger, FieldDefinition field, CancellationToken cancellationToken)
+    {
+        var fieldId = field.Id;
         var fieldElapsed = Stopwatch.StartNew();
 
         var resolution = await _resolver.ResolveAsync(field.Selector, cancellationToken).ConfigureAwait(false);
@@ -424,7 +456,7 @@ public sealed class SessionCoordinator
                 Confidence: resolution.Confidence,
                 Elapsed: fieldElapsed.Elapsed));
 
-            return new CapturedFieldValue(null, failure);
+            return (new CapturedFieldValue(null, failure), resolution.Status != SelectorResolutionStatus.Ambiguous);
         }
 
         if (resolution.Confidence < FallbackConfidenceThreshold)
@@ -455,16 +487,17 @@ public sealed class SessionCoordinator
                 CaptureOutcome.TimedOut or CaptureOutcome.TooLarge => CaptureFailure.Unreadable,
                 _ => CaptureFailure.Unavailable
             };
+            var transient = captureResult.Outcome is CaptureOutcome.ElementUnavailable or CaptureOutcome.TimedOut or CaptureOutcome.Obscured;
 
-            return new CapturedFieldValue(null, failure);
+            return (new CapturedFieldValue(null, failure), transient);
         }
 
         if (field.Kind == FieldKind.File)
         {
-            return await StoreAttachmentAsync(trigger, field, captureResult, cancellationToken).ConfigureAwait(false);
+            return (await StoreAttachmentAsync(trigger, field, captureResult, cancellationToken).ConfigureAwait(false), false);
         }
 
-        return new CapturedFieldValue(captureResult.Value);
+        return (new CapturedFieldValue(captureResult.Value), false);
     }
 
     /// <summary>
