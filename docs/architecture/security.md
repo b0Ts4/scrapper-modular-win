@@ -1,0 +1,13 @@
+# Security and privacy
+
+- **Explicit and visible.** Only elements the operator selected and confirmed are captured, only when a configured trigger fires, and only while a tested configuration is visibly active ("Monitorando gatilho ..." in the Desktop). No keylogger, clipboard reader, hidden monitoring or screen capture exists.
+- **Visible in the background.** Starting with Windows is opt-in (off by default). While the window is hidden a tray icon is always present, its tooltip says whether the Agent is monitoring, and a notification states what was (or was not) resumed. Closing the window while monitoring hides it to the tray with a notification instead of stopping silently; the tray menu stops monitoring or exits. Only an integration approved for its exact content is ever resumed automatically.
+- **Configuration** JSON contains selectors, stages and actions — never captured values.
+- **Business data at rest.** Event payloads are encrypted with Windows DPAPI (`DataProtectionScope.CurrentUser`) before they reach SQLite; only metadata (IDs, sequence, timestamp, type, configuration version and content revision, status) is plaintext. The end-to-end tests assert the captured values never appear in the database file bytes (UTF-8 and UTF-16).
+- **Technical logs** (`StructuredTechnicalLog`, JSON lines) record IDs, codes, provider, confidence and timings. No log call site passes a captured value; trigger-watch failures log only the exception type. End-to-end tests assert captured values are absent from the log.
+- **Test mode** values stay in memory (`TestModeViewModel.Report`); nothing persists them.
+- **Display.** The Desktop monitor shows decrypted event values on screen for the operator; they are not written anywhere else.
+- **Retention.** Confirmed events: 7 days. Pending events: kept until confirmed; the Desktop shows an orange/red alert at 1000/5000 pending events (configurable) and never deletes them automatically.
+- **Explicit cleanup.** *Clear Local Data...* (disabled while monitoring, confirmed by the operator) deletes every queued event, then `VACUUM`s the database so freed pages hold no ciphertext, and empties the technical log. Configurations are kept.
+- **DPAPI scope** ties data to the Windows user running the Agent; moving to a Windows service requires a migration strategy (spec §15).
+- **Attachments** (file fields): content and original file name encrypted with DPAPI in the `attachments` table; only SHA-256, size, type and source are plain. At most 10 MB each. Screen captures cover only the configured control and are refused when anything covers it. The technical log records size and source, never the file name or content.

@@ -1,0 +1,18 @@
+# Domain session contract
+
+`SessionEngine` is constructed with an immutable `IntegrationConfiguration` and validates it before use. `CaptureSession.Start(sessionId, stageId)` creates independent active state; the caller chooses the ID and starting stage. The caller must keep a session associated with the same process instance and configuration. The Domain layer neither observes processes nor persists sessions.
+
+`Apply(session, occurrence, values, now)` returns an immutable `SessionTransitionResult`. The occurrence identifies a configured trigger and supplies an immutable array of event IDs, consumed in event emission order. The caller supplies normalized string values keyed by configured field ID, or a typed capture failure, and the event timestamp. The engine does not read a clock, generate IDs, or access desktop/persistence APIs.
+
+An active session accepts only triggers for its current stage. A trigger from another stage returns `Ignored` with no events or changes. Unknown triggers, invalid session metadata and terminal sessions return typed failures. Actions execute in their configured order, using tentative state. Any failure returns `Rejected`, the exact original session and no events; no partial values, items, sequence increments or used IDs escape.
+
+- Capture reads only the fields explicitly listed in the action. Required absent, null or blank values reject the transition, even when a previous capture populated that field. Optional absent/blank values remove stale data. A supplied typed capture failure rejects the transition, including optional-field failures, so failures remain visible.
+- Transition changes the current stage to the configured target, including backward movement.
+- Emit checks required fields across every stage defined in the configuration against accumulated values, not only the current stage: a required field belonging to a stage the session has left, or never visited, still blocks the event if it is absent, null or blank. Unrequested input values cannot satisfy that check. It snapshots the accumulated fields and confirmed items. `item_added` appends a confirmed item snapshot before emission.
+- Clear removes accumulated fields and confirmed items while preserving the stage, sequence and used event IDs.
+- Finish emits `budget_finished` with the current fields and confirmed items, then marks the session finished. Configure `FinishSessionAction` alone for this semantic event; adding an explicit `EmitEventAction("budget_finished")` before it requests an additional event. Finish retains state for inspection.
+- Cancel clears accumulated fields and items and marks the session cancelled. It emits no implicit event. Both terminal actions stop execution of the remaining actions; events from earlier actions remain part of a successful transition.
+
+Events carry ID, configuration ID/schema version, session ID, positive increasing `long` sequence, caller timestamp, semantic type and immutable payload. IDs must be nonempty and unused within the session. Missing IDs, reuse and sequence exhaustion reject atomically. Extra supplied IDs are unused. The caller is responsible for global uniqueness and any trigger replay suppression. The current configuration model has a schema version, not a separate content revision.
+
+Business failures use enum codes and optional field/capture-failure identifiers without embedding captured values in diagnostic text. An invalid configuration passed to the constructor remains a programmer/configuration activation error (`ConfigurationValidationException`). Session records and payloads are in-memory Domain types; their eventual persistence representation belongs in Infrastructure.

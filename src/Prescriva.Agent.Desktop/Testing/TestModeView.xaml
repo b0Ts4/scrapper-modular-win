@@ -1,0 +1,76 @@
+<UserControl x:Class="Prescriva.Agent.Desktop.Testing.TestModeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignWidth="480" d:DesignHeight="520">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="12">
+
+            <TextBlock Text="Modo de teste" FontWeight="Bold" FontSize="16" Margin="0,0,0,8" />
+
+            <TextBlock x:Name="GateMessageText" Foreground="DarkRed" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" />
+
+            <Button x:Name="RunTestButton" Content="Executar teste" Click="RunTestButton_Click"
+                    HorizontalAlignment="Left" Padding="8,2" Margin="0,0,0,10" />
+
+            <TextBlock Text="Campos" FontWeight="Bold" Margin="0,4,0,4" />
+            <ItemsControl x:Name="FieldResultsList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="0,4">
+                            <StackPanel>
+                                <TextBlock>
+                                    <Run Text="{Binding FieldId, Mode=OneWay}" FontWeight="SemiBold" />
+                                    <Run Text=" - " />
+                                    <Run Text="{Binding StatusText, Mode=OneWay}" />
+                                </TextBlock>
+                                <TextBlock Text="{Binding ProviderText, Mode=OneWay, StringFormat='Provedor: {0}'}" FontSize="11" />
+                                <TextBlock Text="{Binding ConfidenceText, Mode=OneWay, StringFormat='Confiança: {0}'}" FontSize="11" />
+                                <TextBlock Text="{Binding ValueText, Mode=OneWay, StringFormat='Valor lido: {0}'}" FontSize="11" />
+                                <TextBlock Text="{Binding SignalsText, Mode=OneWay, StringFormat='Sinais: {0}'}" FontSize="11" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding DurationText, Mode=OneWay, StringFormat='Tempo: {0}'}" FontSize="11" />
+                                <ItemsControl ItemsSource="{Binding Warnings, Mode=OneWay}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Mode=OneWay, StringFormat='Aviso: {0}'}" Foreground="DarkOrange" TextWrapping="Wrap" FontSize="11" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding FailureMessage, Mode=OneWay}" Foreground="DarkRed" TextWrapping="Wrap" FontSize="11" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Gatilhos" FontWeight="Bold" Margin="0,10,0,4" />
+            <ItemsControl x:Name="TriggerResultsList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="0,4">
+                            <StackPanel>
+                                <TextBlock>
+                                    <Run Text="{Binding TriggerId, Mode=OneWay}" FontWeight="SemiBold" />
+                                    <Run Text=" - " />
+                                    <Run Text="{Binding StatusText, Mode=OneWay}" />
+                                </TextBlock>
+                                <TextBlock Text="{Binding EffectsText, Mode=OneWay, StringFormat='Efeitos: {0}'}" FontSize="11" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding DurationText, Mode=OneWay, StringFormat='Tempo: {0}'}" FontSize="11" />
+                                <TextBlock Text="{Binding FailureMessage, Mode=OneWay}" Foreground="DarkRed" TextWrapping="Wrap" FontSize="11" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Separator Margin="0,10,0,10" />
+
+            <Button x:Name="ApproveButton" Content="Aprovar configuração" Click="ApproveButton_Click"
+                    HorizontalAlignment="Left" Padding="8,2" />
+
+            <TextBlock x:Name="TestStatusText" Text="Pronto." Margin="0,10,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
