@@ -103,4 +103,30 @@ public sealed class AutomationDispatcherTests
         Assert.Equal(ElementInspectionFailureKind.ElementUnavailable, failure.Kind);
         Assert.IsType<InvalidOperationException>(failure.InnerException);
     }
+
+    [Fact]
+    public async Task Every_call_completes_even_when_its_deadline_expires_while_it_is_being_dequeued()
+    {
+        // Regression: with an (effectively) immediate timeout, the deadline could flip to
+        // "cancelled" just before the queued item ran; the item then returned without
+        // completing the task and disposed the registration whose callback would have -
+        // leaving the caller awaiting forever (the x86 CI hang in ElementInspectionTests).
+        using var dispatcher = new AutomationDispatcher();
+        for (var i = 0; i < 20_000; i++)
+        {
+            var call = dispatcher.RunAsync(_ => i, TimeSpan.Zero, CancellationToken.None);
+            try
+            {
+                await call.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException)
+            {
+                Assert.Fail($"Call {i} never completed.");
+            }
+            catch (ElementInspectionFailure failure)
+            {
+                Assert.Equal(ElementInspectionFailureKind.TimedOut, failure.Kind);
+            }
+        }
+    }
 }
