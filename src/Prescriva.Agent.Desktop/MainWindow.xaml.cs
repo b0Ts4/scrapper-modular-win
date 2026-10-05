@@ -14,6 +14,7 @@ using Prescriva.Agent.Desktop.Configuration;
 using Prescriva.Agent.Desktop.Inspection;
 using Prescriva.Agent.Desktop.Monitoring;
 using Prescriva.Agent.Desktop.Overlay;
+using Prescriva.Agent.Desktop.Shell;
 using Prescriva.Agent.Desktop.Testing;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Infrastructure.Configuration;
@@ -23,6 +24,7 @@ using Prescriva.Agent.Infrastructure.Security;
 using Prescriva.Agent.Windows.Automation;
 using Prescriva.Agent.Windows.Processes;
 using Prescriva.Agent.Windows.Runtime;
+using Prescriva.Agent.Windows.Startup;
 
 namespace Prescriva.Agent.Desktop;
 
@@ -55,8 +57,16 @@ public partial class MainWindow : Window
     private readonly StructuredTechnicalLog _technicalLog;
     private readonly RuntimeMonitorViewModel _monitorViewModel;
     private readonly ApprovalService _approvalService;
+    private readonly JsonConfigurationStore _configurationStore;
+    private readonly JsonMonitoringPreferenceStore _monitoringPreference;
+    private readonly RunKeyStartupRegistration _startupRegistration;
+    private readonly TrayIcon _trayIcon;
+    private readonly SqliteEventOutbox _outbox;
+    private readonly SqliteAttachmentStore _attachments;
 
     private InspectionState? _confirmedSelection;
+    private bool _exiting;
+    private bool _hiddenNoticeShown;
     private TestModeViewModel? _testModeViewModel;
 
     public MainWindow()
@@ -71,6 +81,10 @@ public partial class MainWindow : Window
         var resolver = new UiAutomationSelectorResolver(_automationDispatcher);
         var captureProvider = new UiAutomationCaptureProvider(_automationDispatcher);
         var store = new JsonConfigurationStore(Path.Combine(DataDirectory, "configurations"));
+        _configurationStore = store;
+        _monitoringPreference = new JsonMonitoringPreferenceStore(DataDirectory);
+        _startupRegistration = new RunKeyStartupRegistration(
+            Environment.GetEnvironmentVariable("PRESCRIVA_AGENT_RUN_KEY") is { Length: > 0 } runKey ? runKey : RunKeyStartupRegistration.DefaultSubKey);
         _approvalService = new ApprovalService(new JsonApprovalStore(Path.Combine(DataDirectory, "approvals")));
         _editorViewModel = new IntegrationEditorViewModel(store, resolver, captureProvider);
 
@@ -80,6 +94,8 @@ public partial class MainWindow : Window
         var protector = new DpapiPayloadProtector();
         var outbox = new SqliteEventOutbox(Path.Combine(DataDirectory, "events.db"), protector);
         var attachments = new SqliteAttachmentStore(Path.Combine(DataDirectory, "events.db"), protector);
+        _outbox = outbox;
+        _attachments = attachments;
         var runtime = new AgentRuntime(
             new WindowsApplicationInstanceSource(),
             _runtimeFactories.CreateTriggerProvider,
@@ -103,6 +119,12 @@ public partial class MainWindow : Window
         _monitorViewModel.PropertyChanged += (_, _) => RefreshMonitor();
         Loaded += async (_, _) => await ApplyRetentionAsync(outbox, attachments);
 
+        _trayIcon = new TrayIcon(ShowFromTray, () => StopMonitoringButton_Click(this, new RoutedEventArgs()), ExitApplication);
+        StartWithWindowsCheckBox.IsChecked = _startupRegistration.IsEnabled;
+        StartWithWindowsCheckBox.Checked += (_, _) => SetStartWithWindows(true);
+        StartWithWindowsCheckBox.Unchecked += (_, _) => SetStartWithWindows(false);
+        Closing += OnClosing;
+
         _pointerPollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromMilliseconds(80),
@@ -111,21 +133,123 @@ public partial class MainWindow : Window
 
         Closed += async (_, _) =>
         {
+            // Exiting keeps the integration "left active", so starting with Windows resumes it;
+            // only the Stop button clears that choice.
             await _monitorViewModel.StopAsync();
+            _trayIcon.Dispose();
             _technicalLog.Dispose();
             _pointerPollTimer.Stop();
             _overlay.Close();
             _inspectorViewModel.Dispose();
             _automationDispatcher.Dispose();
+            System.Windows.Application.Current?.Shutdown();
         };
     }
+
+    /// <summary>
+    /// Started by "Iniciar com o Windows": the window stays hidden (the tray icon shows the
+    /// Agent is running) and the integration the operator left active is resumed - only if
+    /// its approval still matches its content. Any other outcome is shown, never activated.
+    /// </summary>
+    public async Task StartInBackgroundAsync()
+    {
+        await ApplyRetentionAsync(_outbox, _attachments);
+        StartupDecision decision;
+        try
+        {
+            decision = await new StartupActivation(_monitoringPreference, _configurationStore, _approvalService).DecideAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            decision = new StartupDecision(StartupDecisionKind.ConfigurationUnavailable, ex.GetType().Name);
+        }
+
+        if (decision.Kind == StartupDecisionKind.Activate)
+        {
+            IntegrationIdBox.Text = decision.ConfigurationId;
+            await _editorViewModel.ReloadAsync(decision.ConfigurationId!);
+            await _monitorViewModel.StartAsync(decision.Configuration!, decision.Approval);
+            SetStatus(decision.Describe());
+            _trayIcon.Notify("Prescriva Agent", decision.Describe());
+        }
+        else
+        {
+            SetStatus(decision.Describe());
+            _trayIcon.Notify("Prescriva Agent", decision.Describe(), warning: decision.Kind != StartupDecisionKind.NothingActive);
+        }
+
+        RefreshTrayStatus();
+    }
+
+    /// <summary>Shows the window (tray menu, double click, or a second start of the Agent).</summary>
+    public void ShowFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+    }
+
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (_exiting || !_monitorViewModel.IsMonitoring)
+        {
+            return;
+        }
+
+        // Closing the window must not silently stop monitoring: keep running in the tray.
+        e.Cancel = true;
+        Hide();
+        if (!_hiddenNoticeShown)
+        {
+            _hiddenNoticeShown = true;
+            _trayIcon.Notify("Prescriva Agent", "Continua monitorando na bandeja. Use o ícone para abrir, parar ou sair.");
+        }
+    }
+
+    private void ExitApplication()
+    {
+        _exiting = true;
+        Close();
+    }
+
+    private void SetStartWithWindows(bool enabled)
+    {
+        try
+        {
+            if (enabled)
+            {
+                _startupRegistration.Enable(Environment.ProcessPath ?? throw new InvalidOperationException("Executable path unknown."));
+            }
+            else
+            {
+                _startupRegistration.Disable();
+            }
+
+            SetStatus(enabled
+                ? "Iniciar com o Windows: ativado. O Agent abrirá na bandeja ao entrar no Windows e retomará a integração ativa, se aprovada."
+                : "Iniciar com o Windows: desativado.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Não foi possível alterar 'Iniciar com o Windows': {ex.Message}");
+        }
+    }
+
+    private void RefreshTrayStatus() =>
+        _trayIcon.SetStatus(_monitorViewModel.IsMonitoring
+            ? $"Prescriva Agent - monitorando '{_editorViewModel.Configuration?.Name}'"
+            : "Prescriva Agent - parado");
 
     /// <summary>
     /// Where configurations, the event queue and technical logs are kept:
     /// %LOCALAPPDATA%\Prescriva\Agent, or the directory named by the
     /// PRESCRIVA_AGENT_DATA environment variable (used to isolate automated UI tests).
     /// </summary>
-    private static string DataDirectory =>
+    internal static string DataDirectory =>
         Environment.GetEnvironmentVariable("PRESCRIVA_AGENT_DATA") is { Length: > 0 } overridden
             ? overridden
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Prescriva", "Agent");
@@ -417,7 +541,11 @@ public partial class MainWindow : Window
             // The stored approval for exactly this content, if any; AgentRuntime enforces the gate.
             var approval = (await _approvalService.GetStatusAsync(configuration)).Approval;
             var status = await _monitorViewModel.StartAsync(configuration, approval);
-            if (status == ActivationStatus.NotTested && _testModeViewModel is not null)
+            if (status == ActivationStatus.Activated)
+            {
+                await _monitoringPreference.SetActiveConfigurationIdAsync(configuration.Id, CancellationToken.None);
+            }
+            else if (_testModeViewModel is not null)
             {
                 _testModeViewModel.GateMessage = _monitorViewModel.StatusText;
             }
@@ -430,8 +558,11 @@ public partial class MainWindow : Window
 
     private async void OnTestApproved(object? sender, EventArgs e) => await RefreshApprovalStateAsync();
 
-    private async void StopMonitoringButton_Click(object sender, RoutedEventArgs e) =>
+    private async void StopMonitoringButton_Click(object sender, RoutedEventArgs e)
+    {
         await _monitorViewModel.StopAsync();
+        await _monitoringPreference.SetActiveConfigurationIdAsync(null, CancellationToken.None);
+    }
 
     private async void ClearLocalDataButton_Click(object sender, RoutedEventArgs e)
     {
@@ -483,6 +614,7 @@ public partial class MainWindow : Window
         }
 
         ActivateButton.IsEnabled = !_monitorViewModel.IsMonitoring;
+        RefreshTrayStatus();
         StopMonitoringButton.IsEnabled = _monitorViewModel.IsMonitoring;
         ClearLocalDataButton.IsEnabled = !_monitorViewModel.IsMonitoring;
 

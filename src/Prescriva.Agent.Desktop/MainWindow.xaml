@@ -140,6 +140,7 @@
                 <Button x:Name="ActivateButton" Content="Activate" Click="ActivateButton_Click" Padding="8,2" Margin="0,0,6,0" />
                 <Button x:Name="StopMonitoringButton" Content="Stop" Click="StopMonitoringButton_Click" Padding="8,2" />
             </StackPanel>
+            <CheckBox x:Name="StartWithWindowsCheckBox" Content="Iniciar com o Windows (abre na bandeja e retoma a integração ativa, se aprovada)" Margin="0,6,0,0" />
             <TextBlock x:Name="MonitorStatusText" Text="Inativo." Margin="0,6,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
             <TextBlock x:Name="HealthText" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
             <TextBlock x:Name="CapacityAlertText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="DarkOrange" FontWeight="SemiBold" Visibility="Collapsed" />

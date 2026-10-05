@@ -387,61 +387,118 @@ internal static class DesktopDriver
     internal sealed class DesktopProcess : IDisposable
     {
         private readonly Process _process;
+        private AutomationElement? _window;
 
-        private DesktopProcess(Process process, AutomationElement window)
+        private DesktopProcess(Process process, AutomationElement? window)
         {
             _process = process;
-            Window = window;
+            _window = window;
         }
 
-        public AutomationElement Window { get; }
+        public AutomationElement Window => _window ??= WaitForWindow();
 
         public int ProcessId => _process.Id;
 
+        public bool HasExited
+        {
+            get
+            {
+                _process.Refresh();
+                return _process.HasExited;
+            }
+        }
+
+        public int ExitCode => _process.ExitCode;
+
+        /// <summary>True while the Agent shows a visible top-level window (false when it runs only in the tray).</summary>
+        public bool HasVisibleWindow
+        {
+            get
+            {
+                _process.Refresh();
+                return !_process.HasExited && _process.MainWindowHandle != IntPtr.Zero;
+            }
+        }
+
         public static DesktopProcess Launch(string dataDirectory, IReadOnlyDictionary<string, string>? environment = null)
         {
-            var testTargetPath = TestTargetLauncher.ResolveBuiltExecutablePath();
-            var binDirectory = Path.GetDirectoryName(testTargetPath)!;
-            var executablePath = Path.GetFullPath(Path.Combine(
-                binDirectory, "..", "..", "..", "..", "Prescriva.Agent.Desktop", "bin",
-                new DirectoryInfo(binDirectory).Parent!.Name, "net10.0-windows", "Prescriva.Agent.Desktop.exe"));
+            var process = Start(dataDirectory, environment, arguments: null);
+            var desktop = new DesktopProcess(process, null);
+            _ = desktop.Window;
+            return desktop;
+        }
+
+        /// <summary>Starts the Agent as "Iniciar com o Windows" does (<c>--background</c>); no window is expected.</summary>
+        public static DesktopProcess LaunchBackground(string dataDirectory, IReadOnlyDictionary<string, string>? environment = null) =>
+            new(Start(dataDirectory, environment, "--background"), null);
+
+        /// <summary>Starts the Agent without waiting for a window (a second start is expected to hand over and exit).</summary>
+        public static DesktopProcess LaunchWithoutWaiting(string dataDirectory, IReadOnlyDictionary<string, string>? environment = null) =>
+            new(Start(dataDirectory, environment, arguments: null), null);
+
+        public static string ExecutablePath
+        {
+            get
+            {
+                var testTargetPath = TestTargetLauncher.ResolveBuiltExecutablePath();
+                var binDirectory = Path.GetDirectoryName(testTargetPath)!;
+                return Path.GetFullPath(Path.Combine(
+                    binDirectory, "..", "..", "..", "..", "Prescriva.Agent.Desktop", "bin",
+                    new DirectoryInfo(binDirectory).Parent!.Name, "net10.0-windows", "Prescriva.Agent.Desktop.exe"));
+            }
+        }
+
+        public bool WaitForExit(TimeSpan timeout) => _process.WaitForExit(timeout);
+
+        private static Process Start(string dataDirectory, IReadOnlyDictionary<string, string>? environment, string? arguments)
+        {
+            var executablePath = ExecutablePath;
             if (!File.Exists(executablePath))
             {
                 throw new FileNotFoundException("Build Prescriva.Agent.Desktop before running this test.", executablePath);
             }
 
             var startInfo = new ProcessStartInfo(executablePath) { UseShellExecute = false };
+            if (arguments is not null)
+            {
+                startInfo.ArgumentList.Add(arguments);
+            }
+
             startInfo.Environment["PRESCRIVA_AGENT_DATA"] = dataDirectory;
             foreach (var (name, value) in environment ?? new Dictionary<string, string>())
             {
                 startInfo.Environment[name] = value;
             }
-            var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the Agent.");
 
+            return Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the Agent.");
+        }
+
+        private AutomationElement WaitForWindow()
+        {
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
             while (DateTime.UtcNow < deadline)
             {
-                process.Refresh();
-                if (process.HasExited)
+                _process.Refresh();
+                if (_process.HasExited)
                 {
-                    throw new InvalidOperationException($"Prescriva.Agent.Desktop exited early with code {process.ExitCode}.");
+                    throw new InvalidOperationException($"Prescriva.Agent.Desktop exited early with code {_process.ExitCode}.");
                 }
 
-                if (process.MainWindowHandle != IntPtr.Zero)
+                if (_process.MainWindowHandle != IntPtr.Zero)
                 {
-                    return new DesktopProcess(process, AutomationElement.FromHandle(process.MainWindowHandle));
+                    return AutomationElement.FromHandle(_process.MainWindowHandle);
                 }
 
                 Thread.Sleep(100);
             }
 
-            process.Kill(entireProcessTree: true);
+            _process.Kill(entireProcessTree: true);
             throw new TimeoutException("Timed out waiting for the Prescriva.Agent.Desktop main window.");
         }
 
         public void Close()
         {
-            if (_process.HasExited)
+            if (HasExited)
             {
                 return;
             }
