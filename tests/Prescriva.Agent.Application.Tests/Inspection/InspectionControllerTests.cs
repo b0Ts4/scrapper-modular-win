@@ -218,7 +218,7 @@ public sealed class InspectionControllerTests
         var state = controller.CurrentState;
         Assert.Null(state.Snapshot);
         Assert.Null(state.Fingerprint);
-        Assert.Contains(state.Warnings, w => w.Contains("own process", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(state.Warnings, w => w.Contains("próprio Agent", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public sealed class InspectionControllerTests
         Assert.Equal("MedicationTextBox", controller.CurrentState.Snapshot?.AutomationId);
 
         await controller.ObservePointerAsync(new ScreenPoint(3, 4));
-        Assert.Contains(controller.CurrentState.Warnings, w => w.Contains("own process", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(controller.CurrentState.Warnings, w => w.Contains("próprio Agent", StringComparison.OrdinalIgnoreCase));
 
         var confirmed = await controller.ConfirmAsync();
 

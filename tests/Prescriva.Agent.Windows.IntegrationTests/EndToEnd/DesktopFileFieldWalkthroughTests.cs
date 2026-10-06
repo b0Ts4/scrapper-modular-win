@@ -66,30 +66,30 @@ public sealed class DesktopFileFieldWalkthroughTests : IDisposable
         SetText(agent, "StageIdBox", "budget");
         SetText(agent, "StageNameBox", "Orçamento");
         Press(agent, "AddStageButton");
-        await WaitForTextAsync(agent, "StatusText", "Added stage 'budget'");
+        await WaitForTextAsync(agent, "StatusText", "Etapa \'budget\' adicionada");
 
         Press(agent, "StartInspectionButton");
-        await AddFieldAsync(agent, target, "MedicationTextBox", "medication", "Text");
-        await AddFieldAsync(agent, target, "PrescriptionFileTextBox", "prescription_file", "File / image (copy of the file, max 10 MB)");
-        await AddFieldAsync(agent, target, "PrescriptionImage", "prescription_image", "File / image (copy of the file, max 10 MB)");
+        await AddFieldAsync(agent, target, "MedicationTextBox", "medication", "Texto");
+        await AddFieldAsync(agent, target, "PrescriptionFileTextBox", "prescription_file", "Arquivo / imagem (cópia do arquivo, até 10 MB)");
+        await AddFieldAsync(agent, target, "PrescriptionImage", "prescription_image", "Arquivo / imagem (cópia do arquivo, até 10 MB)");
         Assert.Contains("prescription_file@budget*[file]", Text(agent, "ConfigurationSummaryText"), StringComparison.Ordinal);
 
         await HoverAndConfirmAsync(agent, target, "AddButton");
         SetText(agent, "TriggerSemanticIdBox", "add_item");
         SetText(agent, "TriggerCaptureFieldsBox", "medication, prescription_file, prescription_image");
         SetText(agent, "TriggerEmitEventBox", "item_added");
-        SelectComboItem(agent, "TriggerTerminalBox", "Nothing");
+        SelectComboItem(agent, "TriggerTerminalBox", "Nada");
         Press(agent, "AddTriggerButton");
-        await WaitForTextAsync(agent, "StatusText", "Added trigger 'add_item'");
+        await WaitForTextAsync(agent, "StatusText", "Gatilho \'add_item\' adicionado");
         Press(agent, "StopInspectionButton");
         Press(agent, "SaveButton");
-        await WaitForTextAsync(agent, "StatusText", "Saved. Unsaved changes: False");
+        await WaitForTextAsync(agent, "StatusText", "Salvo. Alterações não salvas: não");
 
         // Test mode shows what each file field would capture; approve; activate.
         SetText(target.Window, "MedicationTextBox", "Dipirona-F-1");
         SetText(target.Window, "PrescriptionFileTextBox", pdfPath);
         Press(agent, "PrepareTestButton");
-        await WaitForTextAsync(agent, "StatusText", "Test prepared");
+        await WaitForTextAsync(agent, "StatusText", "Teste preparado");
         await WaitForTextAsync(agent, "TestStatusText", "Pronto.");
         Press(agent, "RunTestButton");
         await PressUntilAsync(target, ["AddButton"], () => Text(agent, "TestStatusText").StartsWith("Teste concluído", StringComparison.Ordinal));
@@ -145,6 +145,6 @@ public sealed class DesktopFileFieldWalkthroughTests : IDisposable
         SetText(agent, "FieldMeaningBox", fieldId);
         SelectComboItem(agent, "FieldKindBox", kind);
         Press(agent, "AddFieldButton");
-        await WaitForTextAsync(agent, "StatusText", $"Added field '{fieldId}'");
+        await WaitForTextAsync(agent, "StatusText", $"Campo \'{fieldId}\' adicionado");
     }
 }

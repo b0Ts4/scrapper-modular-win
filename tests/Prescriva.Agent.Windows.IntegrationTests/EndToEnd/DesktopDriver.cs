@@ -29,7 +29,7 @@ internal static class DesktopDriver
         SetText(agent, "StageIdBox", "budget");
         SetText(agent, "StageNameBox", "Orçamento");
         Press(agent, "AddStageButton");
-        await WaitForTextAsync(agent, "StatusText", "Added stage 'budget'");
+        await WaitForTextAsync(agent, "StatusText", "Etapa \'budget\' adicionada");
 
         Press(agent, "StartInspectionButton");
         foreach (var (automationId, fieldId) in new[]
@@ -43,35 +43,35 @@ internal static class DesktopDriver
             SetText(agent, "FieldSemanticIdBox", fieldId);
             SetText(agent, "FieldMeaningBox", fieldId);
             Press(agent, "AddFieldButton");
-            await WaitForTextAsync(agent, "StatusText", $"Added field '{fieldId}'");
+            await WaitForTextAsync(agent, "StatusText", $"Campo \'{fieldId}\' adicionado");
         }
 
         await HoverAndConfirmAsync(agent, target, "AddButton");
         SetText(agent, "TriggerSemanticIdBox", "add_item");
         SetText(agent, "TriggerCaptureFieldsBox", "medication, concentration, quantity");
         SetText(agent, "TriggerEmitEventBox", "item_added");
-        SelectComboItem(agent, "TriggerTerminalBox", "Nothing");
+        SelectComboItem(agent, "TriggerTerminalBox", "Nada");
         Press(agent, "AddTriggerButton");
-        await WaitForTextAsync(agent, "StatusText", "Added trigger 'add_item' with 2 action(s)");
+        await WaitForTextAsync(agent, "StatusText", "Gatilho \'add_item\' adicionado com 2 ação(ões)");
 
         await HoverAndConfirmAsync(agent, target, "FinishButton");
         SetText(agent, "TriggerSemanticIdBox", "finish_budget");
         SetText(agent, "TriggerCaptureFieldsBox", "");
         SetText(agent, "TriggerEmitEventBox", "");
-        SelectComboItem(agent, "TriggerTerminalBox", "Finish session (budget_finished)");
+        SelectComboItem(agent, "TriggerTerminalBox", "Finalizar sessão (budget_finished)");
         Press(agent, "AddTriggerButton");
-        await WaitForTextAsync(agent, "StatusText", "Added trigger 'finish_budget' with 1 action(s)");
+        await WaitForTextAsync(agent, "StatusText", "Gatilho \'finish_budget\' adicionado com 1 ação(ões)");
         Press(agent, "StopInspectionButton");
 
         Press(agent, "SaveButton");
-        await WaitForTextAsync(agent, "StatusText", "Saved. Unsaved changes: False");
+        await WaitForTextAsync(agent, "StatusText", "Salvo. Alterações não salvas: não");
     }
 
     /// <summary>Prepares and runs test mode while the "operator" presses Add and Finish, until the run completes.</summary>
     internal static async Task RunTestModeAsync(AutomationElement agent, TestTargetLauncher target)
     {
         Press(agent, "PrepareTestButton");
-        await WaitForTextAsync(agent, "StatusText", "Test prepared");
+        await WaitForTextAsync(agent, "StatusText", "Teste preparado");
         await WaitForTextAsync(agent, "TestStatusText", "Pronto.");
         Press(agent, "RunTestButton");
         await PressUntilAsync(target, ["AddButton", "FinishButton"], () => Text(agent, "TestStatusText").StartsWith("Teste concluído", StringComparison.Ordinal));

@@ -8,154 +8,154 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="12">
 
-            <TextBlock Text="1. Integration" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="1. Integração" FontWeight="Bold" Margin="0,0,0,4" />
             <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="Integration ID:" VerticalAlignment="Center" />
-                <TextBox x:Name="IntegrationIdBox" Text="sample-integration" Margin="2" />
-                <TextBlock Text="Name:" VerticalAlignment="Center" />
-                <TextBox x:Name="IntegrationNameBox" Text="Sample Integration" Margin="2" />
+                <TextBlock Text="ID da integração:" VerticalAlignment="Center" />
+                <TextBox x:Name="IntegrationIdBox" Text="orcamento" Margin="2" />
+                <TextBlock Text="Nome:" VerticalAlignment="Center" />
+                <TextBox x:Name="IntegrationNameBox" Text="Orçamento da farmácia" Margin="2" />
             </UniformGrid>
             <UniformGrid Columns="2" Rows="2" Margin="0,4,0,0">
-                <TextBlock Text="Target process:" VerticalAlignment="Center" />
+                <TextBlock Text="Programa (processo):" VerticalAlignment="Center" />
                 <TextBox x:Name="ProcessIdentityBox" Text="Prescriva.Agent.TestTarget.exe" Margin="2" />
-                <TextBlock Text="Window rule:" VerticalAlignment="Center" />
+                <TextBlock Text="Título da janela:" VerticalAlignment="Center" />
                 <TextBox x:Name="WindowRuleBox" Text="Prescriva Agent Test Target" Margin="2" />
             </UniformGrid>
-            <Button x:Name="CreateIntegrationButton" Content="Create Integration" Margin="0,6,0,0"
+            <Button x:Name="CreateIntegrationButton" Content="Criar integração" Margin="0,6,0,0"
                     Click="CreateIntegrationButton_Click" HorizontalAlignment="Left" Padding="8,2" />
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="2. Stage" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="2. Etapa" FontWeight="Bold" Margin="0,0,0,4" />
             <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="Stage ID:" VerticalAlignment="Center" />
-                <TextBox x:Name="StageIdBox" Text="intake" Margin="2" />
-                <TextBlock Text="Stage name:" VerticalAlignment="Center" />
-                <TextBox x:Name="StageNameBox" Text="Intake" Margin="2" />
+                <TextBlock Text="ID da etapa:" VerticalAlignment="Center" />
+                <TextBox x:Name="StageIdBox" Text="orcamento" Margin="2" />
+                <TextBlock Text="Nome da etapa:" VerticalAlignment="Center" />
+                <TextBox x:Name="StageNameBox" Text="Orçamento" Margin="2" />
             </UniformGrid>
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="AddStageButton" Content="Add Stage" Click="AddStageButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="RemoveStageButton" Content="Remove Stage" Click="RemoveStageButton_Click" Padding="8,2" />
+                <Button x:Name="AddStageButton" Content="Adicionar etapa" Click="AddStageButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="RemoveStageButton" Content="Remover etapa" Click="RemoveStageButton_Click" Padding="8,2" />
             </StackPanel>
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="3. Inspect an element" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="3. Selecionar um elemento na tela" FontWeight="Bold" Margin="0,0,0,4" />
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="StartInspectionButton" Content="Start Inspection" Click="StartInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="StopInspectionButton" Content="Stop Inspection" Click="StopInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ConfirmSelectionButton" Content="Confirm Selection" Click="ConfirmSelectionButton_Click" Padding="8,2" />
+                <Button x:Name="StartInspectionButton" Content="Iniciar seleção" Click="StartInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="StopInspectionButton" Content="Parar seleção" Click="StopInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ConfirmSelectionButton" Content="Confirmar seleção" Click="ConfirmSelectionButton_Click" Padding="8,2" />
             </StackPanel>
-            <TextBlock x:Name="HoverStateText" Text="(inspection not started)" Margin="0,6,0,0" TextWrapping="Wrap" />
-            <TextBlock x:Name="ConfirmedSelectionText" Text="(no confirmed selection)" Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" />
+            <TextBlock x:Name="HoverStateText" Text="(seleção não iniciada)" Margin="0,6,0,0" TextWrapping="Wrap" />
+            <TextBlock x:Name="ConfirmedSelectionText" Text="(nenhuma seleção confirmada)" Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" />
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="4. Assign semantic ID and add field" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="4. Dar um nome ao campo e adicioná-lo" FontWeight="Bold" Margin="0,0,0,4" />
             <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="Semantic ID:" VerticalAlignment="Center" />
-                <TextBox x:Name="FieldSemanticIdBox" Text="medication_name" Margin="2" />
-                <TextBlock Text="Meaning:" VerticalAlignment="Center" />
-                <TextBox x:Name="FieldMeaningBox" Text="Medication name" Margin="2" />
+                <TextBlock Text="ID do campo:" VerticalAlignment="Center" />
+                <TextBox x:Name="FieldSemanticIdBox" Text="medicamento" Margin="2" />
+                <TextBlock Text="Significado:" VerticalAlignment="Center" />
+                <TextBox x:Name="FieldMeaningBox" Text="Nome do medicamento" Margin="2" />
             </UniformGrid>
             <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                <CheckBox x:Name="FieldRequiredBox" Content="Required" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" />
-                <TextBlock Text="Field type:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <CheckBox x:Name="FieldRequiredBox" Content="Obrigatório" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="Tipo do campo:" VerticalAlignment="Center" Margin="0,0,4,0" />
                 <ComboBox x:Name="FieldKindBox" SelectedIndex="0" Width="260">
-                    <ComboBoxItem Content="Text" />
-                    <ComboBoxItem Content="File / image (copy of the file, max 10 MB)" />
-                    <ComboBoxItem Content="Text via OCR (read from the control's image)" />
+                    <ComboBoxItem Content="Texto" />
+                    <ComboBoxItem Content="Arquivo / imagem (cópia do arquivo, até 10 MB)" />
+                    <ComboBoxItem Content="Texto via OCR (lido da imagem do campo)" />
                 </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="AddFieldButton" Content="Add Field From Confirmed Selection" Click="AddFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="UpdateFieldButton" Content="Update Meaning/Required" Click="UpdateFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="RemoveFieldButton" Content="Remove Field" Click="RemoveFieldButton_Click" Padding="8,2" />
+                <Button x:Name="AddFieldButton" Content="Adicionar campo selecionado" Click="AddFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="UpdateFieldButton" Content="Atualizar significado/obrigatório" Click="UpdateFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="RemoveFieldButton" Content="Remover campo" Click="RemoveFieldButton_Click" Padding="8,2" />
             </StackPanel>
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="4b. Add trigger (button) from confirmed selection" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="4b. Adicionar gatilho (botão) selecionado" FontWeight="Bold" Margin="0,0,0,4" />
             <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="Trigger ID:" VerticalAlignment="Center" />
-                <TextBox x:Name="TriggerSemanticIdBox" Text="add_item" Margin="2" />
-                <TextBlock Text="Observed event:" VerticalAlignment="Center" />
+                <TextBlock Text="ID do gatilho:" VerticalAlignment="Center" />
+                <TextBox x:Name="TriggerSemanticIdBox" Text="adicionar_item" Margin="2" />
+                <TextBlock Text="Evento observado:" VerticalAlignment="Center" />
                 <TextBox x:Name="TriggerObservedEventBox" Text="Invoke" Margin="2" />
             </UniformGrid>
-            <TextBlock Text="Actions, executed in this order:" Margin="0,6,0,2" FontStyle="Italic" />
+            <TextBlock Text="Ações, executadas nesta ordem:" Margin="0,6,0,2" FontStyle="Italic" />
             <UniformGrid Columns="2" Rows="4">
-                <TextBlock Text="Capture fields (IDs, comma-separated):" VerticalAlignment="Center" />
-                <TextBox x:Name="TriggerCaptureFieldsBox" Text="medication_name" Margin="2" />
-                <TextBlock Text="Emit event (e.g. item_added):" VerticalAlignment="Center" />
+                <TextBlock Text="Capturar campos (IDs separados por vírgula):" VerticalAlignment="Center" />
+                <TextBox x:Name="TriggerCaptureFieldsBox" Text="medicamento" Margin="2" />
+                <TextBlock Text="Gerar evento (ex.: item_added):" VerticalAlignment="Center" />
                 <TextBox x:Name="TriggerEmitEventBox" Text="item_added" Margin="2" />
-                <TextBlock Text="Then go to stage (optional):" VerticalAlignment="Center" />
+                <TextBlock Text="Depois ir para a etapa (opcional):" VerticalAlignment="Center" />
                 <TextBox x:Name="TriggerTransitionStageBox" Text="" Margin="2" />
-                <TextBlock Text="Finally:" VerticalAlignment="Center" />
+                <TextBlock Text="Por fim:" VerticalAlignment="Center" />
                 <ComboBox x:Name="TriggerTerminalBox" SelectedIndex="0" Margin="2">
-                    <ComboBoxItem Content="Nothing" />
-                    <ComboBoxItem Content="Finish session (budget_finished)" />
-                    <ComboBoxItem Content="Cancel session" />
+                    <ComboBoxItem Content="Nada" />
+                    <ComboBoxItem Content="Finalizar sessão (budget_finished)" />
+                    <ComboBoxItem Content="Cancelar sessão" />
                 </ComboBox>
             </UniformGrid>
-            <CheckBox x:Name="TriggerClearStateBox" Content="Clear captured state after emitting" Margin="0,4,0,0" />
+            <CheckBox x:Name="TriggerClearStateBox" Content="Limpar os valores capturados depois de gerar o evento" Margin="0,4,0,0" />
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="AddTriggerButton" Content="Add Trigger From Confirmed Selection" Click="AddTriggerButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ReplaceTriggerActionsButton" Content="Replace Actions" Click="ReplaceTriggerActionsButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="RemoveTriggerButton" Content="Remove Trigger" Click="RemoveTriggerButton_Click" Padding="8,2" />
+                <Button x:Name="AddTriggerButton" Content="Adicionar gatilho selecionado" Click="AddTriggerButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ReplaceTriggerActionsButton" Content="Substituir ações" Click="ReplaceTriggerActionsButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="RemoveTriggerButton" Content="Remover gatilho" Click="RemoveTriggerButton_Click" Padding="8,2" />
             </StackPanel>
 
-            <TextBlock x:Name="ConfigurationSummaryText" Text="(no integration)" Margin="0,8,0,0" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" />
-            <TextBlock x:Name="ApprovalStateText" Text="(no integration)" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
+            <TextBlock x:Name="ConfigurationSummaryText" Text="(nenhuma integração)" Margin="0,8,0,0" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" />
+            <TextBlock x:Name="ApprovalStateText" Text="(nenhuma integração)" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="5. Save / reload" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="5. Salvar / recarregar" FontWeight="Bold" Margin="0,0,0,4" />
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="SaveButton" Content="Save" Click="SaveButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ReloadButton" Content="Reload From Disk" Click="ReloadButton_Click" Padding="8,2" />
+                <Button x:Name="SaveButton" Content="Salvar" Click="SaveButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ReloadButton" Content="Recarregar salva" Click="ReloadButton_Click" Padding="8,2" />
             </StackPanel>
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="6. Resolve + read a saved field" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="6. Localizar e ler um campo salvo" FontWeight="Bold" Margin="0,0,0,4" />
             <UniformGrid Columns="2" Rows="1">
-                <TextBlock Text="Field ID:" VerticalAlignment="Center" />
-                <TextBox x:Name="ResolveFieldIdBox" Text="medication_name" Margin="2" />
+                <TextBlock Text="ID do campo:" VerticalAlignment="Center" />
+                <TextBox x:Name="ResolveFieldIdBox" Text="medicamento" Margin="2" />
             </UniformGrid>
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="ResolveButton" Content="Resolve" Click="ResolveButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ReadValueButton" Content="Read Value" Click="ReadValueButton_Click" Padding="8,2" />
+                <Button x:Name="ResolveButton" Content="Localizar" Click="ResolveButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="ReadValueButton" Content="Ler valor" Click="ReadValueButton_Click" Padding="8,2" />
             </StackPanel>
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="7. Test mode (required before activation)" FontWeight="Bold" Margin="0,0,0,4" />
-            <Button x:Name="PrepareTestButton" Content="Prepare Test Against Running Application" Click="PrepareTestButton_Click"
+            <TextBlock Text="7. Modo de teste (obrigatório antes de ativar)" FontWeight="Bold" Margin="0,0,0,4" />
+            <Button x:Name="PrepareTestButton" Content="Preparar teste com a aplicação aberta" Click="PrepareTestButton_Click"
                     HorizontalAlignment="Left" Padding="8,2" />
             <testing:TestModeView x:Name="TestModeHost" Margin="0,4,0,0" Visibility="Collapsed" />
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="8. Activate and monitor" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="8. Ativar e monitorar" FontWeight="Bold" Margin="0,0,0,4" />
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="ActivateButton" Content="Activate" Click="ActivateButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="StopMonitoringButton" Content="Stop" Click="StopMonitoringButton_Click" Padding="8,2" />
+                <Button x:Name="ActivateButton" Content="Ativar" Click="ActivateButton_Click" Padding="8,2" Margin="0,0,6,0" />
+                <Button x:Name="StopMonitoringButton" Content="Parar" Click="StopMonitoringButton_Click" Padding="8,2" />
             </StackPanel>
             <CheckBox x:Name="StartWithWindowsCheckBox" Content="Iniciar com o Windows (abre na bandeja e retoma a integração ativa, se aprovada)" Margin="0,6,0,0" />
             <TextBlock x:Name="MonitorStatusText" Text="Inativo." Margin="0,6,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
             <TextBlock x:Name="HealthText" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
             <TextBlock x:Name="CapacityAlertText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="DarkOrange" FontWeight="SemiBold" Visibility="Collapsed" />
-            <TextBlock Text="Diagnostics" Margin="0,6,0,2" FontStyle="Italic" />
+            <TextBlock Text="Diagnóstico" Margin="0,6,0,2" FontStyle="Italic" />
             <ListBox x:Name="DiagnosticsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Message" />
-            <TextBlock Text="Persisted events (local encrypted queue)" Margin="0,6,0,2" FontStyle="Italic" />
+            <TextBlock Text="Eventos gravados (fila local criptografada)" Margin="0,6,0,2" FontStyle="Italic" />
             <ListBox x:Name="EventsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Text" />
-            <Button x:Name="ClearLocalDataButton" Content="Clear Local Data (events and technical log)..." Click="ClearLocalDataButton_Click"
+            <Button x:Name="ClearLocalDataButton" Content="Limpar dados locais (eventos e registro técnico)..." Click="ClearLocalDataButton_Click"
                     HorizontalAlignment="Left" Padding="8,2" Margin="0,6,0,0" />
 
             <Separator Margin="0,10,0,10" />
 
-            <TextBlock Text="Status" FontWeight="Bold" Margin="0,0,0,4" />
-            <TextBlock x:Name="StatusText" Text="Ready." TextWrapping="Wrap" />
+            <TextBlock Text="Situação" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock x:Name="StatusText" Text="Pronto." TextWrapping="Wrap" />
         </StackPanel>
     </ScrollViewer>
 </Window>
