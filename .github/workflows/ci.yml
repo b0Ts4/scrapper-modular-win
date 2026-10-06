@@ -26,6 +26,11 @@ jobs:
           "Recognizer languages: " + (([Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages | ForEach-Object { $_.LanguageTag }) -join ', ')
           Get-WindowsCapability -Online -Name 'Language.OCR*' | Where-Object { $_.Name -match 'en-US|pt-BR' } | Format-Table Name, State -AutoSize | Out-String -Width 200
 
+      - name: Real Windows apps on the runner (diagnostic)
+        shell: powershell
+        continue-on-error: true
+        run: ./scripts/probe-real-apps.ps1
+
       - name: Restore
         run: dotnet restore Prescriva.Agent.slnx
 
