@@ -36,7 +36,7 @@ No Partner Center, em **Envio 1**:
   - Para distribuir só aos seus clientes, em **Visibilidade** escolha *Oculto na Store — somente quem tiver o link direto pode instalar* (ou *Público privado*, com uma lista de contas).
 - **Propriedades:**
   - Categoria *Negócios* (ou *Produtividade*).
-  - **URL da política de privacidade**: obrigatória. Pode ser o endereço público de `docs/privacy-policy.md` no GitHub, ou uma página do seu site com o mesmo texto, com o e-mail de contato preenchido.
+  - **URL da política de privacidade**: obrigatória. Pode ser o endereço público de `docs/privacy-policy.md` no GitHub, ou uma página do seu site com o mesmo texto (o e-mail de contato já está preenchido).
 - **Classificação etária:** responda o questionário (sem conteúdo sensível, sem compras, sem chat).
 - **Pacotes:** envie o `.msix` gerado no passo 2.
 - **Listagem na Store (pt-BR):** use o texto da seção 5.

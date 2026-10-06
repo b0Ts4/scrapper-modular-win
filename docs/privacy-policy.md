@@ -39,7 +39,7 @@ O Agent não vende, aluga nem compartilha dados. Em versões futuras com envio a
 
 ## 6. Contato
 
-Dúvidas sobre esta política: **[e-mail de contato do publicador]**.
+Dúvidas sobre esta política: **barbosarthur98@gmail.com**.
 
 ---
 
@@ -54,4 +54,4 @@ Prescriva Agent is a Windows app that reads, visibly and only from the fields th
 - **Retention:** unconfirmed events until confirmed (with a visible alert); confirmed events 7 days; unused attachments are deleted.
 - **Control:** visible monitoring state; start with Windows is opt-in; "Clear local data" deletes everything; uninstalling removes all local data.
 - **Sharing:** none. This policy will be updated before any future server upload feature ships.
-- **Contact:** **[publisher contact e-mail]**.
+- **Contact:** **barbosarthur98@gmail.com**.
