@@ -32,7 +32,7 @@ public sealed class Win32OpenWindowSource : IOpenWindowSource
     public Task<IReadOnlyList<OpenWindowInfo>> ListAsync(CancellationToken cancellationToken) =>
         Task.Run<IReadOnlyList<OpenWindowInfo>>(() => List(cancellationToken), cancellationToken);
 
-    private List<OpenWindowInfo> List(CancellationToken cancellationToken)
+    internal List<OpenWindowInfo> List(CancellationToken cancellationToken)
     {
         var handles = new List<IntPtr>();
         EnumWindows((handle, _) =>
