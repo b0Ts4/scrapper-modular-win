@@ -138,6 +138,9 @@ jobs:
             Write-Output ([Convert]::ToBase64String($stream.ToArray()))
             Write-Output "===END $($_.BaseName)==="
             $preview.Dispose(); $image.Dispose()
+            Write-Output "===BEGIN-FULL $($_.BaseName)==="
+            Write-Output ([Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName)))
+            Write-Output "===END-FULL $($_.BaseName)==="
           }
 
       - name: Upload the Microsoft Store listing screenshots
