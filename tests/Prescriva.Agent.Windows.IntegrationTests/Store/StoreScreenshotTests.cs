@@ -103,17 +103,16 @@ public sealed class StoreScreenshotTests : IDisposable
     /// <summary>Scrolls the step showing the element until it is well inside the window.</summary>
     private static void ScrollUntilVisible(AutomationElement agent, string automationId)
     {
-        // The nearest scrolling ancestor that is the step's page, not a list inside it.
+        // The nearest ancestor page that can scroll vertically (not a list, not a page that fits).
         AutomationElement? scroller = TreeWalker.ControlViewWalker.GetParent(Find(agent, automationId));
-        while (scroller is not null &&
-               !((bool)scroller.GetCurrentPropertyValue(AutomationElement.IsScrollPatternAvailableProperty) && scroller.Current.ControlType == ControlType.Pane))
+        while (scroller is not null && !CanScrollVertically(scroller))
         {
             scroller = TreeWalker.ControlViewWalker.GetParent(scroller);
         }
 
         if (scroller is null)
         {
-            return;
+            return; // the whole step already fits
         }
 
         var scroll = (ScrollPattern)scroller.GetCurrentPattern(ScrollPattern.Pattern);
@@ -128,6 +127,11 @@ public sealed class StoreScreenshotTests : IDisposable
             }
         }
     }
+
+    private static bool CanScrollVertically(AutomationElement element) =>
+        element.Current.ControlType == ControlType.Pane &&
+        element.TryGetCurrentPattern(ScrollPattern.Pattern, out var pattern) &&
+        ((ScrollPattern)pattern).Current.VerticallyScrollable;
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
