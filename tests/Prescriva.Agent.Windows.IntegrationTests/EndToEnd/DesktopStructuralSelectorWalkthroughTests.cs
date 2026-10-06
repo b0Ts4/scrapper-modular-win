@@ -60,38 +60,38 @@ public sealed class DesktopStructuralSelectorWalkthroughTests : IDisposable
             SetText(agent, "StageIdBox", "budget");
             SetText(agent, "StageNameBox", "Orçamento");
             Press(agent, "AddStageButton");
-            await WaitForTextAsync(agent, "StatusText", "Added stage 'budget'");
+            await WaitForTextAsync(agent, "StatusText", "Etapa \'budget\' adicionada");
 
             Press(agent, "StartInspectionButton");
             await HoverAndConfirmAsync(agent, target, "MedicationTextBox");
             SetText(agent, "FieldSemanticIdBox", "medication");
             SetText(agent, "FieldMeaningBox", "Medicamento");
             Press(agent, "AddFieldButton");
-            await WaitForTextAsync(agent, "StatusText", "Added field 'medication'");
+            await WaitForTextAsync(agent, "StatusText", "Campo \'medication\' adicionado");
 
-            await HoverAndConfirmElementAsync(agent, StructuralSelectorTests.LabelledBox(target, NotesLabel), $"Label='{NotesLabel}'", "hover-notes");
+            await HoverAndConfirmElementAsync(agent, StructuralSelectorTests.LabelledBox(target, NotesLabel), $"Rótulo='{NotesLabel}'", "hover-notes");
             Assert.Contains("AutomationId=''", Text(agent, "ConfirmedSelectionText"), StringComparison.Ordinal);
             SetText(agent, "FieldSemanticIdBox", "notes");
             SetText(agent, "FieldMeaningBox", "Observações");
             Press(agent, "AddFieldButton");
-            await WaitForTextAsync(agent, "StatusText", "Added field 'notes'");
+            await WaitForTextAsync(agent, "StatusText", "Campo \'notes\' adicionado");
 
             await HoverAndConfirmAsync(agent, target, "AddButton");
             SetText(agent, "TriggerSemanticIdBox", "add_item");
             SetText(agent, "TriggerCaptureFieldsBox", "medication, notes");
             SetText(agent, "TriggerEmitEventBox", "item_added");
-            SelectComboItem(agent, "TriggerTerminalBox", "Nothing");
+            SelectComboItem(agent, "TriggerTerminalBox", "Nada");
             Press(agent, "AddTriggerButton");
-            await WaitForTextAsync(agent, "StatusText", "Added trigger 'add_item'");
+            await WaitForTextAsync(agent, "StatusText", "Gatilho \'add_item\' adicionado");
             Press(agent, "StopInspectionButton");
             Press(agent, "SaveButton");
-            await WaitForTextAsync(agent, "StatusText", "Saved. Unsaved changes: False");
+            await WaitForTextAsync(agent, "StatusText", "Salvo. Alterações não salvas: não");
 
             // Test mode reads the label-only field; approve and activate.
             SetText(target.Window, "MedicationTextBox", "Dipirona-S-0");
             SetValue(StructuralSelectorTests.LabelledBox(target, NotesLabel), "nota-teste");
             Press(agent, "PrepareTestButton");
-            await WaitForTextAsync(agent, "StatusText", "Test prepared");
+            await WaitForTextAsync(agent, "StatusText", "Teste preparado");
             await WaitForTextAsync(agent, "TestStatusText", "Pronto.");
             Press(agent, "RunTestButton");
             await PressUntilAsync(target, ["AddButton"], () => Text(agent, "TestStatusText").StartsWith("Teste concluído", StringComparison.Ordinal));

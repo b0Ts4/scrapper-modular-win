@@ -64,7 +64,7 @@ public sealed class DesktopConfigurationLifecycleTests : IDisposable
         //    activates without retesting.
         SetText(agent, "IntegrationIdBox", "walkthrough");
         Press(agent, "ReloadButton");
-        await WaitForTextAsync(agent, "StatusText", "Reloaded 'walkthrough' with 3 field(s)");
+        await WaitForTextAsync(agent, "StatusText", "Integração \'walkthrough\' recarregada com 3 campo(s)");
         await WaitForTextAsync(agent, "ApprovalStateText", "Aprovada em");
         await ActivateAndWaitForMonitoringAsync(agent);
         SetMedicine(target, "Dipirona-L-2", "500mg-L-2", "12-L-2");
@@ -77,7 +77,7 @@ public sealed class DesktopConfigurationLifecycleTests : IDisposable
         SetText(agent, "FieldMeaningBox", "quantity");
         SetToggle(agent, "FieldRequiredBox", on: false);
         Press(agent, "UpdateFieldButton");
-        await WaitForTextAsync(agent, "StatusText", "Updated field 'quantity'");
+        await WaitForTextAsync(agent, "StatusText", "Campo \'quantity\' atualizado");
         await WaitForTextAsync(agent, "ApprovalStateText", "Alterada desde o último teste");
         Press(agent, "ActivateButton");
         await WaitForTextAsync(agent, "MonitorStatusText", "Ativação recusada");
@@ -92,23 +92,23 @@ public sealed class DesktopConfigurationLifecycleTests : IDisposable
         // 4. An edit that would leave a dangling reference is refused, naming the trigger.
         SetText(agent, "FieldSemanticIdBox", "medication");
         Press(agent, "RemoveFieldButton");
-        await WaitForTextAsync(agent, "StatusText", "Edit refused");
+        await WaitForTextAsync(agent, "StatusText", "Edição recusada");
         Assert.Contains("add_item", Text(agent, "StatusText"), StringComparison.Ordinal);
         await WaitForTextAsync(agent, "ApprovalStateText", "Aprovada em");
 
         // 5. Removing the Finish trigger and saving requires a new test before activation.
         SetText(agent, "TriggerSemanticIdBox", "finish_budget");
         Press(agent, "RemoveTriggerButton");
-        await WaitForTextAsync(agent, "StatusText", "Removed trigger 'finish_budget'");
+        await WaitForTextAsync(agent, "StatusText", "Gatilho \'finish_budget\' removido");
         Press(agent, "SaveButton");
-        await WaitForTextAsync(agent, "StatusText", "Saved. Unsaved changes: False");
+        await WaitForTextAsync(agent, "StatusText", "Salvo. Alterações não salvas: não");
         await WaitForTextAsync(agent, "ApprovalStateText", "Alterada desde o último teste");
         Press(agent, "ActivateButton");
         await WaitForTextAsync(agent, "MonitorStatusText", "Ativação recusada");
 
         // The edited configuration on disk no longer has the trigger, and reloading keeps it that way.
         Press(agent, "ReloadButton");
-        await WaitForTextAsync(agent, "StatusText", "Reloaded 'walkthrough'");
+        await WaitForTextAsync(agent, "StatusText", "Integração \'walkthrough\' recarregada");
         Assert.DoesNotContain("finish_budget", Text(agent, "ConfigurationSummaryText"), StringComparison.Ordinal);
     }
 

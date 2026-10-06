@@ -61,7 +61,7 @@ public sealed class DesktopWalkthroughTests : IDisposable
         await ConfigureAndSaveMedicineIntegrationAsync(agent, target);
         Assert.True(File.Exists(Path.Combine(_dataDirectory, "configurations", "walkthrough.json")));
         Press(agent, "ReloadButton");
-        await WaitForTextAsync(agent, "StatusText", "Reloaded 'walkthrough' with 3 field(s)");
+        await WaitForTextAsync(agent, "StatusText", "Integração \'walkthrough\' recarregada com 3 campo(s)");
 
         // 5. Activation is refused before the configuration is tested.
         Press(agent, "ActivateButton");

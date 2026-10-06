@@ -15,7 +15,7 @@ namespace Prescriva.Agent.Windows.IntegrationTests.EndToEnd;
 /// </summary>
 public sealed class DesktopOcrFieldWalkthroughTests : IDisposable
 {
-    private const string OcrKind = "Text via OCR (read from the control's image)";
+    private const string OcrKind = "Texto via OCR (lido da imagem do campo)";
 
     private readonly string _dataDirectory =
         Path.Combine(Path.GetTempPath(), "prescriva-desktop-ocr-" + Guid.NewGuid().ToString("N"));
@@ -57,7 +57,7 @@ public sealed class DesktopOcrFieldWalkthroughTests : IDisposable
         SetText(agent, "StageIdBox", "budget");
         SetText(agent, "StageNameBox", "Orçamento");
         Press(agent, "AddStageButton");
-        await WaitForTextAsync(agent, "StatusText", "Added stage 'budget'");
+        await WaitForTextAsync(agent, "StatusText", "Etapa \'budget\' adicionada");
 
         Press(agent, "StartInspectionButton");
         await HoverAndConfirmAsync(agent, target, "ScannedPrescriptionImage");
@@ -65,23 +65,23 @@ public sealed class DesktopOcrFieldWalkthroughTests : IDisposable
         SetText(agent, "FieldMeaningBox", "Receita digitalizada");
         SelectComboItem(agent, "FieldKindBox", OcrKind);
         Press(agent, "AddFieldButton");
-        await WaitForTextAsync(agent, "StatusText", "Added field 'scanned_prescription'");
+        await WaitForTextAsync(agent, "StatusText", "Campo \'scanned_prescription\' adicionado");
         Assert.Contains("scanned_prescription@budget*[ocr]", Text(agent, "ConfigurationSummaryText"), StringComparison.Ordinal);
 
         await HoverAndConfirmAsync(agent, target, "AddButton");
         SetText(agent, "TriggerSemanticIdBox", "add_item");
         SetText(agent, "TriggerCaptureFieldsBox", "scanned_prescription");
         SetText(agent, "TriggerEmitEventBox", "item_added");
-        SelectComboItem(agent, "TriggerTerminalBox", "Nothing");
+        SelectComboItem(agent, "TriggerTerminalBox", "Nada");
         Press(agent, "AddTriggerButton");
-        await WaitForTextAsync(agent, "StatusText", "Added trigger 'add_item'");
+        await WaitForTextAsync(agent, "StatusText", "Gatilho \'add_item\' adicionado");
         Press(agent, "StopInspectionButton");
         Press(agent, "SaveButton");
-        await WaitForTextAsync(agent, "StatusText", "Saved. Unsaved changes: False");
+        await WaitForTextAsync(agent, "StatusText", "Salvo. Alterações não salvas: não");
 
         // Test mode shows the recognized text; approve; activate.
         Press(agent, "PrepareTestButton");
-        await WaitForTextAsync(agent, "StatusText", "Test prepared");
+        await WaitForTextAsync(agent, "StatusText", "Teste preparado");
         await WaitForTextAsync(agent, "TestStatusText", "Pronto.");
         Press(agent, "RunTestButton");
         await PressUntilAsync(target, ["AddButton"], () => Text(agent, "TestStatusText").StartsWith("Teste concluído", StringComparison.Ordinal));
