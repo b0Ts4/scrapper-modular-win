@@ -15,16 +15,28 @@ param(
     [string] $Name = "PrescrivaAgent.Dev",
     [string] $Publisher = "CN=Prescriva Agent Dev",
     [string] $PublisherDisplayName = "Prescriva Agent (desenvolvimento)",
+    [string] $DisplayName = "Prescriva Agent (desenvolvimento)",
+    [switch] $Store,
     [string] $Output = "out/msix",
     [string] $PfxPath,
     [string] $PfxPassword
 )
 
 $ErrorActionPreference = "Stop"
+
+# -Store: the identity reserved in Partner Center (store-identity.json), unsigned (the Store signs).
+if ($Store) {
+    $identity = Get-Content (Join-Path $PSScriptRoot "store-identity.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $Name = $identity.name
+    $Publisher = $identity.publisher
+    $PublisherDisplayName = $identity.publisherDisplayName
+    $DisplayName = $identity.displayName
+    if ($PfxPath) { throw "Do not sign the Store package: the Store signs it." }
+}
 $root = Split-Path -Parent $PSScriptRoot
 $output = [System.IO.Path]::GetFullPath((Join-Path $root $Output))
 $layout = Join-Path $output "layout"
-$package = Join-Path $output "PrescrivaAgent_$($Version)_x64.msix"
+$package = Join-Path $output "$($Name)_$($Version)_x64.msix"
 
 if (Test-Path $output) { Remove-Item $output -Recurse -Force }
 New-Item -ItemType Directory -Path $layout | Out-Null
@@ -36,7 +48,8 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 Copy-Item (Join-Path $PSScriptRoot "Assets") (Join-Path $layout "Assets") -Recurse
 $manifest = Get-Content (Join-Path $PSScriptRoot "AppxManifest.xml") -Raw -Encoding UTF8
 $manifest = $manifest.Replace("{{Name}}", $Name).Replace("{{Publisher}}", [System.Security.SecurityElement]::Escape($Publisher)).
-    Replace("{{PublisherDisplayName}}", [System.Security.SecurityElement]::Escape($PublisherDisplayName)).Replace("{{Version}}", $Version)
+    Replace("{{PublisherDisplayName}}", [System.Security.SecurityElement]::Escape($PublisherDisplayName)).Replace("{{Version}}", $Version).
+    Replace("{{DisplayName}}", [System.Security.SecurityElement]::Escape($DisplayName))
 [System.IO.File]::WriteAllText((Join-Path $layout "AppxManifest.xml"), $manifest, [System.Text.UTF8Encoding]::new($false))
 
 $sdkBin = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" |
