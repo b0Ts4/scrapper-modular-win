@@ -45,7 +45,7 @@ jobs:
           PRESCRIVA_SCREENSHOT_DIR: ${{ github.workspace }}/TestResults/screenshots
         run: >
           dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build
-          --filter "Category!=Packaged"
+          --filter "Category!=Packaged&Category!=StoreScreenshots"
           --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
           --results-directory TestResults
 
@@ -117,6 +117,26 @@ jobs:
           --filter "FullyQualifiedName~TestTargetSmokeTests|FullyQualifiedName~SelectorResolutionTests|FullyQualifiedName~CaptureProviderTests|FullyQualifiedName~TriggerProviderTests|FullyQualifiedName~ElementInspectionTests|FullyQualifiedName~MilestoneFlowTests|FullyQualifiedName~ProcessIdentityDiscoveryTests"
           --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration-x86" --logger "console;verbosity=normal"
           --results-directory TestResults
+
+      - name: Microsoft Store listing screenshots (1920x1080)
+        if: always()
+        shell: powershell
+        env:
+          PRESCRIVA_SCREENSHOT_DIR: ${{ github.workspace }}/out/store-screenshots
+        run: |
+          try { Set-DisplayResolution -Width 1920 -Height 1080 -Force } catch { Write-Output "Set-DisplayResolution failed: $_" }
+          dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build --filter "Category=StoreScreenshots" --logger "console;verbosity=normal"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload the Microsoft Store listing screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-screenshots
+          path: |
+            out/store-screenshots/store-*.png
+            !out/store-screenshots/*-crop.png
+          if-no-files-found: warn
 
       - name: Print hover screenshots (base64 crops, for reviewers without artifact access)
         if: always()
