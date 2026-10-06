@@ -45,6 +45,16 @@ public sealed class JsonConfigurationStore : IConfigurationStore
         return configuration!;
     }
 
+    /// <summary>The IDs of the saved configurations (file names only - nothing is opened), sorted.</summary>
+    public IReadOnlyList<string> ListIds() =>
+        Directory.Exists(_directory)
+            ? Directory.EnumerateFiles(_directory, "*.json")
+                .Select(Path.GetFileNameWithoutExtension)
+                .OfType<string>()
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+            : [];
+
     public async Task SaveAsync(IntegrationConfiguration configuration, CancellationToken cancellationToken)
     {
         var validation = ConfigurationValidator.Validate(configuration);
