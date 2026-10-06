@@ -160,7 +160,7 @@ public sealed class InspectionController
         if (current.Snapshot is null || current.Fingerprint is null)
         {
             throw new InvalidOperationException(
-                "Cannot confirm a selection: no element is currently displayed.");
+                "Não é possível confirmar: nenhum elemento está destacado agora.");
         }
 
         var confirmed = InspectionState.Confirmed(current.Snapshot, current.Fingerprint);
@@ -201,7 +201,7 @@ public sealed class InspectionController
                     _lastRealSnapshot,
                     _lastRealFingerprint,
                     ImmutableArray.Create(
-                        "Ignored an element belonging to the Agent's own process (expected when the pointer is over the highlight overlay)."));
+                        "Elemento do próprio Agent ignorado (normal quando o cursor está sobre o contorno de destaque)."));
             }
             else
             {
@@ -214,10 +214,10 @@ public sealed class InspectionController
         {
             var warning = result.Outcome switch
             {
-                InspectionOutcome.TimedOut => "The inspection timed out before an element could be resolved.",
-                InspectionOutcome.WindowMissing => result.FailureReason ?? "The target window is no longer available.",
-                InspectionOutcome.ElementUnavailable => result.FailureReason ?? "The element under the pointer is no longer available.",
-                _ => "No element was found at the given point.",
+                InspectionOutcome.TimedOut => "A seleção demorou demais para identificar o elemento.",
+                InspectionOutcome.WindowMissing => result.FailureReason ?? "A janela da aplicação não está mais disponível.",
+                InspectionOutcome.ElementUnavailable => result.FailureReason ?? "O elemento sob o cursor não está mais disponível.",
+                _ => "Nenhum elemento encontrado nesse ponto.",
             };
 
             newState = InspectionState.Active(null, null, ImmutableArray.Create(warning));

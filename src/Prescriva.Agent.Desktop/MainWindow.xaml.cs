@@ -313,11 +313,11 @@ public partial class MainWindow : Window
         {
             var application = new ApplicationDefinition(ProcessIdentityBox.Text.Trim(), WindowRuleBox.Text.Trim());
             _editorViewModel.CreateIntegration(IntegrationIdBox.Text.Trim(), IntegrationNameBox.Text.Trim(), application);
-            SetStatus($"Created integration '{_editorViewModel.Configuration!.Id}'. Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
+            SetStatus($"Integração '{_editorViewModel.Configuration!.Id}' criada. {UnsavedChanges()}");
         }
         catch (Exception ex)
         {
-            SetStatus($"Failed to create integration: {ex.Message}");
+            SetStatus($"Não foi possível criar a integração: {ex.Message}");
         }
     }
 
@@ -326,11 +326,11 @@ public partial class MainWindow : Window
         try
         {
             _editorViewModel.AddStage(StageIdBox.Text.Trim(), StageNameBox.Text.Trim());
-            SetStatus($"Added stage '{StageIdBox.Text.Trim()}'.");
+            SetStatus($"Etapa '{StageIdBox.Text.Trim()}' adicionada.");
         }
         catch (Exception ex)
         {
-            SetStatus($"Failed to add stage: {ex.Message}");
+            SetStatus($"Não foi possível adicionar a etapa: {ex.Message}");
         }
     }
 
@@ -338,7 +338,7 @@ public partial class MainWindow : Window
     {
         await _inspectorViewModel.StartAsync();
         _pointerPollTimer.Start();
-        SetStatus("Inspection started - move the mouse over the target application.");
+        SetStatus("Seleção iniciada: passe o mouse sobre o campo ou botão na aplicação.");
     }
 
     private async void StopInspectionButton_Click(object sender, RoutedEventArgs e)
@@ -346,7 +346,7 @@ public partial class MainWindow : Window
         _pointerPollTimer.Stop();
         await _inspectorViewModel.StopAsync();
         _overlay.UpdateHighlight(null);
-        SetStatus("Inspection stopped.");
+        SetStatus("Seleção parada.");
     }
 
     private async void ConfirmSelectionButton_Click(object sender, RoutedEventArgs e)
@@ -356,12 +356,12 @@ public partial class MainWindow : Window
             var confirmed = await _inspectorViewModel.ConfirmAsync();
             _confirmedSelection = confirmed;
             ConfirmedSelectionText.Text =
-                $"Confirmed: AutomationId='{confirmed.Snapshot?.AutomationId}', Name='{confirmed.Snapshot?.Name}', ControlType='{confirmed.Snapshot?.ControlType}', Label='{LabelOf(confirmed.Snapshot)}'.";
-            SetStatus("Selection confirmed. Assign a semantic ID and click 'Add Field'.");
+                $"Confirmado: AutomationId='{confirmed.Snapshot?.AutomationId}', Nome='{confirmed.Snapshot?.Name}', Tipo='{confirmed.Snapshot?.ControlType}', Rótulo='{LabelOf(confirmed.Snapshot)}'.";
+            SetStatus("Seleção confirmada. Dê um ID e clique em 'Adicionar campo selecionado' ou 'Adicionar gatilho selecionado'.");
         }
         catch (InvalidOperationException ex)
         {
-            SetStatus($"Cannot confirm: {ex.Message}");
+            SetStatus($"Não foi possível confirmar: {ex.Message}");
         }
     }
 
@@ -369,7 +369,7 @@ public partial class MainWindow : Window
     {
         if (_confirmedSelection?.Fingerprint is not { } fingerprint)
         {
-            SetStatus("Confirm a selection before adding a field.");
+            SetStatus("Confirme uma seleção antes de adicionar um campo.");
             return;
         }
 
@@ -387,15 +387,15 @@ public partial class MainWindow : Window
                     2 => FieldKind.OcrText,
                     _ => FieldKind.Text,
                 });
-            SetStatus($"Added field '{FieldSemanticIdBox.Text.Trim()}'. Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
+            SetStatus($"Campo '{FieldSemanticIdBox.Text.Trim()}' adicionado. {UnsavedChanges()}");
         }
         catch (ArgumentException ex)
         {
-            SetStatus($"Invalid semantic ID: {ex.Message}");
+            SetStatus($"ID inválido: {ex.Message}");
         }
         catch (InvalidOperationException ex)
         {
-            SetStatus($"Cannot add field: {ex.Message}");
+            SetStatus($"Não foi possível adicionar o campo: {ex.Message}");
         }
     }
 
@@ -403,7 +403,7 @@ public partial class MainWindow : Window
     {
         if (_confirmedSelection?.Fingerprint is not { } fingerprint)
         {
-            SetStatus("Confirm a selection before adding a trigger.");
+            SetStatus("Confirme uma seleção antes de adicionar um gatilho.");
             return;
         }
 
@@ -421,28 +421,28 @@ public partial class MainWindow : Window
                 fingerprint,
                 TriggerObservedEventBox.Text.Trim(),
                 actions);
-            SetStatus($"Added trigger '{TriggerSemanticIdBox.Text.Trim()}' with {actions.Length} action(s). Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
+            SetStatus($"Gatilho '{TriggerSemanticIdBox.Text.Trim()}' adicionado com {actions.Length} ação(ões). {UnsavedChanges()}");
         }
         catch (ArgumentException ex)
         {
-            SetStatus($"Invalid trigger: {ex.Message}");
+            SetStatus($"Gatilho inválido: {ex.Message}");
         }
         catch (InvalidOperationException ex)
         {
-            SetStatus($"Cannot add trigger: {ex.Message}");
+            SetStatus($"Não foi possível adicionar o gatilho: {ex.Message}");
         }
     }
 
     private void RemoveStageButton_Click(object sender, RoutedEventArgs e) =>
-        Edit(() => _editorViewModel.RemoveStage(StageIdBox.Text.Trim()), $"Removed stage '{StageIdBox.Text.Trim()}'.");
+        Edit(() => _editorViewModel.RemoveStage(StageIdBox.Text.Trim()), $"Etapa '{StageIdBox.Text.Trim()}' removida.");
 
     private void UpdateFieldButton_Click(object sender, RoutedEventArgs e) =>
         Edit(
             () => _editorViewModel.UpdateField(FieldSemanticIdBox.Text.Trim(), FieldMeaningBox.Text.Trim(), FieldRequiredBox.IsChecked == true),
-            $"Updated field '{FieldSemanticIdBox.Text.Trim()}'.");
+            $"Campo '{FieldSemanticIdBox.Text.Trim()}' atualizado.");
 
     private void RemoveFieldButton_Click(object sender, RoutedEventArgs e) =>
-        Edit(() => _editorViewModel.RemoveField(FieldSemanticIdBox.Text.Trim()), $"Removed field '{FieldSemanticIdBox.Text.Trim()}'.");
+        Edit(() => _editorViewModel.RemoveField(FieldSemanticIdBox.Text.Trim()), $"Campo '{FieldSemanticIdBox.Text.Trim()}' removido.");
 
     private void ReplaceTriggerActionsButton_Click(object sender, RoutedEventArgs e) =>
         Edit(
@@ -454,10 +454,10 @@ public partial class MainWindow : Window
                     TriggerTransitionStageBox.Text,
                     TriggerClearStateBox.IsChecked == true,
                     (TriggerTerminalAction)Math.Max(0, TriggerTerminalBox.SelectedIndex))),
-            $"Replaced the actions of trigger '{TriggerSemanticIdBox.Text.Trim()}'.");
+            $"Ações do gatilho '{TriggerSemanticIdBox.Text.Trim()}' substituídas.");
 
     private void RemoveTriggerButton_Click(object sender, RoutedEventArgs e) =>
-        Edit(() => _editorViewModel.RemoveTrigger(TriggerSemanticIdBox.Text.Trim()), $"Removed trigger '{TriggerSemanticIdBox.Text.Trim()}'.");
+        Edit(() => _editorViewModel.RemoveTrigger(TriggerSemanticIdBox.Text.Trim()), $"Gatilho '{TriggerSemanticIdBox.Text.Trim()}' removido.");
 
     /// <summary>Applies one editor operation, reporting a refusal instead of applying part of it.</summary>
     private void Edit(Action edit, string success)
@@ -465,11 +465,11 @@ public partial class MainWindow : Window
         try
         {
             edit();
-            SetStatus($"{success} Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
+            SetStatus($"{success} {UnsavedChanges()}");
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            SetStatus($"Edit refused: {ex.Message}");
+            SetStatus($"Edição recusada: {ex.Message}");
         }
     }
 
@@ -478,7 +478,7 @@ public partial class MainWindow : Window
     {
         if (_editorViewModel.Configuration is not { } configuration)
         {
-            ApprovalStateText.Text = "(no integration)";
+            ApprovalStateText.Text = "(nenhuma integração)";
             return;
         }
 
@@ -506,15 +506,15 @@ public partial class MainWindow : Window
         try
         {
             await _editorViewModel.SaveAsync();
-            SetStatus($"Saved. Unsaved changes: {_editorViewModel.HasUnsavedChanges}.");
+            SetStatus($"Salvo. {UnsavedChanges()}");
         }
         catch (ConfigurationValidationException ex)
         {
-            SetStatus($"Save rejected - configuration invalid: {string.Join("; ", ex.Errors.Select(err => err.Code))}");
+            SetStatus($"Não foi salvo: a configuração é inválida ({string.Join("; ", ex.Errors.Select(err => err.Code))}).");
         }
         catch (Exception ex)
         {
-            SetStatus($"Save failed: {ex.Message}");
+            SetStatus($"Falha ao salvar: {ex.Message}");
         }
     }
 
@@ -523,11 +523,11 @@ public partial class MainWindow : Window
         try
         {
             await _editorViewModel.ReloadAsync(IntegrationIdBox.Text.Trim());
-            SetStatus($"Reloaded '{_editorViewModel.Configuration!.Id}' with {_editorViewModel.Configuration.Fields.Length} field(s).");
+            SetStatus($"Integração '{_editorViewModel.Configuration!.Id}' recarregada com {_editorViewModel.Configuration.Fields.Length} campo(s).");
         }
         catch (Exception ex)
         {
-            SetStatus($"Reload failed: {ex.Message}");
+            SetStatus($"Falha ao recarregar: {ex.Message}");
         }
     }
 
@@ -536,11 +536,11 @@ public partial class MainWindow : Window
         try
         {
             var resolution = await _editorViewModel.ResolveFieldAsync(ResolveFieldIdBox.Text.Trim());
-            SetStatus($"Resolve status: {resolution.Status} (confidence {resolution.Confidence:P0}).");
+            SetStatus($"Localização: {resolution.Status} (confiança {resolution.Confidence:P0}).");
         }
         catch (Exception ex)
         {
-            SetStatus($"Resolve failed: {ex.Message}");
+            SetStatus($"Falha ao localizar: {ex.Message}");
         }
     }
 
@@ -549,11 +549,11 @@ public partial class MainWindow : Window
         try
         {
             var result = await _editorViewModel.ReadFieldValueAsync(ResolveFieldIdBox.Text.Trim());
-            SetStatus($"Read value: outcome={result.Outcome}, value='{result.Value}'.");
+            SetStatus($"Leitura: resultado={result.Outcome}, valor='{result.Value}'.");
         }
         catch (Exception ex)
         {
-            SetStatus($"Read failed: {ex.Message}");
+            SetStatus($"Falha na leitura: {ex.Message}");
         }
     }
 
@@ -561,7 +561,7 @@ public partial class MainWindow : Window
     {
         if (_editorViewModel.Configuration is not { } configuration)
         {
-            SetStatus("Create or reload an integration before testing it.");
+            SetStatus("Crie ou recarregue uma integração antes de testá-la.");
             return;
         }
 
@@ -583,14 +583,14 @@ public partial class MainWindow : Window
         TestModeHost.Approved -= OnTestApproved;
         TestModeHost.Approved += OnTestApproved;
         TestModeHost.Visibility = Visibility.Visible;
-        SetStatus($"Test prepared for process {processId}. Click 'Executar teste', then press each configured button in the application, in order, within 15 seconds each.");
+        SetStatus($"Teste preparado para o processo {processId}. Clique em 'Executar teste' e, na aplicação, pressione cada botão configurado, na ordem, em até 15 segundos cada.");
     }
 
     private async void ActivateButton_Click(object sender, RoutedEventArgs e)
     {
         if (_editorViewModel.Configuration is not { } configuration)
         {
-            SetStatus("Create or reload an integration before activating it.");
+            SetStatus("Crie ou recarregue uma integração antes de ativá-la.");
             return;
         }
 
@@ -642,7 +642,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            SetStatus($"Clearing local data failed: {ex.GetType().Name}.");
+            SetStatus($"Falha ao limpar os dados locais: {ex.GetType().Name}.");
         }
     }
 
@@ -700,7 +700,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            SetStatus($"Local event queue unavailable: {ex.GetType().Name}.");
+            SetStatus($"Fila local de eventos indisponível: {ex.GetType().Name}.");
         }
     }
 
@@ -721,11 +721,14 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private string UnsavedChanges() =>
+        _editorViewModel.HasUnsavedChanges ? "Alterações não salvas: sim." : "Alterações não salvas: não.";
+
     private void RefreshConfigurationSummary()
     {
         if (_editorViewModel.Configuration is not { } configuration)
         {
-            ConfigurationSummaryText.Text = "(no integration)";
+            ConfigurationSummaryText.Text = "(nenhuma integração)";
             return;
         }
 
@@ -734,7 +737,7 @@ public partial class MainWindow : Window
         var triggers = string.Join(" | ", configuration.Triggers.Select(trigger =>
             $"{trigger.Id}@{trigger.StageId}: {string.Join(" > ", trigger.Actions.Select(DescribeAction))}"));
         ConfigurationSummaryText.Text =
-            $"'{configuration.Id}' → {configuration.Application.ProcessIdentity}\nStages: {stages}\nFields: {fields}\nTriggers: {triggers}";
+            $"'{configuration.Id}' → {configuration.Application.ProcessIdentity}\nEtapas: {stages}\nCampos: {fields}\nGatilhos: {triggers}";
     }
 
     private static string DescribeAction(TriggerActionDefinition action) => action switch
@@ -764,10 +767,10 @@ public partial class MainWindow : Window
 
         var snapshot = _inspectorViewModel.Snapshot;
         HoverStateText.Text = snapshot is not null
-            ? $"Hovering: AutomationId='{snapshot.AutomationId}', Name='{snapshot.Name}', ControlType='{snapshot.ControlType}', Label='{LabelOf(snapshot)}'."
+            ? $"Sob o cursor: AutomationId='{snapshot.AutomationId}', Nome='{snapshot.Name}', Tipo='{snapshot.ControlType}', Rótulo='{LabelOf(snapshot)}'."
             : _inspectorViewModel.Warnings.Length > 0
                 ? string.Join(" ", _inspectorViewModel.Warnings)
-                : "(nothing under the pointer)";
+                : "(nada sob o cursor)";
     }
 
     private static string LabelOf(ElementSnapshot? snapshot) =>
