@@ -77,6 +77,19 @@ jobs:
           --blame-hang-timeout 5m --logger "trx;LogFilePrefix=packaged" --logger "console;verbosity=normal"
           --results-directory TestResults
 
+      - name: Build the Microsoft Store package (Partner Center identity, unsigned)
+        if: always()
+        shell: powershell
+        run: ./packaging/build-msix.ps1 -Store -Version "1.0.$env:GITHUB_RUN_NUMBER.0" -Output out/msix-store
+
+      - name: Upload the Microsoft Store package (submit this one in Partner Center)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix-store
+          path: out/msix-store/*.msix
+          if-no-files-found: error
+
       - name: Upload the MSIX package (test-signed, for sideload checks)
         if: always()
         uses: actions/upload-artifact@v4

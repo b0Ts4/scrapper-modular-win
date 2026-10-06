@@ -14,7 +14,7 @@
   <Identity Name="{{Name}}" Publisher="{{Publisher}}" Version="{{Version}}" ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>Prescriva Agent</DisplayName>
+    <DisplayName>{{DisplayName}}</DisplayName>
     <PublisherDisplayName>{{PublisherDisplayName}}</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -30,7 +30,7 @@
   <Applications>
     <Application Id="App" Executable="Prescriva.Agent.Desktop.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Prescriva Agent"
+        DisplayName="{{DisplayName}}"
         Description="Captura, de forma visível e somente nos campos configurados, os dados de orçamento do sistema da farmácia."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -38,7 +38,7 @@
       <Extensions>
         <!-- "Iniciar com o Windows": off until the person turns it on in the Agent. -->
         <desktop:Extension Category="windows.startupTask" Executable="Prescriva.Agent.Desktop.exe" EntryPoint="Windows.FullTrustApplication">
-          <desktop:StartupTask TaskId="PrescrivaAgentStartup" Enabled="false" DisplayName="Prescriva Agent" />
+          <desktop:StartupTask TaskId="PrescrivaAgentStartup" Enabled="false" DisplayName="{{DisplayName}}" />
         </desktop:Extension>
       </Extensions>
     </Application>
