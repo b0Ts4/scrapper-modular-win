@@ -127,6 +127,18 @@ jobs:
           try { Set-DisplayResolution -Width 1920 -Height 1080 -Force } catch { Write-Output "Set-DisplayResolution failed: $_" }
           dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build --filter "Category=StoreScreenshots" --logger "console;verbosity=normal"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Small JPEG previews in the log, for reviewers who cannot download artifacts.
+          Add-Type -AssemblyName System.Drawing
+          Get-ChildItem "$env:PRESCRIVA_SCREENSHOT_DIR/store-*.png" -Exclude *-crop.png | ForEach-Object {
+            $image = [System.Drawing.Image]::FromFile($_.FullName)
+            $preview = New-Object System.Drawing.Bitmap $image, 800, ([int](800 * $image.Height / $image.Width))
+            $stream = New-Object System.IO.MemoryStream
+            $preview.Save($stream, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+            Write-Output "===BEGIN $($_.BaseName) $($image.Width)x$($image.Height)==="
+            Write-Output ([Convert]::ToBase64String($stream.ToArray()))
+            Write-Output "===END $($_.BaseName)==="
+            $preview.Dispose(); $image.Dispose()
+          }
 
       - name: Upload the Microsoft Store listing screenshots
         if: always()
