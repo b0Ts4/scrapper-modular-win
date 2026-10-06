@@ -4,8 +4,8 @@ using Prescriva.Agent.Desktop.Shell;
 namespace Prescriva.Agent.Desktop;
 
 /// <summary>
-/// Starts the Agent. <c>--background</c> (the command registered by "Iniciar com o Windows")
-/// starts in the notification area and resumes the integration the operator left active.
+/// Starts the Agent. Started by Windows at sign-in (the Run key's <c>--background</c>, or the
+/// Store package's startup task) it starts in the notification area and resumes the integration the operator left active.
 /// Only one Agent runs per data directory: a second start asks the running one to show its
 /// window and exits, so the same application is never monitored twice (duplicate events).
 /// </summary>
@@ -15,7 +15,8 @@ public partial class App : System.Windows.Application
 
     private async void OnStartup(object sender, StartupEventArgs e)
     {
-        var background = e.Args.Any(argument => string.Equals(argument, "--background", StringComparison.OrdinalIgnoreCase));
+        var background = Prescriva.Agent.Application.Runtime.StartupLaunch.IsBackground(
+            e.Args, Prescriva.Agent.Windows.Startup.PackageIdentity.ActivatedByStartupTask());
         var dataDirectory = Desktop.MainWindow.DataDirectory;
 
         Desktop.MainWindow? window = null;

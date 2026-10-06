@@ -13,7 +13,7 @@ public sealed class RunKeyStartupRegistration : IStartupRegistration
 {
     public const string DefaultSubKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     public const string ValueName = "PrescrivaAgent";
-    public const string BackgroundArgument = "--background";
+    public const string BackgroundArgument = StartupLaunch.BackgroundArgument;
 
     private readonly string _subKey;
 
@@ -24,25 +24,32 @@ public sealed class RunKeyStartupRegistration : IStartupRegistration
         _subKey = subKey;
     }
 
-    public bool IsEnabled
+    public Task<StartupRegistrationState> GetStateAsync()
     {
-        get
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(_subKey);
-            return key?.GetValue(ValueName) is string { Length: > 0 };
-        }
+        using var key = Registry.CurrentUser.OpenSubKey(_subKey);
+        return Task.FromResult(key?.GetValue(ValueName) is string { Length: > 0 }
+            ? StartupRegistrationState.Enabled
+            : StartupRegistrationState.Disabled);
     }
 
-    public void Enable(string executablePath)
+    public Task<StartupRegistrationState> EnableAsync(string executablePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
-        using var key = Registry.CurrentUser.CreateSubKey(_subKey);
-        key.SetValue(ValueName, $"\"{executablePath}\" {BackgroundArgument}", RegistryValueKind.String);
+        using (var key = Registry.CurrentUser.CreateSubKey(_subKey))
+        {
+            key.SetValue(ValueName, $"\"{executablePath}\" {BackgroundArgument}", RegistryValueKind.String);
+        }
+
+        return GetStateAsync();
     }
 
-    public void Disable()
+    public Task<StartupRegistrationState> DisableAsync()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(_subKey, writable: true);
-        key?.DeleteValue(ValueName, throwOnMissingValue: false);
+        using (var key = Registry.CurrentUser.OpenSubKey(_subKey, writable: true))
+        {
+            key?.DeleteValue(ValueName, throwOnMissingValue: false);
+        }
+
+        return GetStateAsync();
     }
 }
