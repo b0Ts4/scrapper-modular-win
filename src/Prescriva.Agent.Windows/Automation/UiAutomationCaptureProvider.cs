@@ -213,6 +213,11 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
                 return (selectionResult, attempts);
             }
 
+            if (TryCaptureViaLabelName(element, attempts, out var labelResult))
+            {
+                return (labelResult, attempts);
+            }
+
             return (null, attempts);
         }
         catch (ElementNotAvailableException ex)
@@ -248,6 +253,24 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
         }
 
         attempts.Add(new PatternAttempt("TextPattern", Succeeded: false, "The element does not support TextPattern."));
+        value = null;
+        return false;
+    }
+
+    /// <summary>
+    /// A plain label (ControlType.Text) - a calculator display, an ERP total - often exposes no
+    /// pattern at all: its text is its Name. Only labels: a button's Name is its caption, not a value.
+    /// </summary>
+    private static bool TryCaptureViaLabelName(AutomationElement element, List<PatternAttempt> attempts, out string? value)
+    {
+        if (element.Current.ControlType == ControlType.Text)
+        {
+            value = element.Current.Name;
+            attempts.Add(new PatternAttempt("Name", Succeeded: true));
+            return true;
+        }
+
+        attempts.Add(new PatternAttempt("Name", Succeeded: false, "Only a label (ControlType.Text) is read through its Name."));
         value = null;
         return false;
     }

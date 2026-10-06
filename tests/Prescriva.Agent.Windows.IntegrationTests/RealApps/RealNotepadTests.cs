@@ -15,6 +15,7 @@ namespace Prescriva.Agent.Windows.IntegrationTests.RealApps;
 public sealed class RealNotepadTests
 {
     private const string ClassicDocumentId = "15";
+    private const int WmSetText = 0x000C;
 
     [SkippableFact]
     public async Task The_text_area_is_found_by_AutomationId_and_its_text_is_read()
@@ -25,9 +26,17 @@ public sealed class RealNotepadTests
         var documentId = DocumentAutomationId(notepad!);
         Skip.If(documentId is null, $"Notepad '{notepad!.Window.ProcessName}' exposes no text area with an AutomationId.");
         var document = notepad!.Find(documentId!);
-        Skip.IfNot(document.TryGetCurrentPattern(ValuePattern.Pattern, out var pattern) && !((ValuePattern)pattern).Current.IsReadOnly,
-            "This Notepad's text area does not accept text through UI Automation, so the test cannot type into it.");
-        ((ValuePattern)pattern).SetValue("Receita 123");
+        if (document.TryGetCurrentPattern(ValuePattern.Pattern, out var pattern) && !((ValuePattern)pattern).Current.IsReadOnly)
+        {
+            ((ValuePattern)pattern).SetValue("Receita 123");
+        }
+        else
+        {
+            // Classic Notepad's multi-line Edit has no writable ValuePattern: set its text directly.
+            var handle = new IntPtr(document.Current.NativeWindowHandle);
+            Skip.If(handle == IntPtr.Zero, "This Notepad's text area accepts no text from UI Automation and has no window handle to type into.");
+            SendMessage(handle, WmSetText, IntPtr.Zero, "Receita 123");
+        }
 
         using var dispatcher = new AutomationDispatcher();
         using var resolver = new UiAutomationSelectorResolver(dispatcher, processId: notepad.Window.ProcessId);
@@ -53,4 +62,7 @@ public sealed class RealNotepadTests
         var id = document?.Current.AutomationId;
         return string.IsNullOrEmpty(id) ? null : id;
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, string text);
 }
