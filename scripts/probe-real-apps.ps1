@@ -9,7 +9,7 @@ Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 "calc.exe in System32: $(Test-Path "$env:windir\System32\calc.exe")"
 "notepad.exe in System32: $(Test-Path "$env:windir\System32\notepad.exe")"
 "mspaint.exe in System32: $(Test-Path "$env:windir\System32\mspaint.exe")"
-"Store packages:"; Get-AppxPackage *Calculator*, *Notepad*, *Paint* | ForEach-Object { "  $($_.Name) $($_.Version)" }
+"Store packages:"; foreach ($pattern in "*Calculator*", "*Notepad*", "*Paint*") { Get-AppxPackage -Name $pattern | ForEach-Object { "  $($_.Name) $($_.Version)" } }
 
 function Describe-TopLevel([string]$label) {
     $root = [System.Windows.Automation.AutomationElement]::RootElement
