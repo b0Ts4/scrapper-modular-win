@@ -59,7 +59,8 @@ public partial class MainWindow : Window
     private readonly ApprovalService _approvalService;
     private readonly JsonConfigurationStore _configurationStore;
     private readonly JsonMonitoringPreferenceStore _monitoringPreference;
-    private readonly RunKeyStartupRegistration _startupRegistration;
+    private readonly IStartupRegistration _startupRegistration;
+    private bool _updatingStartupOption;
     private readonly TrayIcon _trayIcon;
     private readonly SqliteEventOutbox _outbox;
     private readonly SqliteAttachmentStore _attachments;
@@ -83,8 +84,11 @@ public partial class MainWindow : Window
         var store = new JsonConfigurationStore(Path.Combine(DataDirectory, "configurations"));
         _configurationStore = store;
         _monitoringPreference = new JsonMonitoringPreferenceStore(DataDirectory);
-        _startupRegistration = new RunKeyStartupRegistration(
-            Environment.GetEnvironmentVariable("PRESCRIVA_AGENT_RUN_KEY") is { Length: > 0 } runKey ? runKey : RunKeyStartupRegistration.DefaultSubKey);
+        // Installed from the Store (MSIX) the Run key is virtualized: use the package's startup task.
+        _startupRegistration = PackageIdentity.IsPackaged
+            ? new PackagedStartupRegistration()
+            : new RunKeyStartupRegistration(
+                Environment.GetEnvironmentVariable("PRESCRIVA_AGENT_RUN_KEY") is { Length: > 0 } runKey ? runKey : RunKeyStartupRegistration.DefaultSubKey);
         _approvalService = new ApprovalService(new JsonApprovalStore(Path.Combine(DataDirectory, "approvals")));
         _editorViewModel = new IntegrationEditorViewModel(store, resolver, captureProvider);
 
@@ -120,9 +124,9 @@ public partial class MainWindow : Window
         Loaded += async (_, _) => await ApplyRetentionAsync(outbox, attachments);
 
         _trayIcon = new TrayIcon(ShowFromTray, () => StopMonitoringButton_Click(this, new RoutedEventArgs()), ExitApplication);
-        StartWithWindowsCheckBox.IsChecked = _startupRegistration.IsEnabled;
-        StartWithWindowsCheckBox.Checked += (_, _) => SetStartWithWindows(true);
-        StartWithWindowsCheckBox.Unchecked += (_, _) => SetStartWithWindows(false);
+        StartWithWindowsCheckBox.Checked += async (_, _) => await SetStartWithWindowsAsync(true);
+        StartWithWindowsCheckBox.Unchecked += async (_, _) => await SetStartWithWindowsAsync(false);
+        Loaded += async (_, _) => await ShowStartupStateAsync();
         Closing += OnClosing;
 
         _pointerPollTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -226,26 +230,65 @@ public partial class MainWindow : Window
         Close();
     }
 
-    private void SetStartWithWindows(bool enabled)
+    private async Task ShowStartupStateAsync()
     {
         try
         {
-            if (enabled)
-            {
-                _startupRegistration.Enable(Environment.ProcessPath ?? throw new InvalidOperationException("Executable path unknown."));
-            }
-            else
-            {
-                _startupRegistration.Disable();
-            }
+            ShowStartupState(await _startupRegistration.GetStateAsync(), announce: false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Estado de 'Iniciar com o Windows' indisponível ({ex.GetType().Name}).");
+        }
+    }
 
-            SetStatus(enabled
-                ? "Iniciar com o Windows: ativado. O Agent abrirá na bandeja ao entrar no Windows e retomará a integração ativa, se aprovada."
-                : "Iniciar com o Windows: desativado.");
+    private async Task SetStartWithWindowsAsync(bool enabled)
+    {
+        if (_updatingStartupOption)
+        {
+            return;
+        }
+
+        try
+        {
+            var state = enabled
+                ? await _startupRegistration.EnableAsync(Environment.ProcessPath ?? throw new InvalidOperationException("Executable path unknown."))
+                : await _startupRegistration.DisableAsync();
+            ShowStartupState(state, announce: true);
         }
         catch (Exception ex)
         {
             SetStatus($"Não foi possível alterar 'Iniciar com o Windows': {ex.Message}");
+        }
+    }
+
+    /// <summary>Shows the real state (which Windows may override) on the checkbox, with the reason when it differs.</summary>
+    private void ShowStartupState(StartupRegistrationState state, bool announce)
+    {
+        var enabled = state is StartupRegistrationState.Enabled or StartupRegistrationState.EnabledByPolicy;
+        _updatingStartupOption = true;
+        try
+        {
+            StartWithWindowsCheckBox.IsChecked = enabled;
+            StartWithWindowsCheckBox.IsEnabled = state is not (StartupRegistrationState.DisabledByPolicy or StartupRegistrationState.EnabledByPolicy);
+        }
+        finally
+        {
+            _updatingStartupOption = false;
+        }
+
+        var message = state switch
+        {
+            StartupRegistrationState.Enabled => "Iniciar com o Windows: ativado. O Agent abrirá na bandeja ao entrar no Windows e retomará a integração ativa, se aprovada.",
+            StartupRegistrationState.DisabledByUser => "Iniciar com o Windows está desativado no Gerenciador de Tarefas (Aplicativos de inicialização). Ative o Prescriva Agent lá para que ele inicie com o Windows.",
+            StartupRegistrationState.DisabledByPolicy => "Iniciar com o Windows foi bloqueado por uma política do administrador.",
+            StartupRegistrationState.EnabledByPolicy => "Iniciar com o Windows foi ativado por uma política do administrador.",
+            _ => "Iniciar com o Windows: desativado.",
+        };
+
+        if (announce || state is not (StartupRegistrationState.Enabled or StartupRegistrationState.Disabled))
+        {
+            SetStatus(message);
         }
     }
 

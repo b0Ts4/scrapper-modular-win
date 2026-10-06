@@ -99,6 +99,17 @@ Plan: `docs/superpowers/plans/2026-10-05-ocr-text-fields.md`, from the user's re
 - **IDs**: semantic IDs unique ignoring case; loading a missing configuration fails with `CONFIGURATION_NOT_FOUND` (no file path); saving a case-variant of an existing configuration ID fails with `CONFIGURATION_ID_CONFLICT` (on Windows it would overwrite the other file).
 - **Fix found by CI**: the new TestTarget column made the last row taller, pushing the image drop zone off a 1024×768 screen at the default window position (`FileCaptureTests`); compacted, and the test now places the window.
 
+### Plan 9 — Microsoft Store packaging (2026-10-06)
+
+Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: distribute through the Microsoft Store (it signs, hosts and updates; no certificate to buy — Azure Artifact Signing does not serve Brazil), publisher an individual.
+
+- `IStartupRegistration` is asynchronous with real states (`DisabledByUser` in Task Manager, policy); `PackagedStartupRegistration` (package `StartupTask`) when the process has package identity, the Run key otherwise; `StartupLaunch` starts in the background on `--background` or a startup-task activation.
+- `packaging/`: MSIX manifest template (full trust, startup task off by default), logos, `build-msix.ps1` (self-contained win-x64 publish → makeappx; optional test signing).
+- CI builds the MSIX, signs it with a throwaway test certificate, installs it and runs `PackagedAgentTests` (starts from `WindowsApps` with package identity; the option turns the package's startup task on/off as recorded by Windows; the reopened Agent shows it). Artifact `msix-package` (+ test certificate).
+- `docs/privacy-policy.md` (pt-BR/en) and `docs/release/microsoft-store.md` (Partner Center steps, identity, capability justification, hidden listing, listing text).
+- Evidence: run 37395451712 on 10b4a7a — Domain 74, Infrastructure 68, Application 136, Windows 26, integration 55 (359) + packaged 1 + x86 30, all passing.
+- **Waiting on the publisher**: Partner Center account, reserved name and its three identity values, a public privacy-policy URL with a contact e-mail; then build with that identity and submit. Real sign-in start from the Store package: manual row 27.
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
@@ -112,8 +123,8 @@ Plan: `docs/superpowers/plans/2026-10-05-ocr-text-fields.md`, from the user's re
 ### Exact next action
 
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
-2. Review/merge the PR with plan 8 and the pending-item fixes.
-3. Next plans (`docs/roadmap.md`): event transport to the backend (needs the backend's API), signed installer/updater, configurator list-based editing.
+2. Publisher: create the Partner Center account and reserve the name; send the three identity values (see `docs/release/microsoft-store.md`); then build with them and submit.
+3. Next plans (`docs/roadmap.md`): event transport to the backend (needs the backend's API), configurator list-based editing.
 
 ---
 

@@ -45,8 +45,47 @@ jobs:
           PRESCRIVA_SCREENSHOT_DIR: ${{ github.workspace }}/TestResults/screenshots
         run: >
           dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build
+          --filter "Category!=Packaged"
           --blame-hang-timeout 5m --logger "trx;LogFilePrefix=integration" --logger "console;verbosity=normal"
           --results-directory TestResults
+
+      - name: Build, sign (test certificate) and install the MSIX package
+        if: always()
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=Prescriva Agent Dev" -KeyUsage DigitalSignature `
+            -FriendlyName "Prescriva Agent test signing" -CertStoreLocation "Cert:\CurrentUser\My" `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          $password = ConvertTo-SecureString -String "prescriva-test" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath "$env:RUNNER_TEMP\test-signing.pfx" -Password $password | Out-Null
+          Export-Certificate -Cert $cert -FilePath "$env:RUNNER_TEMP\test-signing.cer" | Out-Null
+          Import-Certificate -FilePath "$env:RUNNER_TEMP\test-signing.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
+          ./packaging/build-msix.ps1 -Version "1.0.$env:GITHUB_RUN_NUMBER.0" -PfxPath "$env:RUNNER_TEMP\test-signing.pfx" -PfxPassword "prescriva-test"
+          Copy-Item "$env:RUNNER_TEMP\test-signing.cer" out/msix/PrescrivaAgent-test-signing.cer
+          $msix = Get-ChildItem out/msix/*.msix | Select-Object -First 1
+          Add-AppxPackage -Path $msix.FullName
+          $family = (Get-AppxPackage -Name "PrescrivaAgent.Dev").PackageFamilyName
+          if (-not $family) { throw "The MSIX package did not install." }
+          "PRESCRIVA_PACKAGE_FAMILY_NAME=$family" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Packaged Agent tests (installed MSIX)
+        if: always()
+        run: >
+          dotnet test tests/Prescriva.Agent.Windows.IntegrationTests --configuration Release --no-build
+          --filter "Category=Packaged"
+          --blame-hang-timeout 5m --logger "trx;LogFilePrefix=packaged" --logger "console;verbosity=normal"
+          --results-directory TestResults
+
+      - name: Upload the MSIX package (test-signed, for sideload checks)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix-package
+          path: |
+            out/msix/*.msix
+            out/msix/*.cer
+          if-no-files-found: warn
 
       - name: Publish a 32-bit TestTarget
         if: always()

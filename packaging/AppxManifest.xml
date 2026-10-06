@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest template for the Microsoft Store. build-msix.ps1 fills the {{...}} values:
+  the identity (Name, Publisher, PublisherDisplayName) must be exactly the one reserved in
+  Partner Center (Product management > Product identity).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop rescap">
+
+  <Identity Name="{{Name}}" Publisher="{{Publisher}}" Version="{{Version}}" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Prescriva Agent</DisplayName>
+    <PublisherDisplayName>{{PublisherDisplayName}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="pt-BR" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="Prescriva.Agent.Desktop.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Prescriva Agent"
+        Description="Captura, de forma visível e somente nos campos configurados, os dados de orçamento do sistema da farmácia."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <!-- "Iniciar com o Windows": off until the person turns it on in the Agent. -->
+        <desktop:Extension Category="windows.startupTask" Executable="Prescriva.Agent.Desktop.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="PrescrivaAgentStartup" Enabled="false" DisplayName="Prescriva Agent" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- A full-trust desktop app: UI Automation of the configured application, DPAPI, SQLite. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
