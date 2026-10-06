@@ -37,25 +37,25 @@
 ---
 
 ### Task 1: Startup registration that works packaged and unpackaged
-- [ ] RED:
+- [x] RED:
   - `StartupModeTests`: `--background` → background; ativação `StartupTask` → background; ativação normal → janela.
   - `RunKeyStartupRegistrationTests` adaptados à API assíncrona com estado.
-- [ ] GREEN:
+- [x] GREEN:
   - `IStartupRegistration` assíncrona com `StartupRegistrationState` (`Enabled`, `Disabled`, `DisabledByUser`, `DisabledByPolicy`, `EnabledByPolicy`);
   - `RunKeyStartupRegistration`, `PackagedStartupRegistration` (`StartupTask`), `PackageIdentity.IsPackaged`;
   - `App` usa `StartupMode`; o Desktop mostra a mensagem certa para cada estado.
 
 ### Task 2: MSIX package built, installed and started by CI
-- [ ] `packaging/AppxManifest.xml` (template), logos, `packaging/build-msix.ps1`.
-- [ ] CI:
+- [x] `packaging/AppxManifest.xml` (template), logos, `packaging/build-msix.ps1`.
+- [x] CI:
   - gera um certificado de teste, monta e assina o `.msix` e o publica como artefato;
   - instala com `Add-AppxPackage`;
   - roda `PackagedAgentTests`: o app abre pela AUMID com identidade de pacote; marcar "Iniciar com o Windows" registra a `StartupTask` (estado `Enabled`) e desmarcar desativa; reabrir mostra o estado salvo.
-- [ ] Desinstala no fim.
+- [x] Desinstala no fim.
 
 ### Task 3: Store readiness
-- [ ] `docs/privacy-policy.md` (pt-BR e en), `docs/release/microsoft-store.md`: passo a passo no Partner Center, identidade, upload, idade, categoria, *declarações de capacidade* (`runFullTrust`), público oculto (link privado).
-- [ ] Texto da listagem (pt-BR).
+- [x] `docs/privacy-policy.md` (pt-BR e en), `docs/release/microsoft-store.md`: passo a passo no Partner Center, identidade, upload, idade, categoria, *declarações de capacidade* (`runFullTrust`), público oculto (link privado).
+- [x] Texto da listagem (pt-BR).
 
 ### Task 4: Docs and handoff
-- [ ] Setup (instalação pela Store, sideload de teste), arquitetura, roteiro manual (instalar pela Store, iniciar com o Windows empacotado), handoff.
+- [x] Setup (instalação pela Store, sideload de teste), arquitetura, roteiro manual (instalar pela Store, iniciar com o Windows empacotado), handoff.

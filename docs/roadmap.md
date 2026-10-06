@@ -12,7 +12,7 @@ Configure, test, activate and capture against `Prescriva.Agent.TestTarget` with 
 4. ~~Dispatcher recovery~~ — shipped in plan 8's session: a call wedged past 30 s is abandoned for a fresh STA thread.
 5. **Providers:** MSAA/Win32 providers. (OCR text fields shipped in plan 8; possible follow-ups: OCR of a captured file such as a PDF/JPG prescription, a per-field language, a region inside a larger control.)
 6. **Transport:** deliver outbox events to the backend with idempotent confirmation (`MarkConfirmedAsync`), driving the 7-day retention of confirmed events.
-7. **Packaging:** signed installer/updater (also removes Smart App Control friction on developer machines).
+7. **Packaging:** ~~signed installer/updater~~ — Microsoft Store MSIX shipped in plan 9 (the Store signs and updates); waiting on the publisher's Partner Center identity to submit.
 
 ## Shipped after milestone 1
 
