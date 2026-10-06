@@ -87,6 +87,7 @@ public partial class MainWindow : Window
             string.IsNullOrWhiteSpace(MedicationTextBox.Text) ? $"Medication {_rowCounter}" : MedicationTextBox.Text,
             string.IsNullOrWhiteSpace(ConcentrationTextBox.Text) ? $"{_rowCounter} mg" : ConcentrationTextBox.Text,
             string.IsNullOrWhiteSpace(QuantityTextBox.Text) ? _rowCounter.ToString() : QuantityTextBox.Text));
+        ItemCountText.Text = $"Itens: {_items.Count}";
     }
 
     private void FinishButton_Click(object sender, RoutedEventArgs e)
