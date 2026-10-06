@@ -45,11 +45,14 @@ public sealed class StoreScreenshotTests : IDisposable
         var (screenWidth, screenHeight) = (GetSystemMetrics(0), GetSystemMetrics(1));
         Assert.True(screenWidth >= 1366 && screenHeight >= 768, $"The Store needs at least 1366x768; the screen is {screenWidth}x{screenHeight}.");
 
+        // A plain backdrop in the brand's light colour hides the CI console and desktop watermark.
+        using var backdrop = Backdrop.Show();
         using var target = TestTargetLauncher.Launch();
         using var desktop = DesktopProcess.Launch(_dataDirectory);
         var agent = desktop.Window;
-        ArrangeSideBySide(agent, target);
-        ((TransformPattern)agent.GetCurrentPattern(TransformPattern.Pattern)).Resize(760, screenHeight - 60);
+        Move(target.Window, 160, 70);
+        Move(agent, 720, 30);
+        ((TransformPattern)agent.GetCurrentPattern(TransformPattern.Pattern)).Resize(980, screenHeight - 110);
 
         // 1. Selecting fields on the pharmacy system with the mouse.
         await ConfigureAndSaveMedicineIntegrationAsync(agent, target);
@@ -112,4 +115,53 @@ public sealed class StoreScreenshotTests : IDisposable
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
+
+    /// <summary>A borderless full-screen window behind everything else, on its own STA thread.</summary>
+    private sealed class Backdrop : IDisposable
+    {
+        private readonly System.Windows.Threading.Dispatcher _dispatcher;
+        private readonly Thread _thread;
+
+        private Backdrop(System.Windows.Threading.Dispatcher dispatcher, Thread thread)
+        {
+            _dispatcher = dispatcher;
+            _thread = thread;
+        }
+
+        public static Backdrop Show()
+        {
+            System.Windows.Threading.Dispatcher? dispatcher = null;
+            using var ready = new ManualResetEventSlim();
+            var thread = new Thread(() =>
+            {
+                var window = new System.Windows.Window
+                {
+                    WindowStyle = System.Windows.WindowStyle.None,
+                    ResizeMode = System.Windows.ResizeMode.NoResize,
+                    ShowInTaskbar = false,
+                    Left = 0,
+                    Top = 0,
+                    Width = System.Windows.SystemParameters.PrimaryScreenWidth,
+                    Height = System.Windows.SystemParameters.PrimaryScreenHeight,
+                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEE, 0xF3, 0xF1)),
+                    Title = "Store screenshot backdrop",
+                };
+                window.Show();
+                dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+                ready.Set();
+                System.Windows.Threading.Dispatcher.Run();
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+            ready.Wait(TimeSpan.FromSeconds(10));
+            return new Backdrop(dispatcher!, thread);
+        }
+
+        public void Dispose()
+        {
+            _dispatcher.InvokeShutdown();
+            _thread.Join(TimeSpan.FromSeconds(5));
+        }
+    }
 }
