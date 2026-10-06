@@ -3,159 +3,453 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:testing="clr-namespace:Prescriva.Agent.Desktop.Testing"
         Title="Receita Fácil Agent"
-        Width="680" Height="820"
-        WindowStartupLocation="CenterScreen">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="12">
+        Width="720" Height="800" MinWidth="560" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Background="#F3F6F5"
+        FontFamily="Segoe UI" FontSize="13">
+    <Window.Resources>
+        <!-- Light theme: neutral page, white cards, one accent (the brand green). -->
+        <SolidColorBrush x:Key="CardBrush" Color="White" />
+        <SolidColorBrush x:Key="LineBrush" Color="#D6DEDB" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#1E6F5C" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#175848" />
+        <SolidColorBrush x:Key="AccentSoftBrush" Color="#E3F1EC" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#5B6B66" />
+        <SolidColorBrush x:Key="InkBrush" Color="#1D2A26" />
 
-            <TextBlock Text="1. Integração" FontWeight="Bold" Margin="0,0,0,4" />
-            <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="ID da integração:" VerticalAlignment="Center" />
-                <TextBox x:Name="IntegrationIdBox" Text="orcamento" Margin="2" />
-                <TextBlock Text="Nome:" VerticalAlignment="Center" />
-                <TextBox x:Name="IntegrationNameBox" Text="Orçamento da farmácia" Margin="2" />
-            </UniformGrid>
-            <UniformGrid Columns="2" Rows="2" Margin="0,4,0,0">
-                <TextBlock Text="Programa (processo):" VerticalAlignment="Center" />
-                <TextBox x:Name="ProcessIdentityBox" Text="Prescriva.Agent.TestTarget.exe" Margin="2" />
-                <TextBlock Text="Título da janela:" VerticalAlignment="Center" />
-                <TextBox x:Name="WindowRuleBox" Text="Prescriva Agent Test Target" Margin="2" />
-            </UniformGrid>
-            <Button x:Name="CreateIntegrationButton" Content="Criar integração" Margin="0,6,0,0"
-                    Click="CreateIntegrationButton_Click" HorizontalAlignment="Left" Padding="8,2" />
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        </Style>
+        <Style x:Key="StepTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        </Style>
+        <Style x:Key="Guidance" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        </Style>
+        <Style x:Key="EmptyState" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="Margin" Value="2,4,2,4" />
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,6,0,2" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        </Style>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Padding" Value="6,3" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,4,0,4" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{StaticResource AccentBrush}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Expander">
+            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        </Style>
+        <Style TargetType="ListBox">
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="Background" Value="White" />
+        </Style>
 
-            <Separator Margin="0,10,0,10" />
+        <!-- Wizard steps on the left: plain rows, the current one filled with the accent. -->
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Chrome" Background="Transparent" CornerRadius="6" Padding="12,10" Margin="0,0,0,4" MinWidth="150">
+                            <ContentPresenter ContentSource="Header" TextElement.FontSize="14" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
-            <TextBlock Text="2. Etapa" FontWeight="Bold" Margin="0,0,0,4" />
-            <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="ID da etapa:" VerticalAlignment="Center" />
-                <TextBox x:Name="StageIdBox" Text="orcamento" Margin="2" />
-                <TextBlock Text="Nome da etapa:" VerticalAlignment="Center" />
-                <TextBox x:Name="StageNameBox" Text="Orçamento" Margin="2" />
-            </UniformGrid>
-            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="AddStageButton" Content="Adicionar etapa" Click="AddStageButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="RemoveStageButton" Content="Remover etapa" Click="RemoveStageButton_Click" Padding="8,2" />
+    <DockPanel>
+        <!-- Header: what is being configured and whether it may be activated. -->
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,10">
+            <StackPanel>
+                <TextBlock Text="Receita Fácil Agent" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock x:Name="CurrentIntegrationText" Text="Nenhuma integração aberta. Comece pelo passo 1." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                <TextBlock x:Name="ApprovalStateText" Text="(nenhuma integração)" TextWrapping="Wrap" FontWeight="SemiBold" />
             </StackPanel>
+        </Border>
 
-            <Separator Margin="0,10,0,10" />
+        <!-- Footer: the last result, in words, and the step navigation. -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="16,8">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="BackStepButton" Content="← Voltar" Click="BackStepButton_Click" />
+                    <Button x:Name="NextStepButton" Content="Próximo passo →" Click="NextStepButton_Click" Style="{StaticResource PrimaryButton}" Margin="0" />
+                </StackPanel>
+                <TextBlock x:Name="StatusText" Text="Pronto." TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+            </DockPanel>
+        </Border>
 
-            <TextBlock Text="3. Selecionar um elemento na tela" FontWeight="Bold" Margin="0,0,0,4" />
-            <StackPanel Orientation="Horizontal">
-                <Button x:Name="StartInspectionButton" Content="Iniciar seleção" Click="StartInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="StopInspectionButton" Content="Parar seleção" Click="StopInspectionButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ConfirmSelectionButton" Content="Confirmar seleção" Click="ConfirmSelectionButton_Click" Padding="8,2" />
-            </StackPanel>
-            <TextBlock x:Name="HoverStateText" Text="(seleção não iniciada)" Margin="0,6,0,0" TextWrapping="Wrap" />
-            <TextBlock x:Name="ConfirmedSelectionText" Text="(nenhuma seleção confirmada)" Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" />
+        <TabControl x:Name="WizardSteps" TabStripPlacement="Left" Background="Transparent" BorderThickness="0" Padding="0" Margin="8,12,0,0"
+                    SelectionChanged="WizardSteps_SelectionChanged">
 
-            <Separator Margin="0,10,0,10" />
+            <!-- 1. Choose the program -->
+            <TabItem x:Name="Step1Tab" Header="1  Escolher programa">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,16,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource StepTitle}" Text="Escolha o programa" />
+                        <TextBlock Style="{StaticResource Guidance}"
+                                   Text="Abra o programa que você quer integrar (por exemplo, o sistema da farmácia), escolha-o na lista e dê um nome à integração. Só aparecem programas com janela visível; o Agent não lê nada deles até você marcar os campos." />
 
-            <TextBlock Text="4. Dar um nome ao campo e adicioná-lo" FontWeight="Bold" Margin="0,0,0,4" />
-            <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="ID do campo:" VerticalAlignment="Center" />
-                <TextBox x:Name="FieldSemanticIdBox" Text="medicamento" Margin="2" />
-                <TextBlock Text="Significado:" VerticalAlignment="Center" />
-                <TextBox x:Name="FieldMeaningBox" Text="Nome do medicamento" Margin="2" />
-            </UniformGrid>
-            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                <CheckBox x:Name="FieldRequiredBox" Content="Obrigatório" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" />
-                <TextBlock Text="Tipo do campo:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <ComboBox x:Name="FieldKindBox" SelectedIndex="0" Width="260">
-                    <ComboBoxItem Content="Texto" />
-                    <ComboBoxItem Content="Arquivo / imagem (cópia do arquivo, até 10 MB)" />
-                    <ComboBoxItem Content="Texto via OCR (lido da imagem do campo)" />
-                </ComboBox>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="AddFieldButton" Content="Adicionar campo selecionado" Click="AddFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="UpdateFieldButton" Content="Atualizar significado/obrigatório" Click="UpdateFieldButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="RemoveFieldButton" Content="Remover campo" Click="RemoveFieldButton_Click" Padding="8,2" />
-            </StackPanel>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Programas abertos" />
+                                <DockPanel Margin="0,0,0,6">
+                                    <Button x:Name="RefreshWindowsButton" DockPanel.Dock="Right" Content="Atualizar lista" Click="RefreshWindowsButton_Click" Margin="8,0,0,0" />
+                                    <TextBox x:Name="OpenWindowsSearchBox" TextChanged="OpenWindowsSearchBox_TextChanged"
+                                             AutomationProperties.Name="Buscar programa" ToolTip="Buscar por nome, título ou processo" />
+                                </DockPanel>
+                                <ListBox x:Name="OpenWindowsList" Height="190" VirtualizingPanel.IsVirtualizing="False"
+                                         SelectionChanged="OpenWindowsList_SelectionChanged" MouseDoubleClick="OpenWindowsList_MouseDoubleClick">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="2,3">
+                                                <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="24" Height="24" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Info.AppName}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Info.WindowTitle}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Details}" FontSize="11" Foreground="{StaticResource MutedBrush}" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock x:Name="OpenWindowsEmptyText" Style="{StaticResource EmptyState}" Visibility="Collapsed" />
+                                <Button x:Name="UseSelectedWindowButton" Content="Usar o programa selecionado" Click="UseSelectedWindowButton_Click"
+                                        HorizontalAlignment="Left" Margin="0,8,0,0" IsEnabled="False" />
+                                <TextBlock x:Name="ChosenProgramText" Text="Nenhum programa escolhido." Margin="0,8,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
 
-            <Separator Margin="0,10,0,10" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Nova integração" />
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Nome da integração" />
+                                <TextBox x:Name="IntegrationNameBox" TextChanged="IntegrationNameBox_TextChanged" />
+                                <Expander x:Name="AdvancedProgramExpander" Header="Opções avançadas (digitar processo e janela)">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Identificador da integração (gerado do nome)" />
+                                        <TextBox x:Name="IntegrationIdBox" TextChanged="IntegrationIdBox_TextChanged" />
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Processo do programa (ex.: sistema.exe)" />
+                                        <TextBox x:Name="ProcessIdentityBox" />
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Título exato da janela" />
+                                        <TextBox x:Name="WindowRuleBox" />
+                                    </StackPanel>
+                                </Expander>
+                                <Button x:Name="CreateIntegrationButton" Content="Criar integração" Click="CreateIntegrationButton_Click"
+                                        Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
 
-            <TextBlock Text="4b. Adicionar gatilho (botão) selecionado" FontWeight="Bold" Margin="0,0,0,4" />
-            <UniformGrid Columns="2" Rows="2">
-                <TextBlock Text="ID do gatilho:" VerticalAlignment="Center" />
-                <TextBox x:Name="TriggerSemanticIdBox" Text="adicionar_item" Margin="2" />
-                <TextBlock Text="Evento observado:" VerticalAlignment="Center" />
-                <TextBox x:Name="TriggerObservedEventBox" Text="Invoke" Margin="2" />
-            </UniformGrid>
-            <TextBlock Text="Ações, executadas nesta ordem:" Margin="0,6,0,2" FontStyle="Italic" />
-            <UniformGrid Columns="2" Rows="4">
-                <TextBlock Text="Capturar campos (IDs separados por vírgula):" VerticalAlignment="Center" />
-                <TextBox x:Name="TriggerCaptureFieldsBox" Text="medicamento" Margin="2" />
-                <TextBlock Text="Gerar evento (ex.: item_added):" VerticalAlignment="Center" />
-                <TextBox x:Name="TriggerEmitEventBox" Text="item_added" Margin="2" />
-                <TextBlock Text="Depois ir para a etapa (opcional):" VerticalAlignment="Center" />
-                <TextBox x:Name="TriggerTransitionStageBox" Text="" Margin="2" />
-                <TextBlock Text="Por fim:" VerticalAlignment="Center" />
-                <ComboBox x:Name="TriggerTerminalBox" SelectedIndex="0" Margin="2">
-                    <ComboBoxItem Content="Nada" />
-                    <ComboBoxItem Content="Finalizar sessão (budget_finished)" />
-                    <ComboBoxItem Content="Cancelar sessão" />
-                </ComboBox>
-            </UniformGrid>
-            <CheckBox x:Name="TriggerClearStateBox" Content="Limpar os valores capturados depois de gerar o evento" Margin="0,4,0,0" />
-            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="AddTriggerButton" Content="Adicionar gatilho selecionado" Click="AddTriggerButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ReplaceTriggerActionsButton" Content="Substituir ações" Click="ReplaceTriggerActionsButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="RemoveTriggerButton" Content="Remover gatilho" Click="RemoveTriggerButton_Click" Padding="8,2" />
-            </StackPanel>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Ou abra uma integração salva" />
+                                <ListBox x:Name="SavedIntegrationsList" MaxHeight="120" SelectionChanged="SavedIntegrationsList_SelectionChanged" />
+                                <TextBlock x:Name="SavedIntegrationsEmptyText" Style="{StaticResource EmptyState}"
+                                           Text="Nenhuma integração salva ainda. Crie uma acima e salve no passo 4." />
+                                <Button x:Name="ReloadButton" Content="Abrir integração selecionada" Click="ReloadButton_Click" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-            <TextBlock x:Name="ConfigurationSummaryText" Text="(nenhuma integração)" Margin="0,8,0,0" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" />
-            <TextBlock x:Name="ApprovalStateText" Text="(nenhuma integração)" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
+            <!-- 2. Mark fields -->
+            <TabItem x:Name="Step2Tab" Header="2  Marcar campos">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,16,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource StepTitle}" Text="Marque os campos a capturar" />
+                        <TextBlock Style="{StaticResource Guidance}"
+                                   Text="Clique em 'Começar a marcar', passe o mouse sobre um campo no programa (ele fica contornado) e clique em 'Usar este elemento'. Depois dê um nome ao campo, como você o chama no dia a dia." />
 
-            <Separator Margin="0,10,0,10" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="StartInspectionButton" Content="Começar a marcar" Click="StartInspectionButton_Click" />
+                                    <Button x:Name="ConfirmSelectionButton" Content="Usar este elemento" Click="ConfirmSelectionButton_Click" Style="{StaticResource PrimaryButton}" />
+                                    <Button x:Name="StopInspectionButton" Content="Parar de marcar" Click="StopInspectionButton_Click" />
+                                </StackPanel>
+                                <TextBlock x:Name="HoverStateText" Text="(seleção não iniciada)" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
+                                <TextBlock x:Name="ConfirmedSelectionText" Text="(nenhuma seleção confirmada)" Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" />
+                            </StackPanel>
+                        </Border>
 
-            <TextBlock Text="5. Salvar / recarregar" FontWeight="Bold" Margin="0,0,0,4" />
-            <StackPanel Orientation="Horizontal">
-                <Button x:Name="SaveButton" Content="Salvar" Click="SaveButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ReloadButton" Content="Recarregar salva" Click="ReloadButton_Click" Padding="8,2" />
-            </StackPanel>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Dados do campo" />
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Nome do campo (ex.: Medicamento)" />
+                                <TextBox x:Name="FieldMeaningBox" TextChanged="FieldMeaningBox_TextChanged" />
+                                <WrapPanel Margin="0,8,0,0">
+                                    <CheckBox x:Name="FieldRequiredBox" Content="Obrigatório" IsChecked="True" Margin="0,0,16,0" />
+                                    <TextBlock Text="Tipo:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <ComboBox x:Name="FieldKindBox" SelectedIndex="0" MinWidth="260">
+                                        <ComboBoxItem Content="Texto" />
+                                        <ComboBoxItem Content="Arquivo / imagem (cópia do arquivo, até 10 MB)" />
+                                        <ComboBoxItem Content="Texto via OCR (lido da imagem do campo)" />
+                                    </ComboBox>
+                                </WrapPanel>
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Identificador técnico (gerado do nome)" FontSize="11" Foreground="{StaticResource MutedBrush}" />
+                                <TextBox x:Name="FieldSemanticIdBox" TextChanged="FieldSemanticIdBox_TextChanged" FontSize="11" />
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="AddFieldButton" Content="Adicionar campo" Click="AddFieldButton_Click" Style="{StaticResource PrimaryButton}" />
+                                    <Button x:Name="UpdateFieldButton" Content="Salvar alterações do campo" Click="UpdateFieldButton_Click" />
+                                    <Button x:Name="RemoveFieldButton" Content="Remover campo" Click="RemoveFieldButton_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
 
-            <Separator Margin="0,10,0,10" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Campos marcados" />
+                                <ListBox x:Name="FieldsList" MaxHeight="180" VirtualizingPanel.IsVirtualizing="False" SelectionChanged="FieldsList_SelectionChanged" />
+                                <TextBlock x:Name="FieldsEmptyText" Style="{StaticResource EmptyState}"
+                                           Text="Nenhum campo marcado ainda. Marque um campo no programa e clique em 'Adicionar campo'." />
+                                <TextBlock Text="Clique em um campo da lista para mudar o nome ou o obrigatório, ou para removê-lo." Style="{StaticResource Guidance}" Margin="0,6,0,0" FontSize="11" />
+                            </StackPanel>
+                        </Border>
 
-            <TextBlock Text="6. Localizar e ler um campo salvo" FontWeight="Bold" Margin="0,0,0,4" />
-            <UniformGrid Columns="2" Rows="1">
-                <TextBlock Text="ID do campo:" VerticalAlignment="Center" />
-                <TextBox x:Name="ResolveFieldIdBox" Text="medicamento" Margin="2" />
-            </UniformGrid>
-            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Button x:Name="ResolveButton" Content="Localizar" Click="ResolveButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="ReadValueButton" Content="Ler valor" Click="ReadValueButton_Click" Padding="8,2" />
-            </StackPanel>
+                        <Expander x:Name="StagesExpander" Header="Etapas (avançado)">
+                            <Border Style="{StaticResource Card}" Margin="0,6,0,12">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource Guidance}" Margin="0"
+                                               Text="Uma integração simples tem uma só etapa, criada automaticamente com o primeiro campo. Use etapas quando o programa muda de tela no meio do processo." />
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Identificador da etapa" />
+                                    <TextBox x:Name="StageIdBox" Text="orcamento" />
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Nome da etapa" />
+                                    <TextBox x:Name="StageNameBox" Text="Orçamento" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Button x:Name="AddStageButton" Content="Adicionar etapa" Click="AddStageButton_Click" />
+                                        <Button x:Name="RemoveStageButton" Content="Remover etapa" Click="RemoveStageButton_Click" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-            <Separator Margin="0,10,0,10" />
+            <!-- 3. Mark buttons (the selection controls repeat with the same AutomationIds as step 2) -->
+            <TabItem x:Name="Step3Tab" Header="3  Marcar botões">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,16,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource StepTitle}" Text="Marque os botões que disparam a captura" />
+                        <TextBlock Style="{StaticResource Guidance}"
+                                   Text="Marque um botão do programa (por exemplo 'Adicionar' ou 'Finalizar') do mesmo jeito que os campos e diga o que acontece quando ele é clicado: quais campos são lidos e qual evento é gerado." />
 
-            <TextBlock Text="7. Modo de teste (obrigatório antes de ativar)" FontWeight="Bold" Margin="0,0,0,4" />
-            <Button x:Name="PrepareTestButton" Content="Preparar teste com a aplicação aberta" Click="PrepareTestButton_Click"
-                    HorizontalAlignment="Left" Padding="8,2" />
-            <testing:TestModeView x:Name="TestModeHost" Margin="0,4,0,0" Visibility="Collapsed" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="TriggerStartInspectionButton" Content="Começar a marcar" Click="StartInspectionButton_Click" AutomationProperties.AutomationId="StartInspectionButton" />
+                                    <Button x:Name="TriggerConfirmSelectionButton" Content="Usar este elemento" Click="ConfirmSelectionButton_Click" Style="{StaticResource PrimaryButton}" AutomationProperties.AutomationId="ConfirmSelectionButton" />
+                                    <Button x:Name="TriggerStopInspectionButton" Content="Parar de marcar" Click="StopInspectionButton_Click" AutomationProperties.AutomationId="StopInspectionButton" />
+                                </StackPanel>
+                                <TextBlock x:Name="TriggerHoverStateText" Text="(seleção não iniciada)" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" AutomationProperties.AutomationId="HoverStateText" />
+                                <TextBlock x:Name="TriggerConfirmedSelectionText" Text="(nenhuma seleção confirmada)" Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" AutomationProperties.AutomationId="ConfirmedSelectionText" />
+                            </StackPanel>
+                        </Border>
 
-            <Separator Margin="0,10,0,10" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Quando este botão for clicado" />
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Nome do botão (ex.: Adicionar item)" />
+                                <TextBox x:Name="TriggerNameBox" TextChanged="TriggerNameBox_TextChanged" />
 
-            <TextBlock Text="8. Ativar e monitorar" FontWeight="Bold" Margin="0,0,0,4" />
-            <StackPanel Orientation="Horizontal">
-                <Button x:Name="ActivateButton" Content="Ativar" Click="ActivateButton_Click" Padding="8,2" Margin="0,0,6,0" />
-                <Button x:Name="StopMonitoringButton" Content="Parar" Click="StopMonitoringButton_Click" Padding="8,2" />
-            </StackPanel>
-            <CheckBox x:Name="StartWithWindowsCheckBox" Content="Iniciar com o Windows (abre na bandeja e retoma a integração ativa, se aprovada)" Margin="0,6,0,0" />
-            <TextBlock x:Name="MonitorStatusText" Text="Inativo." Margin="0,6,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
-            <TextBlock x:Name="HealthText" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
-            <TextBlock x:Name="CapacityAlertText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="DarkOrange" FontWeight="SemiBold" Visibility="Collapsed" />
-            <TextBlock Text="Diagnóstico" Margin="0,6,0,2" FontStyle="Italic" />
-            <ListBox x:Name="DiagnosticsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Message" />
-            <TextBlock Text="Eventos gravados (fila local criptografada)" Margin="0,6,0,2" FontStyle="Italic" />
-            <ListBox x:Name="EventsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Text" />
-            <Button x:Name="ClearLocalDataButton" Content="Limpar dados locais (eventos e registro técnico)..." Click="ClearLocalDataButton_Click"
-                    HorizontalAlignment="Left" Padding="8,2" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Ler estes campos:" />
+                                <ItemsControl x:Name="CaptureFieldsList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                                      AutomationProperties.AutomationId="{Binding AutomationId}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="CaptureFieldsEmptyText" Style="{StaticResource EmptyState}"
+                                           Text="Ainda não há campos. Marque-os no passo 2 para escolher quais este botão lê." />
 
-            <Separator Margin="0,10,0,10" />
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Gerar o evento (deixe vazio para não gerar):" />
+                                <TextBox x:Name="TriggerEmitEventBox" Text="item_added" />
+                                <CheckBox x:Name="TriggerClearStateBox" Content="Limpar os valores lidos depois de gerar o evento" />
+                                <WrapPanel Margin="0,4,0,0">
+                                    <TextBlock Text="Por fim:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <ComboBox x:Name="TriggerTerminalBox" SelectedIndex="0" MinWidth="260">
+                                        <ComboBoxItem Content="Nada" />
+                                        <ComboBoxItem Content="Finalizar sessão (budget_finished)" />
+                                        <ComboBoxItem Content="Cancelar sessão" />
+                                    </ComboBox>
+                                </WrapPanel>
 
-            <TextBlock Text="Situação" FontWeight="Bold" Margin="0,0,0,4" />
-            <TextBlock x:Name="StatusText" Text="Pronto." TextWrapping="Wrap" />
-        </StackPanel>
-    </ScrollViewer>
+                                <Expander Header="Opções avançadas">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Identificador técnico (gerado do nome)" />
+                                        <TextBox x:Name="TriggerSemanticIdBox" TextChanged="TriggerSemanticIdBox_TextChanged" />
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Evento observado no botão" />
+                                        <TextBox x:Name="TriggerObservedEventBox" Text="Invoke" />
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Depois ir para a etapa (opcional)" />
+                                        <TextBox x:Name="TriggerTransitionStageBox" />
+                                    </StackPanel>
+                                </Expander>
+
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="AddTriggerButton" Content="Adicionar botão" Click="AddTriggerButton_Click" Style="{StaticResource PrimaryButton}" />
+                                    <Button x:Name="ReplaceTriggerActionsButton" Content="Salvar alterações do botão" Click="ReplaceTriggerActionsButton_Click" />
+                                    <Button x:Name="RemoveTriggerButton" Content="Remover botão" Click="RemoveTriggerButton_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Botões marcados" />
+                                <ListBox x:Name="TriggersList" MaxHeight="160" VirtualizingPanel.IsVirtualizing="False" SelectionChanged="TriggersList_SelectionChanged" />
+                                <TextBlock x:Name="TriggersEmptyText" Style="{StaticResource EmptyState}"
+                                           Text="Nenhum botão marcado ainda. Sem um botão, nada é capturado." />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 4. Test -->
+            <TabItem x:Name="Step4Tab" Header="4  Testar">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,16,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource StepTitle}" Text="Salve e teste com o programa aberto" />
+                        <TextBlock Style="{StaticResource Guidance}"
+                                   Text="Salve a integração, prepare o teste e, no programa, clique em cada botão marcado. O teste mostra os valores lidos e a confiança; só depois de aprovado a integração pode ser ativada." />
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <Button x:Name="SaveButton" Content="Salvar integração" Click="SaveButton_Click" Style="{StaticResource PrimaryButton}" />
+                                    <Button x:Name="PrepareTestButton" Content="Preparar teste" Click="PrepareTestButton_Click" />
+                                </WrapPanel>
+                                <testing:TestModeView x:Name="TestModeHost" Margin="0,8,0,0" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Conferir um campo agora" />
+                                <WrapPanel>
+                                    <ComboBox x:Name="ResolveFieldBox" MinWidth="220" Margin="0,0,8,0" />
+                                    <Button x:Name="ResolveButton" Content="Localizar" Click="ResolveButton_Click" />
+                                    <Button x:Name="ReadValueButton" Content="Ler valor" Click="ReadValueButton_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Expander Header="Resumo técnico" IsExpanded="True">
+                            <TextBlock x:Name="ConfigurationSummaryText" Text="(nenhuma integração)" Margin="0,6,0,12" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" />
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 5. Activate -->
+            <TabItem x:Name="Step5Tab" Header="5  Ativar">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,16,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource StepTitle}" Text="Ative a integração" />
+                        <TextBlock Style="{StaticResource Guidance}"
+                                   Text="Ativada, a integração lê os campos marcados sempre que um botão marcado é clicado e guarda os eventos numa fila local criptografada. Fechar a janela mantém o Agent na bandeja." />
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <Button x:Name="ActivateButton" Content="Ativar" Click="ActivateButton_Click" Style="{StaticResource PrimaryButton}" />
+                                    <Button x:Name="StopMonitoringButton" Content="Parar" Click="StopMonitoringButton_Click" />
+                                </WrapPanel>
+                                <CheckBox x:Name="StartWithWindowsCheckBox" Margin="0,8,0,0">
+                                    <TextBlock Text="Iniciar com o Windows (abre na bandeja e retoma a integração ativa, se aprovada)" TextWrapping="Wrap" />
+                                </CheckBox>
+                                <TextBlock x:Name="MonitorStatusText" Text="Inativo." Margin="0,8,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
+                                <TextBlock x:Name="HealthText" Margin="0,4,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
+                                <TextBlock x:Name="CapacityAlertText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="DarkOrange" FontWeight="SemiBold" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Eventos gravados (fila local criptografada)" />
+                                <ListBox x:Name="EventsList" Height="130" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Text" />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Diagnóstico" Margin="0,10,0,6" />
+                                <ListBox x:Name="DiagnosticsList" Height="120" VirtualizingPanel.IsVirtualizing="False" DisplayMemberPath="Message" />
+                                <Button x:Name="ClearLocalDataButton" Content="Limpar dados locais (eventos e registro técnico)..." Click="ClearLocalDataButton_Click"
+                                        HorizontalAlignment="Left" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
 </Window>

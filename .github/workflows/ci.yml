@@ -134,7 +134,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Small JPEG previews in the log, for reviewers who cannot download artifacts.
           Add-Type -AssemblyName System.Drawing
-          Get-ChildItem "$env:PRESCRIVA_SCREENSHOT_DIR/store-*.png" -Exclude *-crop.png | ForEach-Object {
+          Get-ChildItem "$env:PRESCRIVA_SCREENSHOT_DIR/*" -Include store-*.png, ui-*.png -Exclude *-crop.png | ForEach-Object {
             $image = [System.Drawing.Image]::FromFile($_.FullName)
             $preview = New-Object System.Drawing.Bitmap $image, 800, ([int](800 * $image.Height / $image.Width))
             $stream = New-Object System.IO.MemoryStream
@@ -155,6 +155,7 @@ jobs:
           name: store-screenshots
           path: |
             out/store-screenshots/store-*.png
+            out/store-screenshots/ui-*.png
             !out/store-screenshots/*-crop.png
           if-no-files-found: warn
 

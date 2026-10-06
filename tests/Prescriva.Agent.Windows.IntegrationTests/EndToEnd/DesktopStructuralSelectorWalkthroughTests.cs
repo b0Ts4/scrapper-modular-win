@@ -78,7 +78,7 @@ public sealed class DesktopStructuralSelectorWalkthroughTests : IDisposable
 
             await HoverAndConfirmAsync(agent, target, "AddButton");
             SetText(agent, "TriggerSemanticIdBox", "add_item");
-            SetText(agent, "TriggerCaptureFieldsBox", "medication, notes");
+            SetCaptureFields(agent, "medication", "notes");
             SetText(agent, "TriggerEmitEventBox", "item_added");
             SelectComboItem(agent, "TriggerTerminalBox", "Nada");
             Press(agent, "AddTriggerButton");
