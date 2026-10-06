@@ -176,20 +176,20 @@ public partial class MainWindow : Window
                 await _editorViewModel.ReloadAsync(decision.ConfigurationId!);
                 await _monitorViewModel.StartAsync(decision.Configuration!, decision.Approval);
                 SetStatus(decision.Describe());
-                _trayIcon.Notify("Prescriva Agent", decision.Describe());
+                _trayIcon.Notify(TrayIcon.ProductName, decision.Describe());
             }
             catch (Exception ex)
             {
                 // Never fail silently at sign-in: the tray stays, with the reason.
                 var message = $"Iniciado com o Windows: não foi possível retomar '{decision.ConfigurationId}' ({ex.GetType().Name}); nada sendo monitorado.";
                 SetStatus(message);
-                _trayIcon.Notify("Prescriva Agent", message, warning: true);
+                _trayIcon.Notify(TrayIcon.ProductName, message, warning: true);
             }
         }
         else
         {
             SetStatus(decision.Describe());
-            _trayIcon.Notify("Prescriva Agent", decision.Describe(), warning: decision.Kind != StartupDecisionKind.NothingActive);
+            _trayIcon.Notify(TrayIcon.ProductName, decision.Describe(), warning: decision.Kind != StartupDecisionKind.NothingActive);
         }
 
         RefreshTrayStatus();
@@ -220,7 +220,7 @@ public partial class MainWindow : Window
         if (!_hiddenNoticeShown)
         {
             _hiddenNoticeShown = true;
-            _trayIcon.Notify("Prescriva Agent", "Continua monitorando na bandeja. Use o ícone para abrir, parar ou sair.");
+            _trayIcon.Notify(TrayIcon.ProductName, "Continua monitorando na bandeja. Use o ícone para abrir, parar ou sair.");
         }
     }
 
@@ -280,7 +280,7 @@ public partial class MainWindow : Window
         var message = state switch
         {
             StartupRegistrationState.Enabled => "Iniciar com o Windows: ativado. O Agent abrirá na bandeja ao entrar no Windows e retomará a integração ativa, se aprovada.",
-            StartupRegistrationState.DisabledByUser => "Iniciar com o Windows está desativado no Gerenciador de Tarefas (Aplicativos de inicialização). Ative o Prescriva Agent lá para que ele inicie com o Windows.",
+            StartupRegistrationState.DisabledByUser => "Iniciar com o Windows está desativado no Gerenciador de Tarefas (Aplicativos de inicialização). Ative o Receita Fácil Agent lá para que ele inicie com o Windows.",
             StartupRegistrationState.DisabledByPolicy => "Iniciar com o Windows foi bloqueado por uma política do administrador.",
             StartupRegistrationState.EnabledByPolicy => "Iniciar com o Windows foi ativado por uma política do administrador.",
             _ => "Iniciar com o Windows: desativado.",
@@ -294,8 +294,8 @@ public partial class MainWindow : Window
 
     private void RefreshTrayStatus() =>
         _trayIcon.SetStatus(_monitorViewModel.IsMonitoring
-            ? $"Prescriva Agent - monitorando '{_editorViewModel.Configuration?.Name}'"
-            : "Prescriva Agent - parado");
+            ? $"{TrayIcon.ProductName} - monitorando '{_editorViewModel.Configuration?.Name}'"
+            : $"{TrayIcon.ProductName} - parado");
 
     /// <summary>
     /// Where configurations, the event queue and technical logs are kept:

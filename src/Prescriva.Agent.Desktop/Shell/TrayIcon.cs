@@ -10,24 +10,40 @@ namespace Prescriva.Agent.Desktop.Shell;
 /// </summary>
 internal sealed class TrayIcon : IDisposable
 {
+    /// <summary>The product name people see (Microsoft Store name).</summary>
+    public const string ProductName = "Receita Fácil Agent";
+
     private readonly NotifyIcon _icon;
 
     public TrayIcon(Action show, Action stopMonitoring, Action exit)
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Mostrar Prescriva Agent", null, (_, _) => show());
+        menu.Items.Add("Mostrar " + ProductName, null, (_, _) => show());
         menu.Items.Add("Parar monitoramento", null, (_, _) => stopMonitoring());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Sair", null, (_, _) => exit());
 
         _icon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
-            Text = "Prescriva Agent",
+            Icon = BrandIcon(),
+            Text = ProductName,
             ContextMenuStrip = menu,
             Visible = true,
         };
         _icon.DoubleClick += (_, _) => show();
+    }
+
+    /// <summary>The executable's own (brand) icon; the generic application icon if it cannot be read.</summary>
+    private static Icon BrandIcon()
+    {
+        try
+        {
+            return (Environment.ProcessPath is { } path ? Icon.ExtractAssociatedIcon(path) : null) ?? SystemIcons.Application;
+        }
+        catch (Exception exception) when (exception is ArgumentException or System.IO.IOException)
+        {
+            return SystemIcons.Application;
+        }
     }
 
     /// <summary>The hover text; Windows limits it to 127 characters.</summary>

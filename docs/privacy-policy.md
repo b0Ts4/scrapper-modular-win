@@ -1,8 +1,8 @@
-# Política de Privacidade — Prescriva Agent
+# Política de Privacidade — Receita Fácil Agent
 
 **Última atualização:** 6 de outubro de 2026
 
-O Prescriva Agent ("Agent") é um aplicativo para Windows que lê, de forma visível e somente nos campos que a pessoa usuária configurou, dados de orçamentos exibidos em outro programa do mesmo computador (por exemplo, o sistema de uma farmácia), e os registra localmente como eventos.
+O Receita Fácil Agent ("Agent") é um aplicativo para Windows que lê, de forma visível e somente nos campos que a pessoa usuária configurou, dados de orçamentos exibidos em outro programa do mesmo computador (por exemplo, o sistema de uma farmácia), e os registra localmente como eventos.
 
 ## 1. Quais dados o Agent coleta
 
@@ -43,11 +43,11 @@ Dúvidas sobre esta política: **barbosarthur98@gmail.com**.
 
 ---
 
-# Privacy Policy — Prescriva Agent (English)
+# Privacy Policy — Receita Fácil Agent (English)
 
 **Last updated:** October 6, 2026
 
-Prescriva Agent is a Windows app that reads, visibly and only from the fields the user configured, budget data shown in another program on the same computer, and records it locally as events.
+Receita Fácil Agent is a Windows app that reads, visibly and only from the fields the user configured, budget data shown in another program on the same computer, and records it locally as events.
 
 - **Collected:** only the values of configured fields, read only when a configured button is pressed; optionally a copy of a file named in a field (up to 10 MB), the image shown in that control (never when another window covers it), or text recognized from that control's image by the on-device Windows OCR (the image is discarded). A technical log keeps IDs, codes and timings — never captured values. No keylogging, clipboard reading, hidden monitoring or full-screen capture.
 - **Storage:** on the computer only, encrypted at rest with Windows DPAPI for the signed-in user. **This version sends no data anywhere.** Configurations never contain captured values.
