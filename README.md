@@ -15,7 +15,7 @@ dotnet build Prescriva.Agent.slnx --configuration Release
 dotnet test Prescriva.Agent.slnx --configuration Release --no-build
 ```
 
-Para usar o Agent: abra `Prescriva.Agent.TestTarget.exe` e `Prescriva.Agent.Desktop.exe` (pastas `bin\Release\net10.0-windows` e `bin\Release\net10.0-windows10.0.19041.0`, respectivamente) e siga o [roteiro do milestone](docs/testing/milestone-1-manual.md).
+Para usar o Agent, abra `Prescriva.Agent.Desktop.exe` (pasta `bin\Release\net10.0-windows10.0.19041.0`) e siga os 5 passos da janela: 1 Escolher programa (na lista de programas abertos), 2 Marcar campos, 3 Marcar botões, 4 Testar e 5 Ativar. Para experimentar sem um sistema real, use o `Prescriva.Agent.TestTarget.exe` (pasta `bin\Release\net10.0-windows`) ou a Calculadora do Windows. O [roteiro do milestone](docs/testing/milestone-1-manual.md) descreve cada verificação e as limitações conhecidas (apps Electron, Java e canvas).
 
 Consulte [setup](docs/setup.md) para os pré-requisitos e [testing](docs/testing.md) para a estratégia de testes. As decisões arquiteturais estão em `docs/decisions/`, e o estado atual em [current-state](docs/handoffs/current-state.md).
 
