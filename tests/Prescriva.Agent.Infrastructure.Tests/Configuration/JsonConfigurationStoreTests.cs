@@ -43,6 +43,19 @@ public sealed class JsonConfigurationStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ListIds_returns_the_saved_configurations_sorted_and_nothing_else()
+    {
+        var store = new JsonConfigurationStore(_directory);
+        Assert.Empty(store.ListIds()); // the directory does not exist yet
+
+        await store.SaveAsync(ValidConfiguration() with { Id = "zeta" }, CancellationToken.None);
+        await store.SaveAsync(ValidConfiguration() with { Id = "Alfa" }, CancellationToken.None);
+        await File.WriteAllTextAsync(Path.Combine(_directory, "notes.txt"), "not a configuration");
+
+        Assert.Equal(["Alfa", "zeta"], store.ListIds());
+    }
+
+    [Fact]
     public async Task Load_rejects_unknown_schema_version_with_stable_code()
     {
         var store = new JsonConfigurationStore(_directory);

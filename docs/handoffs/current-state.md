@@ -1,5 +1,7 @@
 # Current state
 
+## Status — 2026-10-07 (plan 10 done; see below)
+
 ## Status — 2026-10-04
 
 **Milestone 1 is functionally complete and verified by automated tests on Windows; a person-driven visual walkthrough on a Windows 10/11 desktop is the only open acceptance item.**
@@ -110,10 +112,33 @@ Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: di
 - Evidence: run 37395451712 on 10b4a7a — Domain 74, Infrastructure 68, Application 136, Windows 26, integration 55 (359) + packaged 1 + x86 30, all passing.
 - **Waiting on the publisher**: Partner Center account, reserved name and its three identity values, a public privacy-policy URL with a contact e-mail; then build with that identity and submit. Real sign-in start from the Store package: manual row 27.
 
+### Plan 10 — Guided configurator and real Windows apps (2026-10-06/07)
+
+Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 tasks implemented.
+
+- **Open-program list**: `OpenWindowInfo` / `IOpenWindowSource` / `OpenWindowFilter` (Application), `Win32OpenWindowSource` (Windows). Lists visible, titled, unowned, non-cloaked top-level windows, never the Agent's own. Kept in memory only, never logged or saved; only app name, title, process, PID and icon.
+- **Probe of the CI runner** (`scripts/probe-real-apps.ps1`, every build): `windows-latest` (Server 2025) has the **classic** calculator `win32calc` (numeric AutomationIds) and the classic Notepad (text area `15`). The Store Calculator (`CalculatorApp` in `ApplicationFrameHost`) is **absent**, so the UWP hypothesis could not be reproduced on CI.
+- **Bug found by the real-app tests (RED run 37544709491, GREEN afterwards)**: a plain label with no pattern (the Calculator display, a TestTarget label) was `UnsupportedPattern`. Capture now reads a `ControlType.Text` element's Name; a button's Name stays unsupported.
+- **ApplicationFrameHost**: the window locator, instance discovery and test preparation identify a framed Store app by its content process. An empty frame matches nothing. Preparing a test with several identical windows open is refused rather than picking one. Covered by `RealCalculatorTests.The_Store_calculator_...`, which **skips on CI** (no Store Calculator) — **needs human verification on Windows 10/11** (manual row 30).
+- **Guided configurator** (`MainWindow`): five steps (1 Escolher programa, 2 Marcar campos, 3 Marcar botões, 4 Testar, 5 Ativar).
+  - Program list with search, refresh and icons; manual entry under *Opções avançadas*; list of saved integrations (`JsonConfigurationStore.ListIds`).
+  - Field and button lists with edit/remove; capture-field checkboxes; IDs generated from friendly names (`SemanticIdGenerator`); the only stage is created with the first field.
+  - Explained empty states and actionable errors; light theme. All earlier behaviour is kept.
+  - The E2E driver reaches controls on other steps by opening them; assertions are unchanged. The main walkthrough now chooses TestTarget from the list.
+- **Bug found by screenshot review**: the selected step's white header text was inherited by the step content, so test-mode results were drawn white on white. Fixed in 784452e.
+- **Real apps**:
+  - `RealCalculatorTests` (listed by content process, display read after 3 9 2, `=` detected, instance discovered, Store variant skipped with reason);
+  - `RealNotepadTests`;
+  - `DesktopCalculatorWalkthroughTests` — the whole guided flow against the real Calculator, passing on CI.
+- Screenshots of the five steps (CI run 37549925964): `docs/screenshots/guided-ui/`.
+- Evidence: run 37549925964 on 5661329 (same counts as run 37548039030 on f016abb) — Domain 74, Infrastructure 69, Application 150, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
-- Edits are by typed ID (no list selection yet); a field's selector can only be replaced by removing and re-adding it.
+- Fields and buttons are chosen from lists now; a field's selector can still only be replaced by removing and re-adding it.
+- Store (UWP) apps framed by `ApplicationFrameHost` (Windows 10/11 Calculator): implemented but only unit/skip-covered on CI — manual row 30. Windows 11's new Notepad, Electron, Java and canvas apps: see the limitations in the manual walkthrough.
+- Display scaling 125–150% for the new step-by-step window: manual row 32.
 - Older limitations below remain unless marked resolved.
 
 ### Important files
@@ -124,7 +149,8 @@ Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: di
 
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
 2. Publisher: create the Partner Center account and reserve the name; send the three identity values (see `docs/release/microsoft-store.md`); then build with them and submit.
-3. Next plans (`docs/roadmap.md`): event transport to the backend (needs the backend's API), configurator list-based editing.
+3. A person verifies rows 29–32 on Windows 10/11 (Store Calculator, new Notepad, scaling).
+4. Next plans (`docs/roadmap.md`): event transport to the backend (needs the backend's API).
 
 ---
 

@@ -70,7 +70,7 @@ public sealed class DesktopOcrFieldWalkthroughTests : IDisposable
 
         await HoverAndConfirmAsync(agent, target, "AddButton");
         SetText(agent, "TriggerSemanticIdBox", "add_item");
-        SetText(agent, "TriggerCaptureFieldsBox", "scanned_prescription");
+        SetCaptureFields(agent, "scanned_prescription");
         SetText(agent, "TriggerEmitEventBox", "item_added");
         SelectComboItem(agent, "TriggerTerminalBox", "Nada");
         Press(agent, "AddTriggerButton");

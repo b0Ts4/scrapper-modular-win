@@ -76,7 +76,7 @@ public sealed class DesktopFileFieldWalkthroughTests : IDisposable
 
         await HoverAndConfirmAsync(agent, target, "AddButton");
         SetText(agent, "TriggerSemanticIdBox", "add_item");
-        SetText(agent, "TriggerCaptureFieldsBox", "medication, prescription_file, prescription_image");
+        SetCaptureFields(agent, "medication", "prescription_file", "prescription_image");
         SetText(agent, "TriggerEmitEventBox", "item_added");
         SelectComboItem(agent, "TriggerTerminalBox", "Nada");
         Press(agent, "AddTriggerButton");

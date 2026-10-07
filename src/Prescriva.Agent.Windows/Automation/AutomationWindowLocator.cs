@@ -44,7 +44,10 @@ internal static class AutomationWindowLocator
 
     /// <summary>
     /// Finds the single top-level window matching <paramref name="processIdentity"/> (by
-    /// process name) and <paramref name="windowRule"/> (by window title).
+    /// process name) and <paramref name="windowRule"/> (by window title). For a Store app framed
+    /// by <c>ApplicationFrameHost</c> the process (name and ID) is the one owning the frame's
+    /// content - the process the open-window list shows and the inspector records - while the
+    /// window returned is the frame, whose descendants include that content.
     /// </summary>
     /// <param name="processId">
     /// When supplied, additionally requires the window's owning process ID to match
@@ -65,7 +68,20 @@ internal static class AutomationWindowLocator
             try
             {
                 windowProcessId = window.Current.ProcessId;
-                processName = Process.GetProcessById(windowProcessId).ProcessName;
+                processName = ProcessNameOf(windowProcessId);
+                if (string.Equals(processName, Win32OpenWindowSource.FrameHostProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // A Store app: the frame belongs to ApplicationFrameHost, the app is the
+                    // process that owns the content (e.g. CalculatorApp). An empty frame matches nothing.
+                    var contentProcessId = Win32OpenWindowSource.ContentProcessOf(new IntPtr(window.Current.NativeWindowHandle), windowProcessId);
+                    if (contentProcessId is null)
+                    {
+                        continue;
+                    }
+
+                    windowProcessId = contentProcessId.Value;
+                    processName = ProcessNameOf(windowProcessId);
+                }
             }
             catch (ArgumentException)
             {
@@ -94,5 +110,11 @@ internal static class AutomationWindowLocator
         }
 
         return null;
+    }
+
+    private static string ProcessNameOf(int processId)
+    {
+        using var process = Process.GetProcessById(processId);
+        return process.ProcessName;
     }
 }

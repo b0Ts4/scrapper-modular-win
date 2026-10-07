@@ -54,9 +54,18 @@ public sealed class StoreScreenshotTests : IDisposable
         Move(agent, 720, 30);
         ((TransformPattern)agent.GetCurrentPattern(TransformPattern.Pattern)).Resize(980, screenHeight - 110);
 
-        // 1. Selecting fields on the pharmacy system with the mouse.
+        // The guided configurator's steps, once configured.
         await ConfigureAndSaveMedicineIntegrationAsync(agent, target);
+        foreach (var (step, name) in new[] { ("Step1Tab", "ui-1-escolher-programa"), ("Step2Tab", "ui-2-marcar-campos"), ("Step3Tab", "ui-3-marcar-botoes") })
+        {
+            GoToStep(agent, step);
+            await Task.Delay(500);
+            SaveScreenshot(name);
+        }
+
+        // 1. Selecting fields on the pharmacy system with the mouse.
         SetMedicine(target, "Dipirona", "500 mg", "2");
+        GoToStep(agent, "Step2Tab");
         Press(agent, "StartInspectionButton");
         await HoverAndConfirmAsync(agent, target, "MedicationTextBox");
         await Task.Delay(500);
@@ -91,13 +100,19 @@ public sealed class StoreScreenshotTests : IDisposable
         desktop.Close();
     }
 
-    /// <summary>Scrolls the Agent's main view until the element is well inside the window.</summary>
+    /// <summary>Scrolls the step showing the element until it is well inside the window.</summary>
     private static void ScrollUntilVisible(AutomationElement agent, string automationId)
     {
-        var scroller = agent.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.IsScrollPatternAvailableProperty, true));
+        // The nearest ancestor page that can scroll vertically (not a list, not a page that fits).
+        AutomationElement? scroller = TreeWalker.ControlViewWalker.GetParent(Find(agent, automationId));
+        while (scroller is not null && !CanScrollVertically(scroller))
+        {
+            scroller = TreeWalker.ControlViewWalker.GetParent(scroller);
+        }
+
         if (scroller is null)
         {
-            return;
+            return; // the whole step already fits
         }
 
         var scroll = (ScrollPattern)scroller.GetCurrentPattern(ScrollPattern.Pattern);
@@ -112,6 +127,11 @@ public sealed class StoreScreenshotTests : IDisposable
             }
         }
     }
+
+    private static bool CanScrollVertically(AutomationElement element) =>
+        element.Current.ControlType == ControlType.Pane &&
+        element.TryGetCurrentPattern(ScrollPattern.Pattern, out var pattern) &&
+        ((ScrollPattern)pattern).Current.VerticallyScrollable;
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);

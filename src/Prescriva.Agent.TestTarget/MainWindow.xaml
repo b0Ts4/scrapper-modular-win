@@ -178,6 +178,15 @@
                     </Paragraph>
                 </FlowDocument>
             </RichTextBox>
+            <!--
+                A plain label (TextBlock, no UI Automation pattern) whose text changes: the
+                read-only "display" case of real programs (the Calculator result, an ERP total).
+            -->
+            <TextBlock x:Name="ItemCountText"
+                       Text="Itens: 0"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center"
+                       AutomationProperties.AutomationId="ItemCountText" />
         </StackPanel>
     </Grid>
 </Window>
