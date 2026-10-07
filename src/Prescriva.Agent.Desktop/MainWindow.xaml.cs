@@ -1070,6 +1070,10 @@ public partial class MainWindow : Window
         SetGenerated(TriggerSemanticIdBox, string.Empty);
         _triggerIdEdited = false;
         TriggerNameBox.Text = string.Empty;
+        TriggerEmitEventBox.Text = "item_added";
+        TriggerTransitionStageBox.Text = string.Empty;
+        TriggerClearStateBox.IsChecked = false;
+        TriggerTerminalBox.SelectedIndex = 0;
         foreach (var choice in _captureChoices)
         {
             choice.IsChecked = false;

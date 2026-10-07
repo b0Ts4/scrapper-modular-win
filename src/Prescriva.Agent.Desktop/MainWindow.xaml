@@ -105,12 +105,14 @@
 
         <!-- Wizard steps on the left: plain rows, the current one filled with the accent. -->
         <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="Chrome" Background="Transparent" CornerRadius="6" Padding="12,10" Margin="0,0,0,4" MinWidth="150">
-                            <ContentPresenter ContentSource="Header" TextElement.FontSize="14" />
+                            <!-- Colour and weight go on the header only: set on the TabItem they would
+                                 inherit into the step's content (white text on a white page). -->
+                            <ContentPresenter x:Name="Header" ContentSource="Header" TextElement.FontSize="14"
+                                              TextElement.Foreground="{StaticResource InkBrush}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -118,8 +120,8 @@
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentBrush}" />
-                                <Setter Property="Foreground" Value="White" />
-                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter TargetName="Header" Property="TextElement.Foreground" Value="White" />
+                                <Setter TargetName="Header" Property="TextElement.FontWeight" Value="SemiBold" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
