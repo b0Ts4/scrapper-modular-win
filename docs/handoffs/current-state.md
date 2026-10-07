@@ -130,7 +130,8 @@ Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 task
   - `RealCalculatorTests` (listed by content process, display read after 3 9 2, `=` detected, instance discovered, Store variant skipped with reason);
   - `RealNotepadTests`;
   - `DesktopCalculatorWalkthroughTests` — the whole guided flow against the real Calculator, passing on CI.
-- Evidence: run 37548039030 on f016abb — Domain 74, Infrastructure 69, Application 150, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
+- Screenshots of the five steps (CI run 37549925964): `docs/screenshots/guided-ui/`.
+- Evidence: run 37549925964 on 5661329 (same counts as run 37548039030 on f016abb) — Domain 74, Infrastructure 69, Application 150, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
 
 ### Not verified / known issues
 
