@@ -221,6 +221,36 @@ public sealed class RuntimeMonitorViewModelTests
         Assert.DoesNotContain(reference, shown, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ExportCsvAsync_writes_the_events_as_a_UTF8_CSV_with_BOM_naming_files_by_file_name()
+    {
+        var reference = AttachmentReference.For(new string('B', 64));
+        var attachments = new SingleAttachmentStore(new AttachmentInfo(reference, "receita.pdf", "application/pdf", 4096, AttachmentSource.File));
+        var outbox = new InMemoryOutbox();
+        await outbox.AppendAsync(new DomainEvent(Guid.NewGuid(), "monitor-config", 1, Guid.NewGuid(), 1, DateTimeOffset.UtcNow, "item_added",
+            new DomainEventPayload(
+                System.Collections.Immutable.ImmutableDictionary<string, string>.Empty.Add("medication", "Dipirona").Add("prescription", reference),
+                System.Collections.Immutable.ImmutableArray<System.Collections.Immutable.ImmutableDictionary<string, string>>.Empty)), CancellationToken.None);
+        var runtime = new AgentRuntime(new FakeInstanceSource(), (_, id) => new FakeTriggers(Task.CompletedTask).ForSession(id), _ => new FoundResolver(), _ => new FakeCapture(), outbox, new NullLog());
+        var viewModel = new RuntimeMonitorViewModel(runtime, outbox, attachments: attachments);
+        var path = Path.Combine(Path.GetTempPath(), $"prescriva-export-{Guid.NewGuid():N}.csv");
+        try
+        {
+            var exported = await viewModel.ExportCsvAsync(path);
+
+            Assert.Equal(1, exported);
+            var bytes = await File.ReadAllBytesAsync(path);
+            Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, bytes[..3]);
+            var text = System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
+            Assert.StartsWith("sequencia;data_hora;evento;integracao;sessao;itens;medication;prescription\r\n", text, StringComparison.Ordinal);
+            Assert.EndsWith(";item_added;monitor-config;" + text.Split("\r\n")[1].Split(';')[4] + ";0;Dipirona;receita.pdf\r\n", text, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private sealed class SingleAttachmentStore(AttachmentInfo info) : IAttachmentStore
     {
         public Task<AttachmentInfo> SaveAsync(CapturedAttachment attachment, CancellationToken cancellationToken) => throw new NotSupportedException();

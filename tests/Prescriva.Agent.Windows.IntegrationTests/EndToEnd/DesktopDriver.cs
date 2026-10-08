@@ -100,6 +100,33 @@ internal static class DesktopDriver
         await WaitForTextAsync(agent, "StatusText", "Programa escolhido");
     }
 
+    /// <summary>
+    /// Step 5: <c>Exportar eventos (CSV)...</c> through the real Windows save dialog (file name box
+    /// "1001", Save button "1"), then waits for the Agent to report the export.
+    /// </summary>
+    internal static async Task ExportCsvAsync(AutomationElement agent, int processId, string path)
+    {
+        Press(agent, "ExportCsvButton");
+        AutomationElement? dialog = null;
+        await WaitUntilAsync(
+            () => (dialog = AutomationElement.RootElement.FindFirst(TreeScope.Children, new AndCondition(
+                new PropertyCondition(AutomationElement.ProcessIdProperty, processId),
+                new PropertyCondition(AutomationElement.ClassNameProperty, "#32770")))) is not null,
+            () => "the save dialog did not open");
+        AutomationElement? fileName = null;
+        await WaitUntilAsync(
+            () => (fileName = dialog!.FindFirst(TreeScope.Descendants, new AndCondition(
+                new PropertyCondition(AutomationElement.AutomationIdProperty, "1001"),
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit)))) is not null,
+            () => "the save dialog has no file name box");
+        ((ValuePattern)fileName!.GetCurrentPattern(ValuePattern.Pattern)).SetValue(path);
+        var save = dialog!.FindFirst(TreeScope.Descendants, new AndCondition(
+            new PropertyCondition(AutomationElement.AutomationIdProperty, "1"),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button)));
+        ((InvokePattern)save.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+        await WaitForTextAsync(agent, "StatusText", "exportado(s) para");
+    }
+
     /// <summary>Opens a step of the Agent's guided configurator (Step1Tab ... Step5Tab).</summary>
     internal static void GoToStep(AutomationElement agent, string stepAutomationId) =>
         ((SelectionItemPattern)Find(agent, stepAutomationId).GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
