@@ -126,6 +126,7 @@ Plan: `docs/superpowers/plans/2026-10-08-csv-export.md`.
 - Step 5: *Exportar eventos (CSV)...*, using a save dialog. The status warns that the file is not encrypted.
 - Each step was test-first (RED observed: exporter and outbox locally; view model by compile).
 - `DesktopWalkthroughTests` exports through the real save dialog and checks the rows.
+- Evidence: run 37800907393 on 51d2f03 — Domain 74, Infrastructure 70, Application 164, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
 
 ### Plan 10 — Guided configurator and real Windows apps (2026-10-06/07)
 
