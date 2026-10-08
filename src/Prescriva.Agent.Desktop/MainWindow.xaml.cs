@@ -714,6 +714,42 @@ public partial class MainWindow : Window
         await _monitoringPreference.SetActiveConfigurationIdAsync(null, CancellationToken.None);
     }
 
+    /// <summary>
+    /// Saves the captured events where the operator chooses, as CSV for Excel. An explicit,
+    /// visible action; the exported file is not encrypted, which the status says.
+    /// </summary>
+    private async void ExportCsvButton_Click(object sender, RoutedEventArgs e)
+    {
+        var name = _editorViewModel.Configuration?.Id ?? "eventos";
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Exportar eventos para CSV",
+            Filter = "Planilha CSV (*.csv)|*.csv",
+            DefaultExt = ".csv",
+            AddExtension = true,
+            FileName = $"eventos-{name}-{DateTime.Now:yyyy-MM-dd}.csv",
+            OverwritePrompt = true,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var count = await _monitorViewModel.ExportCsvAsync(dialog.FileName);
+            SetStatus($"{count} evento(s) exportado(s) para '{dialog.FileName}'. Atenção: o arquivo CSV não é criptografado; guarde-o em local seguro.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SetStatus($"Não foi possível exportar: {ex.Message} Escolha outra pasta ou feche o arquivo se ele estiver aberto no Excel.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Falha ao exportar os eventos ({ex.GetType().Name}).");
+        }
+    }
+
     private async void ClearLocalDataButton_Click(object sender, RoutedEventArgs e)
     {
         var answer = MessageBox.Show(
@@ -767,6 +803,7 @@ public partial class MainWindow : Window
         RefreshTrayStatus();
         StopMonitoringButton.IsEnabled = _monitorViewModel.IsMonitoring;
         ClearLocalDataButton.IsEnabled = !_monitorViewModel.IsMonitoring;
+        ExportCsvButton.IsEnabled = _monitorViewModel.Events.Count > 0;
 
         HealthText.Text = _monitorViewModel.HealthText;
         HealthText.Foreground = _monitorViewModel.HealthState switch

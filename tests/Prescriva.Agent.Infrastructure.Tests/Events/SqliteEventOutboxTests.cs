@@ -148,6 +148,36 @@ public sealed class SqliteEventOutboxTests : IDisposable
         return result;
     }
 
+    [Fact]
+    public async Task ReadExportableAsync_returns_pending_and_confirmed_events_in_order_but_never_quarantined_ones()
+    {
+        var outbox = new SqliteEventOutbox(_dbPath, new PassThroughProtector());
+        var session = Guid.NewGuid();
+        var delivered = MakeEvent(session, 1, "delivered");
+        var quarantined = MakeEvent(session, 2, "quarantined");
+        var pending = MakeEvent(session, 3, "pending");
+        foreach (var domainEvent in new[] { delivered, quarantined, pending })
+        {
+            await outbox.AppendAsync(domainEvent, CancellationToken.None);
+        }
+
+        await outbox.MarkConfirmedAsync(delivered.Id, CancellationToken.None);
+        await outbox.QuarantineAsync(quarantined.Id, "test", CancellationToken.None);
+
+        var exported = await outbox.ReadExportableAsync(CancellationToken.None);
+
+        Assert.Equal([delivered.Id, pending.Id], exported.Select(domainEvent => domainEvent.Id));
+        Assert.Equal([pending.Id], (await outbox.ReadPendingAsync(CancellationToken.None)).Select(domainEvent => domainEvent.Id));
+    }
+
+    /// <summary>No encryption, so the test also runs where DPAPI does not exist.</summary>
+    private sealed class PassThroughProtector : IPayloadProtector
+    {
+        public byte[] Protect(byte[] plaintext) => plaintext;
+
+        public byte[] Unprotect(byte[] ciphertext) => ciphertext;
+    }
+
     private static DomainEvent MakeEvent(Guid sessionId, long sequence, string secretValue, Guid? id = null) =>
         new(
             id ?? Guid.NewGuid(),

@@ -7,17 +7,17 @@ dotnet build Prescriva.Agent.slnx --configuration Release
 dotnet test Prescriva.Agent.slnx --configuration Release --no-build
 ```
 
-## Current suites (Release, last run 2026-10-07 on GitHub Actions `windows-latest`, Windows Server 2025)
+## Current suites (Release, last run 2026-10-08 on GitHub Actions `windows-latest`, Windows Server 2025)
 
 | Project | Tests | Runs on |
 | --- | --- | --- |
 | `Prescriva.Agent.Domain.Tests` | 74 | any OS |
-| `Prescriva.Agent.Infrastructure.Tests` | 69 | Windows (DPAPI tests throw `PlatformNotSupportedException` elsewhere) |
-| `Prescriva.Agent.Application.Tests` | 150 | Windows (references the WPF Desktop project) |
+| `Prescriva.Agent.Infrastructure.Tests` | 70 | Windows (DPAPI tests throw `PlatformNotSupportedException` elsewhere) |
+| `Prescriva.Agent.Application.Tests` | 164 | Windows (references the WPF Desktop project) |
 | `Prescriva.Agent.Windows.Tests` | 26 | Windows |
 | `Prescriva.Agent.Windows.IntegrationTests` | 66, 1 skipped (+31 re-run against a 32-bit TestTarget) | Windows **with an interactive desktop** (launch TestTarget/Desktop, real UI Automation, real cursor) |
 
-Total: 385, all passing except one skip (the Store Calculator is not on the runner), plus the 31-test x86 pass, the packaged test and the Store screenshots. CI also saves screenshots of every hover (uploaded with the results; small crops are printed in the log). CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
+Total: 400, all passing except one skip (the Store Calculator is not on the runner), plus the 31-test x86 pass, the packaged test and the Store screenshots. CI also saves screenshots of every hover (uploaded with the results; small crops are printed in the log). CI (`.github/workflows/ci.yml`) restores, builds Release with warnings as errors, runs the non-interactive suites, then the integration suite, with a 5-minute hang timeout, and uploads `.trx` results.
 
 End-to-end coverage of the milestone:
 
@@ -36,6 +36,7 @@ End-to-end coverage of the milestone:
 
 - `Automation/FileCaptureTests` and `EndToEnd/DesktopFileFieldWalkthroughTests` — file fields: a path box yields an exact copy (10 MB limit, missing file is a typed failure), an image control yields a PNG of exactly its rectangle (refused when another window covers it); through the real Desktop UI the attachments are stored encrypted, referenced by `item_added`, and read back byte-for-byte.
 
+- `Events/EventCsvExporterTests` and the CSV step of `EndToEnd/DesktopWalkthroughTests` — CSV export (format, quoting, formula guard, attachments; real save dialog).
 - `RealApps/*` and `EndToEnd/DesktopCalculatorWalkthroughTests` — real Windows programs (Calculator, Notepad) found by AutomationId only. They close what they start and skip with the reason when an app is missing. See "Real Windows applications on the CI runner" in the [milestone walkthrough](testing/milestone-1-manual.md).
 
 Integration tests running longer than 60 s are named in the output (`xunit.runner.json`), so a hang is attributable.

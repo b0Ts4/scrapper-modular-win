@@ -98,9 +98,26 @@ public sealed class DesktopWalkthroughTests : IDisposable
         Assert.Contains(shown, text => text.Contains("#3 budget_finished", StringComparison.Ordinal) && text.Contains("2 item(ns)", StringComparison.Ordinal));
         Assert.DoesNotContain(ListTexts(agent, "DiagnosticsList"), text => text.Contains("rejeitado", StringComparison.Ordinal));
 
-        // 8. Close the Agent; the encrypted queue it leaves behind holds the three events.
+        // 8. Export the events as CSV for Excel: one row per event, a column per field;
+        //    "itens" is the session's item count so far (1, 2, then 2 when finished).
         Press(agent, "StopMonitoringButton");
         await WaitForTextAsync(agent, "MonitorStatusText", "Monitoramento parado");
+        var csvPath = Path.Combine(_dataDirectory, "exportados.csv");
+        await ExportCsvAsync(agent, desktop.ProcessId, csvPath);
+        Assert.Contains("3 evento(s) exportado(s)", Text(agent, "StatusText"), StringComparison.Ordinal);
+        Assert.Contains("não é criptografado", Text(agent, "StatusText"), StringComparison.Ordinal);
+        var csv = File.ReadAllBytes(csvPath);
+        Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, csv[..3]);
+        var rows = System.Text.Encoding.UTF8.GetString(csv, 3, csv.Length - 3).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("sequencia;data_hora;evento;integracao;sessao;itens;concentration;medication;quantity", rows[0]);
+        Assert.StartsWith("1;", rows[1], StringComparison.Ordinal);
+        Assert.EndsWith(";item_added;walkthrough;" + rows[1].Split(';')[4] + ";1;500mg-UI-2;Dipirona-UI-2;12-UI-2", rows[1], StringComparison.Ordinal);
+        Assert.EndsWith(";2;875mg-UI-3;Amoxicilina-UI-3;21-UI-3", rows[2], StringComparison.Ordinal);
+        Assert.Contains(";budget_finished;walkthrough;", rows[3], StringComparison.Ordinal);
+        Assert.Equal("2", rows[3].Split(';')[5]); // itens
+        Assert.Equal(4, rows.Length);
+
+        // 9. Close the Agent; the encrypted queue it leaves behind holds the three events.
         desktop.Close();
 
         var outbox = new SqliteEventOutbox(Path.Combine(_dataDirectory, "events.db"), new DpapiPayloadProtector());

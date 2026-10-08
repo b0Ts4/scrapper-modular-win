@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -440,6 +441,30 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
     };
 
     /// <summary>Display text for every attachment the events reference (file name, size, origin) - never the raw reference.</summary>
+    /// <summary>
+    /// Writes the exportable events (pending and delivered) to <paramref name="path"/> as a UTF-8
+    /// CSV with BOM, so Excel opens accents correctly; file fields are shown by file name.
+    /// The file is NOT encrypted - the operator chooses where it goes. Returns the event count.
+    /// </summary>
+    public async Task<int> ExportCsvAsync(string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var events = await _outbox.ReadExportableAsync(cancellationToken).ConfigureAwait(false);
+        var fileNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var reference in events.SelectMany(domainEvent => domainEvent.Payload.Fields.Values).Where(AttachmentReference.IsReference).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (_attachments is not null && await _attachments.GetInfoAsync(reference, cancellationToken).ConfigureAwait(false) is { } info)
+            {
+                fileNames[reference] = info.FileName;
+            }
+        }
+
+        await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        await using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        EventCsvExporter.Write(writer, events, reference => fileNames.GetValueOrDefault(reference), TimeZoneInfo.Local);
+        return events.Count;
+    }
+
     private async Task<IReadOnlyDictionary<string, string>> DescribeAttachmentsAsync(IReadOnlyList<DomainEvent> events, CancellationToken cancellationToken)
     {
         var descriptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
