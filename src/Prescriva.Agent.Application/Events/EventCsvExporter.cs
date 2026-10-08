@@ -9,7 +9,8 @@ namespace Prescriva.Agent.Application.Events;
 /// <c>;</c> separator, CRLF line ends, RFC 4180 quoting. One row per event; fixed columns
 /// <c>sequencia;data_hora;evento;integracao;sessao;itens</c>, then one column per captured field
 /// in the order fields first appear (an event's own fields alphabetically). <c>itens</c> is the
-/// number of items an event closed (each item already has its own <c>item_added</c> row).
+/// number of items the event's session had confirmed at that point (each item also has its own
+/// <c>item_added</c> row).
 ///
 /// A value a spreadsheet would run as a formula (starting with <c>=</c>, <c>+</c>, <c>-</c>,
 /// <c>@</c>, tab or CR) is prefixed with <c>'</c> unless it is a plain number. A file field shows

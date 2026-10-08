@@ -11,7 +11,7 @@
 - **Application** — `EventCsvExporter` (pure, no I/O besides a `TextWriter`):
   - one row per event, in sequence order;
   - fixed columns `sequencia;data_hora;evento;integracao;sessao;itens`, then one column per captured field, in the order fields first appear;
-  - the `itens` column is the number of items a `budget_finished` event closed; each item is already its own `item_added` row;
+  - the `itens` column is the number of items the session had confirmed at that event (an `item_added` counts its own item; `budget_finished` gives the total); each item is also its own `item_added` row;
   - `;` separator (Excel pt-BR), CRLF line ends, RFC 4180 quoting;
   - **formula-injection guard**: a value starting with `=`, `+`, `-`, `@`, tab or CR is prefixed with `'`, unless it is a plain number such as `-5` or `+3,5`;
   - file and image fields show a description (file name), never the internal `attachment:` reference.
