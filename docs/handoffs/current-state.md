@@ -112,6 +112,21 @@ Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: di
 - Evidence: run 37395451712 on 10b4a7a — Domain 74, Infrastructure 68, Application 136, Windows 26, integration 55 (359) + packaged 1 + x86 30, all passing.
 - **Waiting on the publisher**: Partner Center account, reserved name and its three identity values, a public privacy-policy URL with a contact e-mail; then build with that identity and submit. Real sign-in start from the Store package: manual row 27.
 
+### Plan 11 — CSV export (2026-10-08)
+
+Plan: `docs/superpowers/plans/2026-10-08-csv-export.md`.
+
+- `EventCsvExporter` (Application) writes CSV for Excel pt-BR:
+  - `;` separator, CRLF, RFC 4180 quoting;
+  - one row per event, fixed columns plus one per field;
+  - formula-injection guard that keeps plain numbers;
+  - file fields shown by file name.
+- `IEventOutbox.ReadExportableAsync`: pending and delivered events, never quarantined ones.
+- `RuntimeMonitorViewModel.ExportCsvAsync` writes UTF-8 with BOM.
+- Step 5: *Exportar eventos (CSV)...*, using a save dialog. The status warns that the file is not encrypted.
+- Each step was test-first (RED observed: exporter and outbox locally; view model by compile).
+- `DesktopWalkthroughTests` exports through the real save dialog and checks the rows.
+
 ### Plan 10 — Guided configurator and real Windows apps (2026-10-06/07)
 
 Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 tasks implemented.

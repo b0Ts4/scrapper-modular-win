@@ -36,6 +36,7 @@ End-to-end coverage of the milestone:
 
 - `Automation/FileCaptureTests` and `EndToEnd/DesktopFileFieldWalkthroughTests` — file fields: a path box yields an exact copy (10 MB limit, missing file is a typed failure), an image control yields a PNG of exactly its rectangle (refused when another window covers it); through the real Desktop UI the attachments are stored encrypted, referenced by `item_added`, and read back byte-for-byte.
 
+- `Events/EventCsvExporterTests` and the CSV step of `EndToEnd/DesktopWalkthroughTests` — CSV export (format, quoting, formula guard, attachments; real save dialog).
 - `RealApps/*` and `EndToEnd/DesktopCalculatorWalkthroughTests` — real Windows programs (Calculator, Notepad) found by AutomationId only. They close what they start and skip with the reason when an app is missing. See "Real Windows applications on the CI runner" in the [milestone walkthrough](testing/milestone-1-manual.md).
 
 Integration tests running longer than 60 s are named in the output (`xunit.runner.json`), so a hang is attributable.

@@ -30,7 +30,7 @@
 - The configuration JSON is unchanged.
 
 ### Task 1: Exporter
-- [ ] RED/GREEN `EventCsvExporterTests`:
+- [x] RED/GREEN `EventCsvExporterTests`:
   - header and columns;
   - field columns in first-appearance order with blanks where an event lacks a field;
   - quoting of `;`, `"` and line breaks;
@@ -39,9 +39,9 @@
   - `itens` count.
 
 ### Task 2: Exportable events
-- [ ] RED/GREEN `SqliteEventOutboxTests`: pending and confirmed events are exported in order, quarantined ones are not.
+- [x] RED/GREEN `SqliteEventOutboxTests`: pending and confirmed events are exported in order, quarantined ones are not.
 
 ### Task 3: Desktop
-- [ ] RED/GREEN `RuntimeMonitorViewModelTests`: `ExportCsvAsync` writes a UTF-8 CSV with BOM and returns the count.
-- [ ] Button in step 5; `DesktopWalkthroughTests` exports through the real save dialog and reads the CSV back.
-- [ ] Docs: manual row, testing, handoff.
+- [x] RED/GREEN `RuntimeMonitorViewModelTests`: `ExportCsvAsync` writes a UTF-8 CSV with BOM and returns the count.
+- [x] Button in step 5; `DesktopWalkthroughTests` exports through the real save dialog and reads the CSV back.
+- [x] Docs: manual row, testing, handoff.
