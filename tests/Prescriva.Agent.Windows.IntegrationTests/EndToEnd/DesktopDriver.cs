@@ -107,12 +107,15 @@ internal static class DesktopDriver
     internal static async Task ExportCsvAsync(AutomationElement agent, int processId, string path)
     {
         Press(agent, "ExportCsvButton");
+        // A modal dialog shows in UI Automation under its owner window (or, on some systems, the desktop).
+        var dialogCondition = new AndCondition(
+            new PropertyCondition(AutomationElement.ProcessIdProperty, processId),
+            new PropertyCondition(AutomationElement.ClassNameProperty, "#32770"));
         AutomationElement? dialog = null;
         await WaitUntilAsync(
-            () => (dialog = AutomationElement.RootElement.FindFirst(TreeScope.Children, new AndCondition(
-                new PropertyCondition(AutomationElement.ProcessIdProperty, processId),
-                new PropertyCondition(AutomationElement.ClassNameProperty, "#32770")))) is not null,
-            () => "the save dialog did not open");
+            () => (dialog = agent.FindFirst(TreeScope.Children, dialogCondition)
+                ?? AutomationElement.RootElement.FindFirst(TreeScope.Children, dialogCondition)) is not null,
+            () => "the save dialog did not open; Agent status: " + Text(agent, "StatusText"));
         AutomationElement? fileName = null;
         await WaitUntilAsync(
             () => (fileName = dialog!.FindFirst(TreeScope.Descendants, new AndCondition(
