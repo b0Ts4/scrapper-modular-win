@@ -122,13 +122,75 @@ internal static class DesktopDriver
                 new PropertyCondition(AutomationElement.AutomationIdProperty, "1001"),
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit)))) is not null,
             () => "the save dialog has no file name box");
-        ((ValuePattern)fileName!.GetCurrentPattern(ValuePattern.Pattern)).SetValue(path);
+        // The modern file dialog keeps its own copy of the name and ignores ValuePattern.SetValue
+        // when saving, so type the path as a person would.
+        fileName!.SetFocus();
+        await WaitUntilAsync(
+            () =>
+            {
+                SelectAllAndType(fileName, path);
+                return string.Equals(((ValuePattern)fileName.GetCurrentPattern(ValuePattern.Pattern)).Current.Value, path, StringComparison.OrdinalIgnoreCase);
+            },
+            () => "the file name box shows: " + ((ValuePattern)fileName.GetCurrentPattern(ValuePattern.Pattern)).Current.Value);
         var save = dialog!.FindFirst(TreeScope.Descendants, new AndCondition(
             new PropertyCondition(AutomationElement.AutomationIdProperty, "1"),
             new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button)));
         ((InvokePattern)save.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
         await WaitForTextAsync(agent, "StatusText", "exportado(s) para");
+        Assert.Contains(path, Text(agent, "StatusText"), StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>Focuses <paramref name="box"/>, selects its text (Ctrl+A) and types <paramref name="text"/> with real keyboard input.</summary>
+    private static void SelectAllAndType(AutomationElement box, string text)
+    {
+        box.SetFocus();
+        SendKeys([Key(VkControl, down: true), Key(VkA, down: true), Key(VkA, down: false), Key(VkControl, down: false)]);
+        SendKeys(text.SelectMany(character => new[] { Unicode(character, down: true), Unicode(character, down: false) }).ToArray());
+        Thread.Sleep(200);
+    }
+
+    private const ushort VkControl = 0x11;
+    private const ushort VkA = 0x41;
+    private const uint InputKeyboard = 1;
+    private const uint KeyEventKeyUp = 0x0002;
+    private const uint KeyEventUnicode = 0x0004;
+
+    private static KeyboardInput Key(ushort virtualKey, bool down) =>
+        new() { Type = InputKeyboard, Data = new KeyboardData { VirtualKey = virtualKey, Flags = down ? 0 : KeyEventKeyUp } };
+
+    private static KeyboardInput Unicode(char character, bool down) =>
+        new() { Type = InputKeyboard, Data = new KeyboardData { ScanCode = character, Flags = KeyEventUnicode | (down ? 0 : KeyEventKeyUp) } };
+
+    private static void SendKeys(KeyboardInput[] inputs)
+    {
+        if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<KeyboardInput>()) != inputs.Length)
+        {
+            throw new InvalidOperationException("SendInput failed.");
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInput
+    {
+        public uint Type;
+        public KeyboardData Data;
+    }
+
+    /// <summary>KEYBDINPUT, padded to the size of the INPUT union (MOUSEINPUT is the largest member).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardData
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
+        public uint Padding1;
+        public uint Padding2;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, KeyboardInput[] inputs, int size);
 
     /// <summary>Opens a step of the Agent's guided configurator (Step1Tab ... Step5Tab).</summary>
     internal static void GoToStep(AutomationElement agent, string stepAutomationId) =>
