@@ -87,6 +87,60 @@ public sealed class ElementInspectionTests
     }
 
     [Fact]
+    public async Task A_value_inside_a_larger_box_is_reported_as_the_box_unless_the_innermost_element_is_asked_for()
+    {
+        using var target = TestTargetLauncher.Launch();
+        using var dispatcher = new AutomationDispatcher();
+        var inspector = new UiAutomationElementInspector(dispatcher);
+        var price = target.Window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "ProductPrice"));
+        Assert.NotNull(price);
+        var rect = WaitForLaidOutBoundingRectangle(price!);
+        var point = new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+
+        var interactive = await InspectAsync(inspector, target, point, InspectionDepth.Interactive);
+        var innermost = await InspectAsync(inspector, target, point, InspectionDepth.Innermost);
+
+        Assert.Equal("ProductCard", interactive.Snapshot?.AutomationId); // what the operator could not get past
+        Assert.Equal("ProductPrice", innermost.Snapshot?.AutomationId);
+        Assert.Equal("R$ 12,90", innermost.Snapshot?.Name);
+    }
+
+    [Fact]
+    public async Task The_innermost_element_is_never_promoted_to_the_button_around_it()
+    {
+        using var target = TestTargetLauncher.Launch();
+        using var dispatcher = new AutomationDispatcher();
+        var inspector = new UiAutomationElementInspector(dispatcher);
+        var button = target.Window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "AddButton"));
+        var rect = WaitForLaidOutBoundingRectangle(button!);
+        var point = new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+
+        var innermost = await InspectAsync(inspector, target, point, InspectionDepth.Innermost);
+
+        Assert.Equal(InspectionOutcome.Found, innermost.Outcome);
+        Assert.Equal("ControlType.Text", innermost.Snapshot?.ControlType);
+        Assert.Equal("Add", innermost.Snapshot?.Name);
+    }
+
+    private static async Task<InspectionResult> InspectAsync(UiAutomationElementInspector inspector, TestTargetLauncher target, ScreenPoint point, InspectionDepth depth)
+    {
+        InspectionResult result = null!;
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            target.Window.SetFocus();
+            result = await inspector.FromPointAsync(point, depth, TimeSpan.FromSeconds(10), CancellationToken.None);
+            if (result.Snapshot?.ProcessId == target.Window.Current.ProcessId)
+            {
+                break;
+            }
+
+            await Task.Delay(200);
+        }
+
+        return result;
+    }
+
+    [Fact]
     public async Task FromPointAsync_returns_TimedOut_when_the_timeout_is_effectively_immediate()
     {
         using var target = TestTargetLauncher.Launch();

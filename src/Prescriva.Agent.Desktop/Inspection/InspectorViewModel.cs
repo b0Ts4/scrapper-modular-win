@@ -64,6 +64,10 @@ public sealed class InspectorViewModel : INotifyPropertyChanged, IDisposable
     public Task ObservePointerAsync(ScreenPoint point, CancellationToken cancellationToken = default) =>
         _controller.ObservePointerAsync(point, cancellationToken);
 
+    /// <summary>Observes the pointer at <paramref name="depth"/> (Shift held: the innermost element).</summary>
+    public Task ObservePointerAsync(ScreenPoint point, InspectionDepth depth, CancellationToken cancellationToken = default) =>
+        _controller.ObservePointerAsync(point, depth, cancellationToken);
+
     public Task StopAsync(CancellationToken cancellationToken = default) =>
         _controller.StopAsync(cancellationToken);
 

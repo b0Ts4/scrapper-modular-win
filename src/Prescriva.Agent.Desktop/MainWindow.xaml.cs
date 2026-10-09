@@ -880,6 +880,12 @@ public partial class MainWindow : Window
         _ => action.GetType().Name,
     };
 
+    /// <summary>
+    /// While marking, the pointer is followed. Two keys help without moving the mouse back to
+    /// the Agent - only their up/down state is read, only while marking is on and visible:
+    /// Shift held marks the smallest element under the pointer (a field inside a larger box),
+    /// and Ctrl pressed over the other program confirms the outlined element.
+    /// </summary>
     private async System.Threading.Tasks.Task PollPointerAsync()
     {
         if (!GetCursorPos(out var point))
@@ -887,8 +893,31 @@ public partial class MainWindow : Window
             return;
         }
 
-        await _inspectorViewModel.ObservePointerAsync(new ScreenPoint(point.X, point.Y));
+        _innermost = IsKeyDown(VkShift);
+        var ctrlDown = IsKeyDown(VkControl);
+        var ctrlPressed = ctrlDown && !_ctrlWasDown;
+        _ctrlWasDown = ctrlDown;
+
+        await _inspectorViewModel.ObservePointerAsync(
+            new ScreenPoint(point.X, point.Y),
+            _innermost ? InspectionDepth.Innermost : InspectionDepth.Interactive);
+
+        // Ctrl while typing in the Agent itself is not a confirmation.
+        if (ctrlPressed && !IsActive && _inspectorViewModel.Snapshot is not null)
+        {
+            ConfirmSelectionButton_Click(this, new RoutedEventArgs());
+        }
     }
+
+    private const int VkShift = 0x10;
+    private const int VkControl = 0x11;
+    private bool _innermost;
+    private bool _ctrlWasDown;
+
+    private static bool IsKeyDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
 
     private void OnInspectorStateChanged()
     {
@@ -896,7 +925,7 @@ public partial class MainWindow : Window
 
         var snapshot = _inspectorViewModel.Snapshot;
         var hover = snapshot is not null
-            ? $"Sob o cursor: AutomationId='{snapshot.AutomationId}', Nome='{snapshot.Name}', Tipo='{snapshot.ControlType}', Rótulo='{LabelOf(snapshot)}'."
+            ? (_innermost ? "[Shift: elemento interno] " : string.Empty) + $"Sob o cursor: AutomationId='{snapshot.AutomationId}', Nome='{snapshot.Name}', Tipo='{snapshot.ControlType}', Rótulo='{LabelOf(snapshot)}'."
             : _inspectorViewModel.Warnings.Length > 0
                 ? string.Join(" ", _inspectorViewModel.Warnings)
                 : "(nada sob o cursor)";

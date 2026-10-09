@@ -112,6 +112,16 @@ Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: di
 - Evidence: run 37395451712 on 10b4a7a — Domain 74, Infrastructure 68, Application 136, Windows 26, integration 55 (359) + packaged 1 + x86 30, all passing.
 - **Waiting on the publisher**: Partner Center account, reserved name and its three identity values, a public privacy-policy URL with a contact e-mail; then build with that identity and submit. Real sign-in start from the Store package: manual row 27.
 
+### Plan 13 — Selecting a small field inside a larger one (2026-10-09)
+
+Plan: `docs/superpowers/plans/2026-10-09-innermost-selection.md`.
+
+- While marking, **Shift** marks the smallest element under the pointer (`InspectionDepth.Innermost`).
+- **Ctrl**, pressed while the other program is in front, confirms the outlined element.
+- Only the Shift/Ctrl up/down state is read, and only while marking.
+- TestTarget gained `ProductCard`/`ProductPrice`, a value the hit-test cannot reach.
+- RED observed locally for `InspectionControllerTests`. The Windows and E2E tests were pushed with the implementation.
+
 ### Plan 12 — Screen-image fields (2026-10-09)
 
 Plan: `docs/superpowers/plans/2026-10-09-screen-image-fields.md`.
