@@ -122,6 +122,9 @@ Plan: `docs/superpowers/plans/2026-10-09-innermost-selection.md`.
 - TestTarget gained a product row `ProductCard` whose price text has no AutomationId: pointing at the price selects the row; Shift selects the price. The case of a program whose hit-test stops at an outer element whose children *are* exposed is handled by the same search, but no TestTarget fixture reproduces it (WPF's UI Automation hit-test ignores `IsHitTestVisible`); it is in manual row 35.
 - RED observed locally for `InspectionControllerTests`. The Windows and E2E tests were pushed with the implementation.
 
+- Evidence: run 37932186976 on 6a0ad74, all green on attempt 2.
+- **Observed once, not root-caused:** on attempt 1, `DesktopResilienceWalkthroughTests` stopped at *Aprovar configuração* (disabled after the first test run). That test does not use the changed code, and it passed on the previous commit and on the re-run. If it recurs, capture the test-mode field results to see which field failed.
+
 ### Plan 12 — Screen-image fields (2026-10-09)
 
 Plan: `docs/superpowers/plans/2026-10-09-screen-image-fields.md`.
