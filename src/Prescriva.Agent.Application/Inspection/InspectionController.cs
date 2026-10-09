@@ -92,7 +92,12 @@ public sealed class InspectionController
     /// movement never queues up a backlog of stale requests - only the most recent
     /// observation is ever allowed to update <see cref="CurrentState"/>.
     /// </summary>
-    public async Task ObservePointerAsync(ScreenPoint point, CancellationToken cancellationToken = default)
+    public Task ObservePointerAsync(ScreenPoint point, CancellationToken cancellationToken = default) =>
+        ObservePointerAsync(point, InspectionDepth.Interactive, cancellationToken);
+
+    /// <inheritdoc cref="ObservePointerAsync(ScreenPoint, CancellationToken)"/>
+    /// <param name="depth">Which element under the pointer to report (see <see cref="InspectionDepth"/>).</param>
+    public async Task ObservePointerAsync(ScreenPoint point, InspectionDepth depth, CancellationToken cancellationToken = default)
     {
         var cts = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _pointerCts, cts);
@@ -112,7 +117,7 @@ public sealed class InspectionController
         InspectionResult result;
         try
         {
-            result = await _inspector.FromPointAsync(point, _timeout, linked.Token).ConfigureAwait(false);
+            result = await _inspector.FromPointAsync(point, depth, _timeout, linked.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ownToken.IsCancellationRequested)
         {
