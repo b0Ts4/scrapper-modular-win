@@ -28,7 +28,7 @@
 ### Tasks
 - [x] RED/GREEN `InspectionControllerTests`: the requested depth reaches the inspector; the default stays interactive.
 - [x] `ElementInspectionTests`:
-  - TestTarget's `ProductPrice`, inside `ProductCard` and not hit-testable, is reported as the card normally and as the price when innermost;
+  - TestTarget's price text (no AutomationId) inside the product row `ProductCard` is reported as the row normally (anonymous caption promoted) and as the price when innermost. The first fixture used `IsHitTestVisible=False`, which UI Automation ignores, so it reproduced nothing; it was replaced;
   - innermost never promotes a caption to its button.
 - [x] `DesktopInnermostSelectionTests`: real Shift/Ctrl input:
   - without Shift → card;

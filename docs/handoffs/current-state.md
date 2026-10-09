@@ -119,7 +119,7 @@ Plan: `docs/superpowers/plans/2026-10-09-innermost-selection.md`.
 - While marking, **Shift** marks the smallest element under the pointer (`InspectionDepth.Innermost`).
 - **Ctrl**, pressed while the other program is in front, confirms the outlined element.
 - Only the Shift/Ctrl up/down state is read, and only while marking.
-- TestTarget gained `ProductCard`/`ProductPrice`, a value the hit-test cannot reach.
+- TestTarget gained a product row `ProductCard` whose price text has no AutomationId: pointing at the price selects the row; Shift selects the price. The case of a program whose hit-test stops at an outer element whose children *are* exposed is handled by the same search, but no TestTarget fixture reproduces it (WPF's UI Automation hit-test ignores `IsHitTestVisible`); it is in manual row 35.
 - RED observed locally for `InspectionControllerTests`. The Windows and E2E tests were pushed with the implementation.
 
 ### Plan 12 — Screen-image fields (2026-10-09)

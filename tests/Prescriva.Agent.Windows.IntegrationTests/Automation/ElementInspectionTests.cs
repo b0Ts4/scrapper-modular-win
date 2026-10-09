@@ -87,23 +87,28 @@ public sealed class ElementInspectionTests
     }
 
     [Fact]
-    public async Task A_value_inside_a_larger_box_is_reported_as_the_box_unless_the_innermost_element_is_asked_for()
+    public async Task A_value_inside_a_larger_element_is_reported_as_that_element_unless_the_innermost_is_asked_for()
     {
         using var target = TestTargetLauncher.Launch();
         using var dispatcher = new AutomationDispatcher();
         var inspector = new UiAutomationElementInspector(dispatcher);
-        var price = target.Window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "ProductPrice"));
-        Assert.NotNull(price);
-        var rect = WaitForLaidOutBoundingRectangle(price!);
+        var price = FindProductPrice(target);
+        var rect = WaitForLaidOutBoundingRectangle(price);
         var point = new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
 
         var interactive = await InspectAsync(inspector, target, point, InspectionDepth.Interactive);
         var innermost = await InspectAsync(inspector, target, point, InspectionDepth.Innermost);
 
         Assert.Equal("ProductCard", interactive.Snapshot?.AutomationId); // what the operator could not get past
-        Assert.Equal("ProductPrice", innermost.Snapshot?.AutomationId);
+        Assert.Equal("ControlType.Text", innermost.Snapshot?.ControlType);
         Assert.Equal("R$ 12,90", innermost.Snapshot?.Name);
     }
+
+    /// <summary>The price text inside TestTarget's product row (it has no AutomationId of its own).</summary>
+    internal static AutomationElement FindProductPrice(TestTargetLauncher target) =>
+        target.Window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "ProductCard"))
+            ?.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "R$ 12,90"))
+        ?? throw new InvalidOperationException("The product price was not found.");
 
     [Fact]
     public async Task The_innermost_element_is_never_promoted_to_the_button_around_it()

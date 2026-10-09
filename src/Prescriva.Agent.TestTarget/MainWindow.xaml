@@ -183,15 +183,19 @@
                 read-only "display" case of real programs (the Calculator result, an ERP total).
             -->
             <!--
-                A small value inside a larger box that hit-testing never reaches (like a price
-                drawn inside a product card): pointing at it returns the card, so selecting the
-                price needs the innermost-element mode (Shift).
+                A small value inside a larger element, like a price inside a product row: the
+                price text has no AutomationId, so pointing at it selects the whole list item.
+                Selecting the price itself needs the innermost-element mode (Shift).
             -->
-            <GroupBox x:Name="ProductCard" Margin="12,0,0,0" Padding="4,0" VerticalAlignment="Center"
-                      AutomationProperties.AutomationId="ProductCard">
-                <TextBlock x:Name="ProductPrice" Text="R$ 12,90" IsHitTestVisible="False"
-                           AutomationProperties.AutomationId="ProductPrice" />
-            </GroupBox>
+            <ListBox x:Name="ProductList" Margin="12,0,0,0" VerticalAlignment="Center"
+                     AutomationProperties.AutomationId="ProductList">
+                <ListBoxItem x:Name="ProductCard" AutomationProperties.AutomationId="ProductCard">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Dipirona" Margin="0,0,6,0" />
+                        <TextBlock Text="R$ 12,90" FontWeight="Bold" />
+                    </StackPanel>
+                </ListBoxItem>
+            </ListBox>
             <TextBlock x:Name="ItemCountText"
                        Text="Itens: 0"
                        Margin="12,0,0,0"
