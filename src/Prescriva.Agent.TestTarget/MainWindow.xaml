@@ -182,6 +182,20 @@
                 A plain label (TextBlock, no UI Automation pattern) whose text changes: the
                 read-only "display" case of real programs (the Calculator result, an ERP total).
             -->
+            <!--
+                A small value inside a larger element, like a price inside a product row: the
+                price text has no AutomationId, so pointing at it selects the whole list item.
+                Selecting the price itself needs the innermost-element mode (Shift).
+            -->
+            <ListBox x:Name="ProductList" Margin="12,0,0,0" VerticalAlignment="Center"
+                     AutomationProperties.AutomationId="ProductList">
+                <ListBoxItem x:Name="ProductCard" AutomationProperties.AutomationId="ProductCard">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Dipirona" Margin="0,0,6,0" />
+                        <TextBlock Text="R$ 12,90" FontWeight="Bold" />
+                    </StackPanel>
+                </ListBoxItem>
+            </ListBox>
             <TextBlock x:Name="ItemCountText"
                        Text="Itens: 0"
                        Margin="12,0,0,0"

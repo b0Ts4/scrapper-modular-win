@@ -107,7 +107,7 @@ public sealed class IntegrationTestRunner
         {
             var capture = await _captureProvider.CaptureAsync(resolution.Handle, field, cancellationToken).ConfigureAwait(false);
             var readable = capture.Outcome == CaptureOutcome.Captured &&
-                (field.Kind != FieldKind.File || capture.Attachment is not null);
+                (!field.Kind.ProducesAttachment() || capture.Attachment is not null);
             return readable
                 ? new FieldCheckResult(field.Id, FieldCheckOutcome.Found, capture.ProviderId, capture.Confidence, FailureCode: null, Value: capture.Value, Attachment: capture.Attachment, CaptureOutcome: capture.Outcome, Signals: signals, Lead: resolution.Lead, Warnings: warnings)
                 : new FieldCheckResult(field.Id, FieldCheckOutcome.Unreadable, capture.ProviderId, resolution.Confidence, FieldCheckResult.FieldUnreadableCode, CaptureOutcome: capture.Outcome, Signals: signals, Lead: resolution.Lead, Warnings: warnings);

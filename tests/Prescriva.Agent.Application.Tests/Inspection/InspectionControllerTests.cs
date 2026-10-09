@@ -35,6 +35,32 @@ public sealed class InspectionControllerTests
         Assert.Null(controller.CurrentState.Fingerprint);
     }
 
+    [Theory]
+    [InlineData(InspectionDepth.Interactive)]
+    [InlineData(InspectionDepth.Innermost)]
+    public async Task ObservePointerAsync_asks_the_inspector_for_the_requested_depth(InspectionDepth depth)
+    {
+        var inspector = new FakeElementInspector();
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        await controller.ObservePointerAsync(new ScreenPoint(10, 20), depth);
+
+        Assert.Equal([depth], inspector.Depths);
+    }
+
+    [Fact]
+    public async Task ObservePointerAsync_without_a_depth_asks_for_the_interactive_element()
+    {
+        var inspector = new FakeElementInspector();
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        await controller.ObservePointerAsync(new ScreenPoint(10, 20));
+
+        Assert.Equal([InspectionDepth.Interactive], inspector.Depths);
+    }
+
     [Fact]
     public async Task ObservePointerAsync_found_element_updates_snapshot_bounds_and_fingerprint()
     {
@@ -272,8 +298,14 @@ public sealed class InspectionControllerTests
 
         public void Enqueue(Func<CancellationToken, Task<InspectionResult>> factory) => _responses.Enqueue(factory);
 
-        public Task<InspectionResult> FromPointAsync(ScreenPoint point, TimeSpan timeout, CancellationToken cancellationToken)
+        public List<InspectionDepth> Depths { get; } = [];
+
+        public Task<InspectionResult> FromPointAsync(ScreenPoint point, TimeSpan timeout, CancellationToken cancellationToken) =>
+            FromPointAsync(point, InspectionDepth.Interactive, timeout, cancellationToken);
+
+        public Task<InspectionResult> FromPointAsync(ScreenPoint point, InspectionDepth depth, TimeSpan timeout, CancellationToken cancellationToken)
         {
+            Depths.Add(depth);
             CallCount++;
             var factory = _responses.Count > 0
                 ? _responses.Dequeue()

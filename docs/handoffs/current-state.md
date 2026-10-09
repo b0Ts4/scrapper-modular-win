@@ -112,6 +112,32 @@ Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: di
 - Evidence: run 37395451712 on 10b4a7a — Domain 74, Infrastructure 68, Application 136, Windows 26, integration 55 (359) + packaged 1 + x86 30, all passing.
 - **Waiting on the publisher**: Partner Center account, reserved name and its three identity values, a public privacy-policy URL with a contact e-mail; then build with that identity and submit. Real sign-in start from the Store package: manual row 27.
 
+### Plan 13 — Selecting a small field inside a larger one (2026-10-09)
+
+Plan: `docs/superpowers/plans/2026-10-09-innermost-selection.md`.
+
+- While marking, **Shift** marks the smallest element under the pointer (`InspectionDepth.Innermost`).
+- **Ctrl**, pressed while the other program is in front, confirms the outlined element.
+- Only the Shift/Ctrl up/down state is read, and only while marking.
+- TestTarget gained a product row `ProductCard` whose price text has no AutomationId: pointing at the price selects the row; Shift selects the price. The case of a program whose hit-test stops at an outer element whose children *are* exposed is handled by the same search, but no TestTarget fixture reproduces it (WPF's UI Automation hit-test ignores `IsHitTestVisible`); it is in manual row 35.
+- RED observed locally for `InspectionControllerTests`. The Windows and E2E tests were pushed with the implementation.
+
+- Evidence: run 37932186976 on 6a0ad74, all green on attempt 2.
+- **Observed once, not root-caused:** on attempt 1, `DesktopResilienceWalkthroughTests` stopped at *Aprovar configuração* (disabled after the first test run). That test does not use the changed code, and it passed on the previous commit and on the re-run. If it recurs, capture the test-mode field results to see which field failed.
+
+### Plan 12 — Screen-image fields (2026-10-09)
+
+Plan: `docs/superpowers/plans/2026-10-09-screen-image-fields.md`.
+
+- New field type *Imagem exibida na tela*: `FieldKind.ScreenImage`.
+  - Always captures the control's on-screen image as PNG, even when the control exposes text.
+  - Refused when anything covers the control.
+  - Stored as an attachment, like file fields.
+- RED observed locally:
+  - `SessionCoordinatorTests` and `IntegrationTestRunnerTests` (behaviour);
+  - `FieldKindTests` (compilation).
+- The new `FileCaptureTests` cases were pushed together with the fix, so their RED was not observed on CI. They would fail without it: the field would be read as text, with no image.
+
 ### Plan 11 — CSV export (2026-10-08)
 
 Plan: `docs/superpowers/plans/2026-10-08-csv-export.md`.

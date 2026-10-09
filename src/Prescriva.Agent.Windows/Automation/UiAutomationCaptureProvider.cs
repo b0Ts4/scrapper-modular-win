@@ -56,7 +56,7 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
                 nameof(handle));
         }
 
-        if (field.Kind == FieldKind.File)
+        if (field.Kind.ProducesAttachment())
         {
             return await CaptureFileAsync(uiaHandle, field, cancellationToken).ConfigureAwait(false);
         }
@@ -97,7 +97,8 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
 
     /// <summary>
     /// A file field: the probe (text or screen image) runs on the dispatcher thread; reading
-    /// a file from disk does not, so a large file never blocks UI Automation.
+    /// a file from disk does not, so a large file never blocks UI Automation. A screen-image
+    /// field skips the text: it is always the control's on-screen image.
     /// </summary>
     private async Task<CaptureResult> CaptureFileAsync(UiaResolvedElementHandle handle, FieldDefinition field, CancellationToken cancellationToken)
     {
@@ -105,7 +106,9 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
         try
         {
             var probe = await _dispatcher.RunAsync(
-                _ => FileFieldCapture.ProbeOnDispatcherThread(handle.Element),
+                _ => field.Kind == FieldKind.ScreenImage
+                    ? FileFieldCapture.ProbeScreenOnDispatcherThread(handle.Element)
+                    : FileFieldCapture.ProbeOnDispatcherThread(handle.Element),
                 _timeout,
                 cancellationToken).ConfigureAwait(false);
 

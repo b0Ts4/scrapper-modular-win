@@ -563,6 +563,39 @@ public sealed class SessionCoordinatorTests
         Assert.True(attachments.SavedBeforeAnyEvent, "The attachment must be stored before the event referencing it is appended.");
     }
 
+    [Fact]
+    public async Task A_screen_image_field_stores_the_image_shown_on_screen_as_an_attachment()
+    {
+        var outbox = new FakeEventOutbox();
+        var attachments = new InMemoryAttachmentStore(outbox);
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        var coordinator = CreateFileCoordinator(
+            new CaptureResult(CaptureOutcome.Captured, null, CaptureResult.UiaProviderId, 1.0, TimeSpan.Zero, [],
+                new CapturedAttachment(png, "prescription.png", "image/png", AttachmentSource.Screen)),
+            outbox, attachments, FieldKind.ScreenImage);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        var reference = Assert.Single(outbox.Appended).Payload.Fields["prescription"];
+        Assert.True(AttachmentReference.IsReference(reference));
+        Assert.Equal(png, await attachments.ReadAsync(reference, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_screen_image_field_without_an_image_rejects_the_occurrence()
+    {
+        var outbox = new FakeEventOutbox();
+        var attachments = new InMemoryAttachmentStore(outbox);
+        var coordinator = CreateFileCoordinator(
+            new CaptureResult(CaptureOutcome.Captured, "texto", CaptureResult.UiaProviderId, 1.0, TimeSpan.Zero, []),
+            outbox, attachments, FieldKind.ScreenImage);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        Assert.Empty(outbox.Appended);
+        Assert.Equal(0, attachments.Count);
+    }
+
     [Theory]
     [InlineData(CaptureOutcome.TooLarge)]
     [InlineData(CaptureOutcome.Obscured)]
@@ -584,14 +617,14 @@ public sealed class SessionCoordinatorTests
         Assert.Equal("prescription", rejected.FieldId);
     }
 
-    private static SessionCoordinator CreateFileCoordinator(CaptureResult capture, FakeEventOutbox outbox, InMemoryAttachmentStore attachments)
+    private static SessionCoordinator CreateFileCoordinator(CaptureResult capture, FakeEventOutbox outbox, InMemoryAttachmentStore attachments, FieldKind kind = FieldKind.File)
     {
         var configuration = new IntegrationConfiguration(
             IntegrationConfiguration.CurrentSchemaVersion,
             "file-config",
             "File configuration",
             new ApplicationDefinition("Prescriva.Agent.TestTarget", "Prescriva Agent Test Target"),
-            [new FieldDefinition("prescription", StageId, "Receita", Required: true, Selector: Fingerprint("prescription"), Kind: FieldKind.File)],
+            [new FieldDefinition("prescription", StageId, "Receita", Required: true, Selector: Fingerprint("prescription"), Kind: kind)],
             [new StageDefinition(StageId, "Entry")],
             [new TriggerDefinition(AddTriggerId, StageId, Fingerprint("AddButton"), "Invoke",
                 [new CaptureFieldsAction(["prescription"]), new EmitEventAction("item_added")])]);

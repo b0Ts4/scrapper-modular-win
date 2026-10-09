@@ -149,7 +149,11 @@ internal static class DesktopDriver
         Thread.Sleep(200);
     }
 
-    private const ushort VkControl = 0x11;
+    /// <summary>Presses (<paramref name="down"/>) or releases a key with real keyboard input.</summary>
+    internal static void SetKey(ushort virtualKey, bool down) => SendKeys([Key(virtualKey, down)]);
+
+    internal const ushort VkShift = 0x10;
+    internal const ushort VkControl = 0x11;
     private const ushort VkA = 0x41;
     private const uint InputKeyboard = 1;
     private const uint KeyEventKeyUp = 0x0002;

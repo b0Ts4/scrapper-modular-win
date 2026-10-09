@@ -58,6 +58,7 @@ internal sealed record FieldItem(FieldDefinition Field)
         {
             FieldKind.File => "arquivo / imagem",
             FieldKind.OcrText => "texto via OCR",
+            FieldKind.ScreenImage => "imagem da tela",
             _ => "texto",
         }}";
 }

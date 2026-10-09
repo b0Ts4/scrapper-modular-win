@@ -433,6 +433,7 @@ public partial class MainWindow : Window
                 {
                     1 => FieldKind.File,
                     2 => FieldKind.OcrText,
+                    3 => FieldKind.ScreenImage,
                     _ => FieldKind.Text,
                 });
             ResetFieldForm();
@@ -861,7 +862,7 @@ public partial class MainWindow : Window
         }
 
         var stages = string.Join(", ", configuration.Stages.Select(stage => stage.Id));
-        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}{field.Kind switch { FieldKind.File => "[file]", FieldKind.OcrText => "[ocr]", _ => "" }}"));
+        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}{field.Kind switch { FieldKind.File => "[file]", FieldKind.OcrText => "[ocr]", FieldKind.ScreenImage => "[image]", _ => "" }}"));
         var triggers = string.Join(" | ", configuration.Triggers.Select(trigger =>
             $"{trigger.Id}@{trigger.StageId}: {string.Join(" > ", trigger.Actions.Select(DescribeAction))}"));
         ConfigurationSummaryText.Text =
@@ -879,6 +880,12 @@ public partial class MainWindow : Window
         _ => action.GetType().Name,
     };
 
+    /// <summary>
+    /// While marking, the pointer is followed. Two keys help without moving the mouse back to
+    /// the Agent - only their up/down state is read, only while marking is on and visible:
+    /// Shift held marks the smallest element under the pointer (a field inside a larger box),
+    /// and Ctrl pressed over the other program confirms the outlined element.
+    /// </summary>
     private async System.Threading.Tasks.Task PollPointerAsync()
     {
         if (!GetCursorPos(out var point))
@@ -886,8 +893,35 @@ public partial class MainWindow : Window
             return;
         }
 
-        await _inspectorViewModel.ObservePointerAsync(new ScreenPoint(point.X, point.Y));
+        _innermost = IsKeyDown(VkShift);
+
+        // A press counts once: when Ctrl goes down, or when it was tapped between two polls
+        // (Windows keeps a "pressed since the last check" bit, so a quick tap is not lost).
+        var ctrlState = GetAsyncKeyState(VkControl);
+        var ctrlDown = (ctrlState & 0x8000) != 0;
+        var ctrlPressed = (ctrlDown && !_ctrlWasDown) || (!ctrlDown && (ctrlState & 0x0001) != 0);
+        _ctrlWasDown = ctrlDown;
+
+        await _inspectorViewModel.ObservePointerAsync(
+            new ScreenPoint(point.X, point.Y),
+            _innermost ? InspectionDepth.Innermost : InspectionDepth.Interactive);
+
+        // Ctrl while typing in the Agent itself is not a confirmation.
+        if (ctrlPressed && !IsActive && _inspectorViewModel.Snapshot is not null)
+        {
+            ConfirmSelectionButton_Click(this, new RoutedEventArgs());
+        }
     }
+
+    private const int VkShift = 0x10;
+    private const int VkControl = 0x11;
+    private bool _innermost;
+    private bool _ctrlWasDown;
+
+    private static bool IsKeyDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
 
     private void OnInspectorStateChanged()
     {
@@ -895,7 +929,7 @@ public partial class MainWindow : Window
 
         var snapshot = _inspectorViewModel.Snapshot;
         var hover = snapshot is not null
-            ? $"Sob o cursor: AutomationId='{snapshot.AutomationId}', Nome='{snapshot.Name}', Tipo='{snapshot.ControlType}', Rótulo='{LabelOf(snapshot)}'."
+            ? (_innermost ? "[Shift: elemento interno] " : string.Empty) + $"Sob o cursor: AutomationId='{snapshot.AutomationId}', Nome='{snapshot.Name}', Tipo='{snapshot.ControlType}', Rótulo='{LabelOf(snapshot)}'."
             : _inspectorViewModel.Warnings.Length > 0
                 ? string.Join(" ", _inspectorViewModel.Warnings)
                 : "(nada sob o cursor)";
@@ -1137,6 +1171,7 @@ public partial class MainWindow : Window
         {
             FieldKind.File => 1,
             FieldKind.OcrText => 2,
+            FieldKind.ScreenImage => 3,
             _ => 0,
         };
     }

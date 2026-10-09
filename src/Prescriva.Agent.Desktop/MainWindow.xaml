@@ -232,6 +232,8 @@
                         <TextBlock Style="{StaticResource StepTitle}" Text="Marque os campos a capturar" />
                         <TextBlock Style="{StaticResource Guidance}"
                                    Text="Clique em 'Começar a marcar', passe o mouse sobre um campo no programa (ele fica contornado) e clique em 'Usar este elemento'. Depois dê um nome ao campo, como você o chama no dia a dia." />
+                        <TextBlock Style="{StaticResource Guidance}" FontSize="12"
+                                   Text="Dicas: segure Shift para marcar um campo pequeno que está dentro de outro maior. Aperte Ctrl, com o mouse ainda sobre o campo, para usá-lo sem precisar voltar até este botão." />
 
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
@@ -257,6 +259,7 @@
                                         <ComboBoxItem Content="Texto" />
                                         <ComboBoxItem Content="Arquivo / imagem (cópia do arquivo, até 10 MB)" />
                                         <ComboBoxItem Content="Texto via OCR (lido da imagem do campo)" />
+                                        <ComboBoxItem Content="Imagem exibida na tela (captura da imagem)" />
                                     </ComboBox>
                                 </WrapPanel>
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="Identificador técnico (gerado do nome)" FontSize="11" Foreground="{StaticResource MutedBrush}" />
@@ -306,6 +309,8 @@
                         <TextBlock Style="{StaticResource StepTitle}" Text="Marque os botões que disparam a captura" />
                         <TextBlock Style="{StaticResource Guidance}"
                                    Text="Marque um botão do programa (por exemplo 'Adicionar' ou 'Finalizar') do mesmo jeito que os campos e diga o que acontece quando ele é clicado: quais campos são lidos e qual evento é gerado." />
+                        <TextBlock Style="{StaticResource Guidance}" FontSize="12"
+                                   Text="Dicas: segure Shift para marcar um elemento pequeno dentro de outro maior; aperte Ctrl para usar o elemento contornado sem tirar o mouse do lugar." />
 
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
