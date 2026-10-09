@@ -433,6 +433,7 @@ public partial class MainWindow : Window
                 {
                     1 => FieldKind.File,
                     2 => FieldKind.OcrText,
+                    3 => FieldKind.ScreenImage,
                     _ => FieldKind.Text,
                 });
             ResetFieldForm();
@@ -861,7 +862,7 @@ public partial class MainWindow : Window
         }
 
         var stages = string.Join(", ", configuration.Stages.Select(stage => stage.Id));
-        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}{field.Kind switch { FieldKind.File => "[file]", FieldKind.OcrText => "[ocr]", _ => "" }}"));
+        var fields = string.Join(", ", configuration.Fields.Select(field => $"{field.Id}@{field.StageId}{(field.Required ? "*" : "")}{field.Kind switch { FieldKind.File => "[file]", FieldKind.OcrText => "[ocr]", FieldKind.ScreenImage => "[image]", _ => "" }}"));
         var triggers = string.Join(" | ", configuration.Triggers.Select(trigger =>
             $"{trigger.Id}@{trigger.StageId}: {string.Join(" > ", trigger.Actions.Select(DescribeAction))}"));
         ConfigurationSummaryText.Text =
@@ -1137,6 +1138,7 @@ public partial class MainWindow : Window
         {
             FieldKind.File => 1,
             FieldKind.OcrText => 2,
+            FieldKind.ScreenImage => 3,
             _ => 0,
         };
     }

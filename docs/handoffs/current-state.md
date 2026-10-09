@@ -112,6 +112,19 @@ Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: di
 - Evidence: run 37395451712 on 10b4a7a — Domain 74, Infrastructure 68, Application 136, Windows 26, integration 55 (359) + packaged 1 + x86 30, all passing.
 - **Waiting on the publisher**: Partner Center account, reserved name and its three identity values, a public privacy-policy URL with a contact e-mail; then build with that identity and submit. Real sign-in start from the Store package: manual row 27.
 
+### Plan 12 — Screen-image fields (2026-10-09)
+
+Plan: `docs/superpowers/plans/2026-10-09-screen-image-fields.md`.
+
+- New field type *Imagem exibida na tela*: `FieldKind.ScreenImage`.
+  - Always captures the control's on-screen image as PNG, even when the control exposes text.
+  - Refused when anything covers the control.
+  - Stored as an attachment, like file fields.
+- RED observed locally:
+  - `SessionCoordinatorTests` and `IntegrationTestRunnerTests` (behaviour);
+  - `FieldKindTests` (compilation).
+- The new `FileCaptureTests` cases were pushed together with the fix, so their RED was not observed on CI. They would fail without it: the field would be read as text, with no image.
+
 ### Plan 11 — CSV export (2026-10-08)
 
 Plan: `docs/superpowers/plans/2026-10-08-csv-export.md`.

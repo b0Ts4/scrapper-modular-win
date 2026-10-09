@@ -71,8 +71,9 @@ public sealed class DesktopFileFieldWalkthroughTests : IDisposable
         Press(agent, "StartInspectionButton");
         await AddFieldAsync(agent, target, "MedicationTextBox", "medication", "Texto");
         await AddFieldAsync(agent, target, "PrescriptionFileTextBox", "prescription_file", "Arquivo / imagem (cópia do arquivo, até 10 MB)");
-        await AddFieldAsync(agent, target, "PrescriptionImage", "prescription_image", "Arquivo / imagem (cópia do arquivo, até 10 MB)");
+        await AddFieldAsync(agent, target, "PrescriptionImage", "prescription_image", "Imagem exibida na tela (captura da imagem)");
         Assert.Contains("prescription_file@budget*[file]", Text(agent, "ConfigurationSummaryText"), StringComparison.Ordinal);
+        Assert.Contains("prescription_image@budget*[image]", Text(agent, "ConfigurationSummaryText"), StringComparison.Ordinal);
 
         await HoverAndConfirmAsync(agent, target, "AddButton");
         SetText(agent, "TriggerSemanticIdBox", "add_item");

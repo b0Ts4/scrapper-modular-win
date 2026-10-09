@@ -257,6 +257,7 @@
                                         <ComboBoxItem Content="Texto" />
                                         <ComboBoxItem Content="Arquivo / imagem (cópia do arquivo, até 10 MB)" />
                                         <ComboBoxItem Content="Texto via OCR (lido da imagem do campo)" />
+                                        <ComboBoxItem Content="Imagem exibida na tela (captura da imagem)" />
                                     </ComboBox>
                                 </WrapPanel>
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="Identificador técnico (gerado do nome)" FontSize="11" Foreground="{StaticResource MutedBrush}" />

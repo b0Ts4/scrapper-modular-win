@@ -13,7 +13,8 @@ namespace Prescriva.Agent.Windows.IntegrationTests.Automation;
 /// <summary>
 /// File fields against the real TestTarget: a path box yields an exact copy of the file
 /// (bounded at 10 MB, typed failure for a missing file); an image-only control yields a PNG
-/// of exactly that control - refused when another window covers it.
+/// of exactly that control - refused when another window covers it. A screen-image field always
+/// yields the control's on-screen image, even when the control exposes text.
 /// </summary>
 public sealed class FileCaptureTests : IDisposable
 {
@@ -113,6 +114,62 @@ public sealed class FileCaptureTests : IDisposable
     }
 
     [Fact]
+    public async Task A_screen_image_field_captures_the_image_the_program_only_shows()
+    {
+        using var target = TestTargetLauncher.Launch();
+        ((TransformPattern)target.Window.GetCurrentPattern(TransformPattern.Pattern)).Move(0, 0);
+        Press(target, "ShowSampleImageButton");
+        await Task.Delay(300);
+
+        var result = await CaptureFileAsync(target, "PrescriptionImage", FieldKind.ScreenImage);
+
+        Assert.Equal(CaptureOutcome.Captured, result.Outcome);
+        var attachment = Assert.IsType<CapturedAttachment>(result.Attachment);
+        Assert.Equal(AttachmentSource.Screen, attachment.Source);
+        Assert.Equal("image/png", attachment.ContentType);
+        var frame = BitmapDecoder.Create(new MemoryStream(attachment.Content), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+        var left = Pixel(frame, frame.PixelWidth / 4, frame.PixelHeight / 2);
+        Assert.True(left.R > 200 && left.B < 60, $"Expected red on the left, got {left}.");
+    }
+
+    [Fact]
+    public async Task A_screen_image_field_captures_the_image_even_when_the_control_exposes_text()
+    {
+        // As a file field this box would yield the file its text names; as a screen image it
+        // yields what is shown on screen - never the file.
+        var path = Path.Combine(_directory, "receita.pdf");
+        await File.WriteAllBytesAsync(path, [0x25, 0x50, 0x44, 0x46]);
+        using var target = TestTargetLauncher.Launch();
+        ((TransformPattern)target.Window.GetCurrentPattern(TransformPattern.Pattern)).Move(0, 0);
+        SetText(target, "PrescriptionFileTextBox", path);
+        await Task.Delay(300);
+
+        var result = await CaptureFileAsync(target, "PrescriptionFileTextBox", FieldKind.ScreenImage);
+
+        Assert.Equal(CaptureOutcome.Captured, result.Outcome);
+        var attachment = Assert.IsType<CapturedAttachment>(result.Attachment);
+        Assert.Equal(AttachmentSource.Screen, attachment.Source);
+        Assert.Equal("image/png", attachment.ContentType);
+        Assert.Null(result.Value);
+    }
+
+    [Fact]
+    public async Task A_covered_screen_image_is_refused_instead_of_capturing_the_other_window()
+    {
+        using var target = TestTargetLauncher.Launch();
+        Press(target, "ShowSampleImageButton");
+        var bounds = Find(target, "PrescriptionImage").Current.BoundingRectangle;
+        using var cover = TestTargetLauncher.Launch();
+        ((TransformPattern)cover.Window.GetCurrentPattern(TransformPattern.Pattern)).Move(bounds.X - 50, bounds.Y - 50);
+        await Task.Delay(500);
+
+        var result = await CaptureFileAsync(target, "PrescriptionImage", FieldKind.ScreenImage);
+
+        Assert.Equal(CaptureOutcome.Obscured, result.Outcome);
+        Assert.Null(result.Attachment);
+    }
+
+    [Fact]
     public async Task An_image_covered_by_another_window_is_refused_instead_of_capturing_that_window()
     {
         using var target = TestTargetLauncher.Launch();
@@ -131,7 +188,7 @@ public sealed class FileCaptureTests : IDisposable
         Assert.Null(result.Attachment);
     }
 
-    private static async Task<CaptureResult> CaptureFileAsync(TestTargetLauncher target, string automationId)
+    private static async Task<CaptureResult> CaptureFileAsync(TestTargetLauncher target, string automationId, FieldKind kind = FieldKind.File)
     {
         using var dispatcher = new AutomationDispatcher();
         using var resolver = new UiAutomationSelectorResolver(dispatcher, processId: target.Window.Current.ProcessId);
@@ -142,7 +199,7 @@ public sealed class FileCaptureTests : IDisposable
         using var capture = new UiAutomationCaptureProvider(dispatcher);
         return await capture.CaptureAsync(
             resolution.Handle!,
-            new FieldDefinition("prescription", "budget", "Receita", Required: false, Selector: fingerprint, Kind: FieldKind.File),
+            new FieldDefinition("prescription", "budget", "Receita", Required: false, Selector: fingerprint, Kind: kind),
             CancellationToken.None);
     }
 
