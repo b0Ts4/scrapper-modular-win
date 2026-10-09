@@ -44,6 +44,21 @@ public sealed class FieldKindTests : IDisposable
     }
 
     [Fact]
+    public async Task A_screen_image_field_round_trips_through_the_json_store_as_a_readable_kind()
+    {
+        var store = new JsonConfigurationStore(_directory);
+        var text = TextOnly();
+        var image = text with { Fields = [text.Fields[0] with { Kind = FieldKind.ScreenImage }] };
+
+        await store.SaveAsync(image, CancellationToken.None);
+        var json = await File.ReadAllTextAsync(Path.Combine(_directory, "budget-flow.json"));
+        var loaded = await store.LoadAsync("budget-flow", CancellationToken.None);
+
+        Assert.Contains("\"kind\": \"screenImage\"", json, StringComparison.Ordinal);
+        Assert.Equal(FieldKind.ScreenImage, loaded.Fields[0].Kind);
+    }
+
+    [Fact]
     public async Task A_file_field_round_trips_through_the_json_store_as_a_readable_kind()
     {
         var store = new JsonConfigurationStore(_directory);

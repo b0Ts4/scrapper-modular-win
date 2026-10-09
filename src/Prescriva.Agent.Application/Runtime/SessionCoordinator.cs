@@ -492,7 +492,7 @@ public sealed class SessionCoordinator
             return (new CapturedFieldValue(null, failure), transient);
         }
 
-        if (field.Kind == FieldKind.File)
+        if (field.Kind.ProducesAttachment())
         {
             return (await StoreAttachmentAsync(trigger, field, captureResult, cancellationToken).ConfigureAwait(false), false);
         }

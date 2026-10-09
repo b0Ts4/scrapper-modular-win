@@ -150,6 +150,25 @@ public sealed class IntegrationTestRunnerTests
     }
 
     [Fact]
+    public async Task A_screen_image_field_without_an_image_is_unreadable_even_if_text_was_read()
+    {
+        var resolver = new FakeSelectorResolver(new() { [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95) });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, "texto", "uia", 1.0, TimeSpan.Zero, []),
+        });
+        var triggerProvider = new FakeTriggerProvider();
+        triggerProvider.FireOnce(TriggerId);
+        var configuration = BuildConfiguration();
+        configuration = configuration with { Fields = [configuration.Fields[0] with { Kind = FieldKind.ScreenImage }] };
+
+        var report = await new IntegrationTestRunner(resolver, captureProvider, triggerProvider, triggerTimeout: TimeSpan.FromSeconds(2)).RunAsync(configuration);
+
+        Assert.Equal(FieldCheckOutcome.Unreadable, Assert.Single(report.FieldResults).Outcome);
+        Assert.False(report.AllPassed);
+    }
+
+    [Fact]
     public async Task A_not_found_field_reports_the_not_found_failure_code_and_never_calls_capture()
     {
         var resolver = new FakeSelectorResolver(new()
