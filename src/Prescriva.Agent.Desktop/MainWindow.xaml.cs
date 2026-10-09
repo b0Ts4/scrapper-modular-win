@@ -894,8 +894,12 @@ public partial class MainWindow : Window
         }
 
         _innermost = IsKeyDown(VkShift);
-        var ctrlDown = IsKeyDown(VkControl);
-        var ctrlPressed = ctrlDown && !_ctrlWasDown;
+
+        // A press counts once: when Ctrl goes down, or when it was tapped between two polls
+        // (Windows keeps a "pressed since the last check" bit, so a quick tap is not lost).
+        var ctrlState = GetAsyncKeyState(VkControl);
+        var ctrlDown = (ctrlState & 0x8000) != 0;
+        var ctrlPressed = (ctrlDown && !_ctrlWasDown) || (!ctrlDown && (ctrlState & 0x0001) != 0);
         _ctrlWasDown = ctrlDown;
 
         await _inspectorViewModel.ObservePointerAsync(

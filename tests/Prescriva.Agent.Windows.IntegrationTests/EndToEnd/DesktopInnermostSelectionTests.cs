@@ -69,6 +69,7 @@ public sealed class DesktopInnermostSelectionTests : IDisposable
 
         // Ctrl with the mouse still over TestTarget confirms it.
         SetKey(VkControl, down: true);
+        await Task.Delay(300); // a person's key press, not a synthetic instant tap
         SetKey(VkControl, down: false);
         SetKey(VkShift, down: false);
         await WaitForTextAsync(agent, "ConfirmedSelectionText", "Nome='R$ 12,90'");
