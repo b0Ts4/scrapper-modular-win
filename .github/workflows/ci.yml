@@ -43,7 +43,9 @@ jobs:
           $exe = Resolve-Path "src/Prescriva.Agent.TestTarget/bin/Release/net10.0-windows/Prescriva.Agent.TestTarget.exe"
           $target = Start-Process $exe -PassThru
           try {
-            Start-Sleep -Seconds 5
+            $deadline = (Get-Date).AddSeconds(60)
+            while ((Get-Date) -lt $deadline -and (Get-Process -Id $target.Id).MainWindowHandle -eq 0) { Start-Sleep -Milliseconds 500 }
+            Start-Sleep -Seconds 2
             $report = Join-Path $env:RUNNER_TEMP "diagnostico.txt"
             ./scripts/diagnose-window.ps1 -Process Prescriva.Agent.TestTarget -Output $report
             $text = Get-Content $report -Raw -Encoding UTF8
