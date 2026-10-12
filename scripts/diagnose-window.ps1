@@ -59,7 +59,9 @@ $wb = $window.Current.BoundingRectangle
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add("Diagnostico de janela - Receita Facil Agent - $(Get-Date -Format 'yyyy-MM-dd HH:mm')")
 $lines.Add("Processo: $($target.Process).exe   Framework: $($window.Current.FrameworkId)   Classe: $($window.Current.ClassName)")
-$lines.Add("Janela: {0}x{1}   Nomes/valores incluidos: {2}" -f [int]$wb.Width, [int]$wb.Height, [bool]$IncludeNames)
+# Inside a method call, commas would split the -f arguments into method arguments: format first.
+$header = "Janela: {0}x{1}   Nomes/valores incluidos: {2}" -f @([int]$wb.Width, [int]$wb.Height, [bool]$IncludeNames)
+$lines.Add($header)
 $lines.Add("")
 $lines.Add("prof | tipo | AutomationId | classe | framework | x,y (relativo) | LxA | padroes" + ($(if ($IncludeNames) { " | nome" } else { "" })))
 
@@ -83,9 +85,9 @@ while ($stack.Count -gt 0 -and $stats.Total -lt $MaxElements) {
         $type = $c.ControlType.ProgrammaticName -replace '^ControlType\.', ''
         $b = $c.BoundingRectangle
         $patterns = ($e.GetSupportedPatterns() | ForEach-Object { $patternNames[$_.ProgrammaticName] } | Where-Object { $_ }) -join ','
-        $pos = if ($b.IsEmpty) { '-' } else { "{0},{1}" -f [int]($b.X - $wb.X), [int]($b.Y - $wb.Y) }
-        $size = if ($b.IsEmpty) { '-' } else { "{0}x{1}" -f [int]$b.Width, [int]$b.Height }
-        $line = "{0,4} | {1} | {2} | {3} | {4} | {5} | {6} | {7}" -f $depth, $type, $c.AutomationId, $c.ClassName, $c.FrameworkId, $pos, $size, $patterns
+        $pos = if ($b.IsEmpty) { '-' } else { "{0},{1}" -f @([int]($b.X - $wb.X), [int]($b.Y - $wb.Y)) }
+        $size = if ($b.IsEmpty) { '-' } else { "{0}x{1}" -f @([int]$b.Width, [int]$b.Height) }
+        $line = "{0,4} | {1} | {2} | {3} | {4} | {5} | {6} | {7}" -f @($depth, $type, $c.AutomationId, $c.ClassName, $c.FrameworkId, $pos, $size, $patterns)
         if ($IncludeNames) { $line += " | " + $c.Name }
         $lines.Add((' ' * [Math]::Min($depth, 20)) + $line)
 
@@ -103,9 +105,10 @@ while ($stack.Count -gt 0 -and $stats.Total -lt $MaxElements) {
     } catch [System.Windows.Automation.ElementNotAvailableException] { }
 }
 
-$lines.Insert(4, "Resumo: {0} elementos ({1} com AutomationId); campos de texto {2} ({3} com AutomationId); botoes {4} ({5} com AutomationId); imagens {6}; paineis {7}{8}" -f `
-    $stats.Total, $stats.WithId, $stats.Edits, $stats.EditsWithId, $stats.Buttons, $stats.ButtonsWithId, $stats.Images, $stats.Panes, `
-    $(if ($stats.Total -ge $MaxElements) { " (limite de $MaxElements atingido)" } else { "" }))
+$limitNote = if ($stats.Total -ge $MaxElements) { " (limite de $MaxElements atingido)" } else { "" }
+$summary = "Resumo: {0} elementos ({1} com AutomationId); campos de texto {2} ({3} com AutomationId); botoes {4} ({5} com AutomationId); imagens {6}; paineis {7}{8}" -f @(
+    $stats.Total, $stats.WithId, $stats.Edits, $stats.EditsWithId, $stats.Buttons, $stats.ButtonsWithId, $stats.Images, $stats.Panes, $limitNote)
+$lines.Insert(4, $summary)
 $lines.Insert(5, "")
 [IO.File]::WriteAllLines($Output, $lines, [Text.UTF8Encoding]::new($true))
 Write-Output "Relatorio salvo em: $Output"
