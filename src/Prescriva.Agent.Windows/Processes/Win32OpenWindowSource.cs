@@ -6,9 +6,10 @@ using Prescriva.Agent.Application.Inspection;
 namespace Prescriva.Agent.Windows.Processes;
 
 /// <summary>
-/// The open programs a person can pick from: visible, titled, unowned top-level windows that are
-/// not cloaked (a suspended Store app's hidden frame is) and not tool windows, excluding the
-/// Agent's own process. Store/UWP apps are framed by <c>ApplicationFrameHost</c>; for those the
+/// The open programs a person can pick from: visible, titled top-level windows with an area,
+/// unowned (or owned by a zero-size application window, as every Delphi form is), not cloaked
+/// (a suspended Store app's hidden frame is) and not tool windows, excluding the Agent's own
+/// process. Store/UWP apps are framed by <c>ApplicationFrameHost</c>; for those the
 /// listed process is the one that owns the content (e.g. <c>CalculatorApp</c>), which is the
 /// process the integration identifies. Reads only window titles and process names - never
 /// window content - and keeps nothing.
@@ -113,7 +114,15 @@ public sealed class Win32OpenWindowSource : IOpenWindowSource
 
     private static bool IsCandidate(IntPtr handle)
     {
-        if (!IsWindowVisible(handle) || GetWindow(handle, GwOwner) != IntPtr.Zero)
+        if (!IsWindowVisible(handle) || HasNoArea(handle))
+        {
+            return false;
+        }
+
+        // An owned window is a dialog of another window - except under a zero-size owner:
+        // Delphi (VCL) programs own every form by their hidden "TApplication" window.
+        var owner = GetWindow(handle, GwOwner);
+        if (owner != IntPtr.Zero && !HasNoArea(owner))
         {
             return false;
         }
@@ -125,6 +134,9 @@ public sealed class Win32OpenWindowSource : IOpenWindowSource
 
         return DwmGetWindowAttribute(handle, DwmwaCloaked, out var cloaked, sizeof(int)) != 0 || cloaked == 0;
     }
+
+    private static bool HasNoArea(IntPtr handle) =>
+        !GetWindowRect(handle, out var rect) || rect.Right <= rect.Left || rect.Bottom <= rect.Top;
 
     private static string TitleOf(IntPtr handle)
     {
@@ -189,6 +201,18 @@ public sealed class Win32OpenWindowSource : IOpenWindowSource
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetWindow(IntPtr handle, int command);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr handle, out Rect rect);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr handle, int index);
