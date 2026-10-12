@@ -51,6 +51,8 @@ jobs:
             $text = Get-Content $report -Raw -Encoding UTF8
             Get-Content $report -Encoding UTF8 | Select-Object -First 40
             if ($text -notmatch "MedicationTextBox") { throw "The report misses a known AutomationId." }
+            if ($text -notmatch "(?m)^\s+1 \| Edit \| MedicationTextBox") { throw "The report does not nest the window's children at depth 1." }
+            if ($text -notmatch "(?m)^\s+[2-9] \| HeaderItem") { throw "The report does not nest the grid's headers below the grid." }
             if ($text -match "Dipirona|R\$ 12,90|Itens: 0") { throw "Screen text leaked into a structure-only report." }
           } finally {
             Stop-Process -Id $target.Id -Force -ErrorAction SilentlyContinue

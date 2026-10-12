@@ -101,7 +101,8 @@ while ($stack.Count -gt 0 -and $stats.Total -lt $MaxElements) {
         $kids = New-Object System.Collections.Generic.List[object]
         $child = $walker.GetFirstChild($e)
         while ($child) { $kids.Add($child); $child = $walker.GetNextSibling($child) }
-        for ($i = $kids.Count - 1; $i -ge 0; $i--) { $stack.Push(@($kids[$i], $depth + 1)) }
+        # Parentheses matter: "a, b + 1" is "(a, b) + 1" in PowerShell.
+        for ($i = $kids.Count - 1; $i -ge 0; $i--) { $stack.Push(@($kids[$i], ($depth + 1))) }
     } catch [System.Windows.Automation.ElementNotAvailableException] { }
 }
 
