@@ -1,5 +1,7 @@
 # Current state
 
+## Status — 2026-10-12 (first real pharmacy system test: two fixes, resolution too slow on FórmulaCerta; see "First test on a real pharmacy system")
+
 ## Status — 2026-10-07 (plan 10 done; see below)
 
 ## Status — 2026-10-04
@@ -175,6 +177,22 @@ Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 task
 - Screenshots of the five steps (CI run 37549925964): `docs/screenshots/guided-ui/`.
 - Evidence: run 37549925964 on 5661329 (same counts as run 37548039030 on f016abb) — Domain 74, Infrastructure 69, Application 150, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
 
+### First test on a real pharmacy system — FórmulaCerta 6.0 (2026-10-12)
+
+Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's PC, against the *Saídas > Receitas* test screen (`FCReceitas.exe`, Delphi VCL). Details and per-step results: `docs/testing/milestone-1-manual.md`, section "Real pharmacy system". Nothing was saved or issued in the pharmacy system; the diagnostic report stays on that PC.
+
+- **Fix — slow programs never showed an element while marking**: one inspection takes 250–330 ms on this program and every 80 ms poll cancelled the one in flight. `InspectionController` now lets a repeated observation of the same point and depth join the inspection in flight. RED `Repeated_observations_of_the_same_point_wait_for_the_slow_inspection_in_flight` (locally), GREEN after.
+- **Fix — Delphi forms missing from the program list**: every Delphi form is owned by the zero-size `TApplication` window, and the list skipped owned windows (or offered the zero-size window, which has no fields). `Win32OpenWindowSource` now lists windows owned by a zero-size owner and never lists zero-size windows. RED `A_form_owned_by_a_zero_size_application_window_is_listed_instead_of_its_owner` (both owner states, locally), GREEN after.
+- Evidence (local, operator's PC): Release build 0 warnings; Domain 74, Application 171, Infrastructure 71, Windows 26; `OpenWindowSourceTests` 5/5. The rest of the integration suite was not run there (it drives the real cursor over the pharmacy system) - CI must run it.
+- **Still blocking FórmulaCerta (not fixed)**:
+  1. Resolution `TimedOut` for every field and the button: under .NET 10 the form exposes 117 UI Automation elements; `FindAll` takes ~8 s and reading their properties ~28 s (limit 10 s); a `CacheRequest` does not help (~15 s). Needs a plan: a native Win32 path (enumerate child windows, match class + relative position + parent classes, then `AutomationElement.FromHandle`).
+  2. AutomationId equals the control's window handle on Win32 controls without an ID (changes every start); the selector must not rely on it.
+  3. Labels are `TLabel` (no window): no label signal at all.
+  4. Text read: edits show as `Document`/`Pane`; capture may need `WM_GETTEXT` or OCR - to be confirmed once resolution works.
+  5. After the outline grows over a large container, hit-testing from inside the Agent returns the Agent's own outline window, so inner fields cannot be reached until marking restarts (`OverlayExclusionTests` accepts that outcome; a RED test can put the overlay over the whole TestTarget window and point at a field inside).
+  6. Window rule includes the program version ("FórmulaCerta - Receitas 6.0.1164").
+  7. Test-mode failure text is English ("Could not resolve the element for trigger ...").
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
@@ -189,6 +207,7 @@ Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 task
 
 ### Exact next action
 
+0. Push `fix/formulacerta-inspection` and let CI run the whole suite (incl. x86); then write the plan for Win32/Delphi resolution (items 1–4 of the FórmulaCerta section) and repeat the FórmulaCerta walkthrough on the operator's PC.
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
 2. Publisher: create the Partner Center account and reserve the name; send the three identity values (see `docs/release/microsoft-store.md`); then build with them and submit.
 3. A person verifies rows 29–32 on Windows 10/11 (Store Calculator, new Notepad, scaling).
