@@ -180,6 +180,43 @@ public sealed class InspectionControllerTests
         Assert.Equal(secondSnapshot, controller.CurrentState.Snapshot);
     }
 
+    /// <summary>
+    /// The Agent polls the pointer every 80 ms. Against a slow program (a Delphi screen took
+    /// 250-330 ms per inspection on a pharmacy PC) every poll used to cancel the one still in
+    /// flight although the pointer had not moved, so no result was ever shown. A repeated
+    /// observation of the same point must wait for the inspection already running instead.
+    /// </summary>
+    [Fact]
+    public async Task Repeated_observations_of_the_same_point_wait_for_the_slow_inspection_in_flight()
+    {
+        var inspector = new FakeElementInspector();
+        var firstCallCts = new TaskCompletionSource<CancellationToken>();
+        var firstCallResult = new TaskCompletionSource<InspectionResult>();
+        inspector.Enqueue(ct =>
+        {
+            firstCallCts.TrySetResult(ct);
+            return firstCallResult.Task;
+        });
+
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        var point = new ScreenPoint(5, 5);
+        var first = controller.ObservePointerAsync(point);
+        var firstToken = await firstCallCts.Task;
+        var second = controller.ObservePointerAsync(point);
+        var third = controller.ObservePointerAsync(point);
+
+        Assert.False(firstToken.IsCancellationRequested);
+        Assert.Equal(1, inspector.CallCount);
+
+        var slowSnapshot = Snapshot("SlowDelphiField");
+        firstCallResult.TrySetResult(InspectionResult.Found(slowSnapshot));
+        await Task.WhenAll(first, second, third);
+
+        Assert.Equal(slowSnapshot, controller.CurrentState.Snapshot);
+    }
+
     [Fact]
     public async Task StopAsync_removes_the_highlight()
     {
