@@ -37,6 +37,23 @@ jobs:
       - name: Build (Release, warnings as errors)
         run: dotnet build Prescriva.Agent.slnx --configuration Release --no-restore
 
+      - name: Window diagnostic script against the TestTarget (structure only, no screen text)
+        shell: powershell
+        run: |
+          $exe = Resolve-Path "src/Prescriva.Agent.TestTarget/bin/Release/net10.0-windows/Prescriva.Agent.TestTarget.exe"
+          $target = Start-Process $exe -PassThru
+          try {
+            Start-Sleep -Seconds 5
+            $report = Join-Path $env:RUNNER_TEMP "diagnostico.txt"
+            ./scripts/diagnose-window.ps1 -Process Prescriva.Agent.TestTarget -Output $report
+            $text = Get-Content $report -Raw -Encoding UTF8
+            Get-Content $report -Encoding UTF8 | Select-Object -First 40
+            if ($text -notmatch "MedicationTextBox") { throw "The report misses a known AutomationId." }
+            if ($text -match "Dipirona|R\$ 12,90|Itens: 0") { throw "Screen text leaked into a structure-only report." }
+          } finally {
+            Stop-Process -Id $target.Id -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Unit tests
         run: >
           dotnet test Prescriva.Agent.slnx --configuration Release --no-build
