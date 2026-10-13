@@ -1,0 +1,86 @@
+{
+  "id": "formulacerta_orcamento",
+  "name": "FórmulaCerta – Orçamento de fórmula",
+  "description": "Lê, na tela de Orçamentos do FórmulaCerta 6, a posologia, o prescritor (conselho, UF, número do registro e nome) e os componentes da fórmula com suas quantidades, quando o botão OK é clicado. Cada item traz uma posição sugerida: use-a, teste e, se não servir, marque o campo você mesmo. Tudo pode ser renomeado, removido ou acrescentado.",
+  "program": {
+    "processIdentity": "FCReceitas.exe",
+    "windowTitleContains": "Orçamentos",
+    "howToOpen": "No FórmulaCerta, abra a tela de Orçamentos (por exemplo pelo botão Orçamento da tela de Receitas, ou por Nova Fórmula num pedido do MobyPharma)."
+  },
+  "items": [
+    {
+      "id": "posologia",
+      "kind": "field",
+      "name": "Posologia",
+      "help": "Como o paciente deve usar a fórmula. Aba Fórmula, campo largo 'Posologia' (abaixo de Forma Farmacêutica).",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBComboBox", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.55, "width": 0.6938, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBComboBox[2]" }
+    },
+    {
+      "id": "prescritor_conselho",
+      "kind": "field",
+      "name": "Conselho do prescritor (CRM, CRO...)",
+      "help": "1ª caixinha da linha 'Prescritor' (aba Fórmula): o tipo de conselho do médico ou dentista. Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.48, "width": 0.0455, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[5]" }
+    },
+    {
+      "id": "prescritor_uf",
+      "kind": "field",
+      "name": "UF do registro do prescritor",
+      "help": "2ª caixinha da linha 'Prescritor': o estado do registro (ex.: SP). Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.1471, "y": 0.48, "width": 0.049, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[4]" }
+    },
+    {
+      "id": "prescritor_crm",
+      "kind": "field",
+      "name": "Número do registro (CRM)",
+      "help": "3º campo da linha 'Prescritor': o número do CRM (ou do conselho). Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.1974, "y": 0.48, "width": 0.0682, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TwwDBEdit[1]" }
+    },
+    {
+      "id": "prescritor_nome",
+      "kind": "field",
+      "name": "Nome do prescritor (médico)",
+      "help": "Campo mais largo da linha 'Prescritor': o nome do médico ou dentista. Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.2679, "y": 0.48, "width": 0.2273, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TwwDBEdit[0]" }
+    },
+    {
+      "id": "componentes",
+      "kind": "field",
+      "name": "Componentes e quantidades (texto da grade)",
+      "help": "A grade da parte de baixo (Código, Descrição, Quantidade, Unid.). O FórmulaCerta não expõe as células, então a grade inteira é lida por OCR: cada linha da grade vira uma linha de texto. Só aparece o que está visível: se houver muitos componentes, confira se a grade mostra todos.",
+      "fieldKind": "ocrText",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" }
+    },
+    {
+      "id": "componentes_imagem",
+      "kind": "field",
+      "name": "Componentes (imagem da grade)",
+      "help": "A mesma grade guardada como imagem, para conferir o que o OCR leu (ou para a sua IA ler).",
+      "fieldKind": "screenImage",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" }
+    },
+    {
+      "id": "ok",
+      "kind": "button",
+      "name": "Botão OK (confirma o orçamento)",
+      "help": "O botão OK no alto, à direita. Quando ele é clicado o Agent lê os campos acima. Se no teste os valores vierem vazios (a tela já foi limpa pelo clique), escolha outro botão que a pessoa clica antes de gravar, como Recálculo.",
+      "fieldKind": "text",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.805, "y": 0.1783, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronButton[8]" },
+      "capturedFields": null,
+      "emitEvent": "orcamento_lido"
+    }
+  ]
+}

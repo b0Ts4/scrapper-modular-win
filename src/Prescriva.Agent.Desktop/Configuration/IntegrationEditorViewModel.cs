@@ -191,6 +191,39 @@ public sealed class IntegrationEditorViewModel
         MarkDirty();
     }
 
+    /// <summary>Points a field at another element (marked again); its ID, meaning and kind are kept.</summary>
+    public void SetFieldSelector(string fieldId, ElementFingerprint selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        var current = RequireConfiguration();
+        var field = FindField(fieldId);
+
+        Configuration = current with { Fields = current.Fields.Replace(field, field with { Selector = selector }) };
+        _resolvedHandles.Remove(fieldId);
+        MarkDirty();
+    }
+
+    /// <summary>Changes how a field is read (text, OCR, image...).</summary>
+    public void SetFieldKind(string fieldId, FieldKind kind)
+    {
+        var current = RequireConfiguration();
+        var field = FindField(fieldId);
+
+        Configuration = current with { Fields = current.Fields.Replace(field, field with { Kind = kind }) };
+        MarkDirty();
+    }
+
+    /// <summary>Points a trigger at another button (marked again); its actions are kept.</summary>
+    public void SetTriggerSelector(string triggerId, ElementFingerprint selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        var current = RequireConfiguration();
+        var trigger = FindTrigger(triggerId);
+
+        Configuration = current with { Triggers = current.Triggers.Replace(trigger, trigger with { Selector = selector }) };
+        MarkDirty();
+    }
+
     /// <summary>Removes a trigger.</summary>
     public void RemoveTrigger(string triggerId)
     {

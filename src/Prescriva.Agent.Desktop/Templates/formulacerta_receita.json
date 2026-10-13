@@ -1,0 +1,86 @@
+{
+  "id": "formulacerta_receita",
+  "name": "FórmulaCerta – Receita (tela de Receitas)",
+  "description": "Lê, na tela de Receitas do FórmulaCerta 6, a posologia, o prescritor (conselho, UF, número do registro e nome) e os componentes da fórmula com suas quantidades, quando o botão OK é clicado. Cada item traz uma posição sugerida: use-a, teste e, se não servir, marque o campo você mesmo. Tudo pode ser renomeado, removido ou acrescentado.",
+  "program": {
+    "processIdentity": "FCReceitas.exe",
+    "windowTitleContains": "Receitas",
+    "howToOpen": "No FórmulaCerta, abra Saídas > Receitas."
+  },
+  "items": [
+    {
+      "id": "posologia",
+      "kind": "field",
+      "name": "Posologia",
+      "help": "Como o paciente deve usar a fórmula. Aba Geral > Fórmula, campo largo 'Posologia'.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBComboBox", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.505, "width": 0.6746, "height": 0.0317 }, "windowPath": "TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TwwDBComboBox[2]" }
+    },
+    {
+      "id": "prescritor_conselho",
+      "kind": "field",
+      "name": "Conselho do prescritor (CRM, CRO...)",
+      "help": "1ª caixinha da linha 'Prescritor': o tipo de conselho do médico ou dentista. Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.435, "width": 0.0467, "height": 0.0317 }, "windowPath": "TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[5]" }
+    },
+    {
+      "id": "prescritor_uf",
+      "kind": "field",
+      "name": "UF do registro do prescritor",
+      "help": "2ª caixinha da linha 'Prescritor': o estado do registro (ex.: SP). Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.1471, "y": 0.435, "width": 0.0443, "height": 0.0317 }, "windowPath": "TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[4]" }
+    },
+    {
+      "id": "prescritor_crm",
+      "kind": "field",
+      "name": "Número do registro (CRM)",
+      "help": "3º campo da linha 'Prescritor': o número do CRM (ou do conselho). Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.1938, "y": 0.435, "width": 0.0574, "height": 0.0317 }, "windowPath": "TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]" }
+    },
+    {
+      "id": "prescritor_nome",
+      "kind": "field",
+      "name": "Nome do prescritor (médico)",
+      "help": "Campo mais largo da linha 'Prescritor': o nome do médico ou dentista. Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.2524, "y": 0.435, "width": 0.2105, "height": 0.0317 }, "windowPath": "TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[6]" }
+    },
+    {
+      "id": "componentes",
+      "kind": "field",
+      "name": "Componentes e quantidades (texto da grade)",
+      "help": "A grade da parte de baixo (Código, Descrição, Quantidade, Unid., Lote). O FórmulaCerta não expõe as células, então a grade inteira é lida por OCR: cada linha da grade vira uma linha de texto. Só aparece o que está visível na grade.",
+      "fieldKind": "ocrText",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0132, "y": 0.6483, "width": 0.7691, "height": 0.2517 }, "windowPath": "TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TFagronPanel[1]/TwwDBGrid[0]" }
+    },
+    {
+      "id": "componentes_imagem",
+      "kind": "field",
+      "name": "Componentes (imagem da grade)",
+      "help": "A mesma grade guardada como imagem, para conferir o que o OCR leu (ou para a sua IA ler).",
+      "fieldKind": "screenImage",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0132, "y": 0.6483, "width": 0.7691, "height": 0.2517 }, "windowPath": "TFagronPanel[0]/TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TFagronPanel[1]/TwwDBGrid[0]" }
+    },
+    {
+      "id": "ok",
+      "kind": "button",
+      "name": "Botão OK (grava a receita)",
+      "help": "O botão OK à direita. Quando ele é clicado o Agent lê os campos acima. Se no teste os valores vierem vazios (a tela já foi limpa pelo clique), escolha outro botão que a pessoa clica antes de gravar, como Recálculo.",
+      "fieldKind": "text",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.8026, "y": 0.2017, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronPanel[0]/TFagronButton[8]" },
+      "capturedFields": null,
+      "emitEvent": "receita_lida"
+    }
+  ]
+}
