@@ -143,6 +143,7 @@ public partial class MainWindow : Window
             RefreshSavedIntegrations();
             RefreshWizardLists();
             UpdateStepButtons();
+            await RefreshTemplatesAsync();
             await RefreshOpenWindowsAsync();
         };
         Closing += OnClosing;
@@ -342,6 +343,7 @@ public partial class MainWindow : Window
             }
 
             var application = new ApplicationDefinition(ProcessIdentityBox.Text.Trim(), WindowRuleBox.Text.Trim());
+            LeaveGuide();
             _editorViewModel.CreateIntegration(IntegrationIdBox.Text.Trim(), IntegrationNameBox.Text.Trim(), application);
             SetStatus($"Integração '{_editorViewModel.Configuration!.Id}' criada. Agora marque os campos (passo 2). {UnsavedChanges()}");
         }
@@ -385,6 +387,11 @@ public partial class MainWindow : Window
         {
             var confirmed = await _inspectorViewModel.ConfirmAsync();
             _confirmedSelection = confirmed;
+            if (TryMarkGuideItem(confirmed))
+            {
+                return;
+            }
+
             var confirmedText =
                 $"Confirmado: AutomationId='{confirmed.Snapshot?.AutomationId}', Nome='{confirmed.Snapshot?.Name}', Tipo='{confirmed.Snapshot?.ControlType}', Rótulo='{LabelOf(confirmed.Snapshot)}'.";
             ConfirmedSelectionText.Text = confirmedText;
@@ -595,6 +602,7 @@ public partial class MainWindow : Window
         try
         {
             await _editorViewModel.ReloadAsync(IntegrationIdBox.Text.Trim());
+            LeaveGuide();
             SetStatus($"Integração '{_editorViewModel.Configuration!.Id}' recarregada com {_editorViewModel.Configuration.Fields.Length} campo(s).");
         }
         catch (Exception ex)

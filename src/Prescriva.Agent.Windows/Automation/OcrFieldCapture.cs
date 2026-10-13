@@ -57,6 +57,12 @@ public static class OcrFieldCapture
             ColorManagementMode.DoNotColorManage).AsTask(cancellationToken).ConfigureAwait(false);
 
         var result = await engine.RecognizeAsync(bitmap).AsTask(cancellationToken).ConfigureAwait(false);
-        return new OcrReading(OcrText.Normalize(result.Lines.Select(line => line.Text)), tag);
+        // A grid's cells come back as separate lines: rebuild its rows from where they sit.
+        return new OcrReading(OcrText.Rows(result.Lines.Where(line => line.Words.Count > 0).Select(line =>
+        {
+            var top = line.Words.Min(word => word.BoundingRect.Y);
+            var bottom = line.Words.Max(word => word.BoundingRect.Y + word.BoundingRect.Height);
+            return new OcrText.PlacedLine(line.Text, line.Words.Min(word => word.BoundingRect.X), top, bottom - top);
+        })), tag);
     }
 }

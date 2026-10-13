@@ -164,6 +164,22 @@
 
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Começar por um modelo (recomendado)" />
+                                <TextBlock Style="{StaticResource Guidance}" Margin="0,0,0,6" FontSize="12"
+                                           Text="Um modelo traz a lista do que capturar, explicada item por item, com posições sugeridas. Nada fica fixo: no passo 2 você testa cada item, ajusta o que precisar e pode salvar a sua versão." />
+                                <ListBox x:Name="TemplatesList" MaxHeight="130" VirtualizingPanel.IsVirtualizing="False"
+                                         SelectionChanged="TemplatesList_SelectionChanged" AutomationProperties.Name="Modelos" />
+                                <TextBlock x:Name="TemplatesEmptyText" Style="{StaticResource EmptyState}" Visibility="Collapsed"
+                                           Text="Nenhum modelo disponível." />
+                                <TextBlock x:Name="TemplateDescriptionText" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock x:Name="TemplateHowToOpenText" TextWrapping="Wrap" FontStyle="Italic" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" />
+                                <Button x:Name="UseTemplateButton" Content="Usar este modelo" Click="UseTemplateButton_Click" IsEnabled="False"
+                                        Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
                                 <TextBlock Style="{StaticResource SectionTitle}" Text="Programas abertos" />
                                 <DockPanel Margin="0,0,0,6">
                                     <Button x:Name="RefreshWindowsButton" DockPanel.Dock="Right" Content="Atualizar lista" Click="RefreshWindowsButton_Click" Margin="8,0,0,0" />
@@ -230,6 +246,80 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,16,0">
                     <StackPanel>
                         <TextBlock Style="{StaticResource StepTitle}" Text="Marque os campos a capturar" />
+
+                        <Border x:Name="GuideCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock x:Name="GuideTitleText" Style="{StaticResource SectionTitle}" Text="Roteiro do modelo" />
+                                <TextBlock Style="{StaticResource Guidance}" Margin="0,0,0,6" FontSize="12"
+                                           Text="Siga item por item: 1) escolha o item na lista; 2) clique em 'Usar posição sugerida' ou em 'Marcar no programa' (passe o mouse sobre o campo e aperte Ctrl); 3) clique em 'Testar este item'. Pule o que não precisar e ajuste o que quiser." />
+                                <TextBlock x:Name="GuideProgressText" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <ListBox x:Name="GuideItemsList" MaxHeight="230" VirtualizingPanel.IsVirtualizing="False"
+                                         SelectionChanged="GuideItemsList_SelectionChanged" AutomationProperties.Name="Itens do roteiro" />
+
+                                <Border Background="#F3F6F5" Padding="10" Margin="0,8,0,0" CornerRadius="4">
+                                    <StackPanel>
+                                        <TextBlock x:Name="GuideItemNameText" FontWeight="SemiBold" TextWrapping="Wrap" Text="Escolha um item na lista." />
+                                        <TextBlock x:Name="GuideItemHelpText" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="GuideUseSuggestionButton" Content="Usar posição sugerida" Click="GuideUseSuggestionButton_Click" Style="{StaticResource PrimaryButton}" />
+                                            <Button x:Name="GuideMarkButton" Content="Marcar no programa" Click="GuideMarkButton_Click" />
+                                            <Button x:Name="GuideTestButton" Content="Testar este item" Click="GuideTestButton_Click" />
+                                            <Button x:Name="GuideSkipButton" Content="Pular" Click="GuideSkipButton_Click" />
+                                        </WrapPanel>
+                                        <TextBlock x:Name="GuideItemResultText" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Expander Header="Ajustar este item" Margin="0,8,0,0">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Nome" />
+                                        <TextBox x:Name="GuideAdjustNameBox" />
+                                        <WrapPanel Margin="0,6,0,0">
+                                            <CheckBox x:Name="GuideAdjustRequiredBox" Content="Obrigatório (sem ele, nada é gerado)" Margin="0,0,16,0" />
+                                            <TextBlock Text="Como ler:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                            <ComboBox x:Name="GuideAdjustKindBox" MinWidth="220" SelectedIndex="0">
+                                                <ComboBoxItem Content="Texto" />
+                                                <ComboBoxItem Content="Arquivo / imagem (cópia do arquivo)" />
+                                                <ComboBoxItem Content="Texto via OCR (lido da imagem)" />
+                                                <ComboBoxItem Content="Imagem exibida na tela" />
+                                            </ComboBox>
+                                        </WrapPanel>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="GuideAdjustButton" Content="Salvar ajuste" Click="GuideAdjustButton_Click" />
+                                            <Button x:Name="GuideRemoveItemButton" Content="Tirar do roteiro" Click="GuideRemoveItemButton_Click" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Header="Acrescentar um item" Margin="0,4,0,0">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Nome do novo item (ex.: Data da prescrição)" />
+                                        <TextBox x:Name="GuideNewItemNameBox" />
+                                        <WrapPanel Margin="0,6,0,0">
+                                            <TextBlock Text="É um:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                            <ComboBox x:Name="GuideNewItemKindBox" MinWidth="220" SelectedIndex="0">
+                                                <ComboBoxItem Content="Campo de texto" />
+                                                <ComboBoxItem Content="Campo lido por OCR" />
+                                                <ComboBoxItem Content="Imagem da tela" />
+                                                <ComboBoxItem Content="Botão que dispara a leitura" />
+                                            </ComboBox>
+                                            <Button x:Name="GuideAddItemButton" Content="Acrescentar ao roteiro" Click="GuideAddItemButton_Click" Margin="8,0,0,0" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Header="Salvar como meu modelo" Margin="0,4,0,0">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Style="{StaticResource Guidance}" Margin="0" FontSize="12"
+                                                   Text="Guarda este roteiro do jeito que está (nomes, tipos, posições marcadas, sem os itens pulados) para usar de novo, aqui ou em outro computador." />
+                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Nome do modelo" />
+                                        <TextBox x:Name="GuideSaveTemplateNameBox" />
+                                        <Button x:Name="GuideSaveTemplateButton" Content="Salvar modelo" Click="GuideSaveTemplateButton_Click" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock Style="{StaticResource Guidance}"
                                    Text="Clique em 'Começar a marcar', passe o mouse sobre um campo no programa (ele fica contornado) e clique em 'Usar este elemento'. Depois dê um nome ao campo, como você o chama no dia a dia." />
                         <TextBlock Style="{StaticResource Guidance}" FontSize="12"

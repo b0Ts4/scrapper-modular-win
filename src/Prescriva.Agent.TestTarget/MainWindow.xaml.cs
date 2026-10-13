@@ -37,6 +37,12 @@ public partial class MainWindow : Window
 
     private void ApplyLayoutVariant(string variant)
     {
+        if (string.Equals(variant, "win32-form", StringComparison.OrdinalIgnoreCase))
+        {
+            Loaded += (_, _) => Win32Form.Show();
+            return;
+        }
+
         if (string.Equals(variant, "duplicate-controls", StringComparison.OrdinalIgnoreCase))
         {
             // Deliberately reuses the AutomationId "MedicationTextBox" so tests can

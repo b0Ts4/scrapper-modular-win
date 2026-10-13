@@ -62,6 +62,16 @@ public sealed class SelectorFragilityTests
     }
 
     [Fact]
+    public void A_Delphi_control_matched_by_its_window_path_does_not_depend_on_position_alone()
+    {
+        var evidence = ImmutableDictionary<string, int>.Empty.Add("windowPath", 40).Add("controlType", 15).Add("relativeBounds", 5);
+
+        var warnings = SelectorFragility.Assess(Selector() with { WindowPath = "TPanel[0]/TEdit[1]" }, Found(1.0, evidence, lead: 40));
+
+        Assert.Equal([SelectorFragilityWarning.MissingAutomationId], warnings.ToArray());
+    }
+
+    [Fact]
     public void Only_a_found_resolution_is_assessed()
     {
         Assert.Empty(SelectorFragility.Assess(Selector(), SelectorResolution.NotFound("gone")));

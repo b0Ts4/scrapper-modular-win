@@ -1,5 +1,7 @@
 # Current state
 
+## Status — 2026-10-12 (first real pharmacy system test: FórmulaCerta works end to end after two fixes and plan 14; see "First test on a real pharmacy system")
+
 ## Status — 2026-10-07 (plan 10 done; see below)
 
 ## Status — 2026-10-04
@@ -175,6 +177,34 @@ Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 task
 - Screenshots of the five steps (CI run 37549925964): `docs/screenshots/guided-ui/`.
 - Evidence: run 37549925964 on 5661329 (same counts as run 37548039030 on f016abb) — Domain 74, Infrastructure 69, Application 150, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
 
+### First test on a real pharmacy system — FórmulaCerta 6.0 (2026-10-12)
+
+Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's PC, against the *Saídas > Receitas* test screen (`FCReceitas.exe`, Delphi VCL). Details and per-step results: `docs/testing/milestone-1-manual.md`, section "Real pharmacy system". Nothing was saved or issued in the pharmacy system; the diagnostic report stays on that PC.
+
+- **Fix — slow programs never showed an element while marking**: one inspection takes 250–330 ms on this program and every 80 ms poll cancelled the one in flight. `InspectionController` now lets a repeated observation of the same point and depth join the inspection in flight. RED `Repeated_observations_of_the_same_point_wait_for_the_slow_inspection_in_flight` (locally), GREEN after.
+- **Fix — Delphi forms missing from the program list**: every Delphi form is owned by the zero-size `TApplication` window, and the list skipped owned windows (or offered the zero-size window, which has no fields). `Win32OpenWindowSource` now lists windows owned by a zero-size owner and never lists zero-size windows. RED `A_form_owned_by_a_zero_size_application_window_is_listed_instead_of_its_owner` (both owner states, locally), GREEN after.
+- Evidence (local, operator's PC): Release build 0 warnings; Domain 74, Application 171, Infrastructure 71, Windows 26; `OpenWindowSourceTests` 5/5. The rest of the integration suite was not run there (it drives the real cursor over the pharmacy system) - CI must run it.
+- **Plan 14 — Win32/Delphi selectors** (`docs/superpowers/plans/2026-10-12-win32-delphi-selectors.md`), same day, each test first:
+  - `ElementFingerprint.WindowPath`; the matcher scores it in the AutomationId's slot and weight (weights stay v2, approvals stay valid). RED: `SelectorMatcherTests.WindowPath_*` (locally).
+  - Content hash folds `windowPath` only when present (RED `WindowPathSelectorTests`; `FieldKindTests` characterization unchanged).
+  - Inspector: an AutomationId equal to the element's window handle is dropped and the window path recorded; ancestors/labels dropped; a name kept only for captioned controls (a Delphi date box is named by its value). Resolver: native child-window enumeration for window-path selectors, `FromHandle` for the winner only. Trigger: `Win32ClickWatcher` (mouse capture start/end on the button's window) for window-path buttons.
+  - TestTarget `--layout-variant win32-form`: a native window with VCL-style handle IDs, own window classes, a capturing vendor-style button and a value-named date box. `Win32WindowPathTests` (3): field found and read after a restart; click on a button without Invoke detected; value-named control marked without its name. RED observed locally for each; `SelectorFragilityTests` (window path is not "position only") too.
+  - The `InspectionControllerTests` window-path test only had a compile-time RED (property added with it).
+  - Evidence (local): build 0 warnings; Domain 76, Application 173, Infrastructure 73, Windows 26; integration Automation/Processes/Overlay 52, Runtime/RealApps 9 (+1 skipped). EndToEnd and x86 not run locally - CI must run them.
+  - **FórmulaCerta second run: steps 1–5 pass**, also after the Receitas screen was closed and reopened (new process, new handles). See the manual.
+- **Plan 15 — Templates ("Modelos") with a guided checklist** (`docs/superpowers/plans/2026-10-12-integration-templates.md`), same day:
+  - `IntegrationTemplate`/`TemplateItem`/`TemplateValidator`/`ITemplateStore` (Application), `JsonTemplateStore` (Infrastructure: shipped `Templates\*.json` next to the executable + own templates in `%LOCALAPPDATA%\Prescriva\Agent\templates`; an own template replaces a shipped one with the same ID; broken files left out), `TemplateGuideViewModel` (Desktop: start, suggestion, mark, test field/button, skip, adjust, add, remove, save as own template; buttons read the marked fields). UI: step 1 *Começar por um modelo*, step 2 *Roteiro* card (`MainWindow.Templates.cs`). Editor: `SetFieldSelector`, `SetFieldKind`, `SetTriggerSelector`.
+  - Shipped templates: FórmulaCerta *Orçamento*, *Receita*, *Foto da receita (MobyPharma)*, with suggested window-path positions taken from the real screens.
+  - OCR: a grid's cells come back as separate lines; `OcrText.Rows` rebuilds rows from line positions ("cell | cell"). RED `OcrTextTests.Cells_side_by_side_become_one_row_in_reading_order`.
+  - Tests: `IntegrationTemplateTests` (7), `JsonTemplateStoreTests` (5, incl. every shipped template valid), `TemplateGuideViewModelTests` (14) - their RED was compile-time only (new types). Evidence (local): build 0 warnings; Domain 76, Application 194, Infrastructure 78, Windows 28; integration Automation/Processes/Overlay/Runtime/RealApps 61 (+1 skipped). No EndToEnd test drives the new UI yet - **CI/EndToEnd coverage of the checklist UI is still to write**; it was exercised by hand on FórmulaCerta (manual row 36).
+- **Still open for FórmulaCerta**:
+  1. Activating a vendor button with the keyboard is not detected (mouse only).
+  2. Reading a field filled with real prescription data was not checked (no record opened); the date filter read `14/07/26`.
+  3. ~~Resolution TimedOut~~, ~~volatile AutomationId~~, ~~no labels~~: solved by the window path (plan 14).
+  5. After the outline grows over a large container, hit-testing from inside the Agent returns the Agent's own outline window, so inner fields cannot be reached until marking restarts (`OverlayExclusionTests` accepts that outcome; a RED test can put the overlay over the whole TestTarget window and point at a field inside).
+  6. Window rule includes the program version ("FórmulaCerta - Receitas 6.0.1164").
+  7. Test-mode failure text is English ("Could not resolve the element for trigger ...").
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
@@ -189,6 +219,7 @@ Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 task
 
 ### Exact next action
 
+0. Push `fix/formulacerta-inspection` and let CI run the whole suite (incl. EndToEnd and x86); add an EndToEnd test of the template checklist (TestTarget `win32-form` + a test template); review and merge. Then, with the operator, run the *Orçamento* template on a quote with a prescriber and components filled in: confirm the prescriber fields' meaning and whether the values are still on screen when *OK* is clicked (otherwise choose *Recálculo*).
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
 2. Publisher: create the Partner Center account and reserve the name; send the three identity values (see `docs/release/microsoft-store.md`); then build with them and submit.
 3. A person verifies rows 29–32 on Windows 10/11 (Store Calculator, new Notepad, scaling).

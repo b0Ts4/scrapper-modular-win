@@ -12,6 +12,7 @@ public sealed record ElementFingerprint(
     string? FrameworkId = null,
     ImmutableArray<AncestorFingerprint> Ancestors = default,
     ImmutableArray<string> NearbyLabels = default,
-    RelativeBounds? RelativeBounds = null);
+    RelativeBounds? RelativeBounds = null,
+    string? WindowPath = null);
 
 public readonly record struct RelativeBounds(double X, double Y, double Width, double Height);

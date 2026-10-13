@@ -51,7 +51,15 @@ public sealed class SelectorMatcher
         SelectorWeights weights)
     {
         var evidence = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
-        AddIfMatched(evidence, "automationId", selector.AutomationId, candidate.AutomationId, weights.AutomationId);
+        if (UsesWindowPath(selector))
+        {
+            AddIfMatched(evidence, "windowPath", selector.WindowPath, candidate.WindowPath, weights.AutomationId);
+        }
+        else
+        {
+            AddIfMatched(evidence, "automationId", selector.AutomationId, candidate.AutomationId, weights.AutomationId);
+        }
+
         AddIfMatched(evidence, "controlType", selector.ControlType, candidate.ControlType, weights.ControlType);
         AddIfMatched(evidence, "name", selector.Name, candidate.Name, weights.Name);
         AddIfMatched(evidence, "className", selector.ClassName, candidate.ClassName, weights.ClassName);
@@ -85,7 +93,7 @@ public sealed class SelectorMatcher
     private static int AvailableWeight(ElementFingerprint selector, SelectorWeights weights)
     {
         var total = 0;
-        if (!string.IsNullOrWhiteSpace(selector.AutomationId)) total += weights.AutomationId;
+        if (!string.IsNullOrWhiteSpace(selector.AutomationId) || UsesWindowPath(selector)) total += weights.AutomationId;
         if (!string.IsNullOrWhiteSpace(selector.ControlType)) total += weights.ControlType;
         if (!string.IsNullOrWhiteSpace(selector.Name)) total += weights.Name;
         if (!string.IsNullOrWhiteSpace(selector.ClassName)) total += weights.ClassName;
@@ -95,6 +103,14 @@ public sealed class SelectorMatcher
         if (selector.RelativeBounds is not null) total += weights.RelativeBounds;
         return total;
     }
+
+    /// <summary>
+    /// A control whose only identity is its window path (a Delphi control, whose AutomationId
+    /// is its window handle and changes on every start): the path takes the AutomationId's
+    /// place and weight. A selector with a real AutomationId keeps using it.
+    /// </summary>
+    private static bool UsesWindowPath(ElementFingerprint selector) =>
+        string.IsNullOrWhiteSpace(selector.AutomationId) && !string.IsNullOrWhiteSpace(selector.WindowPath);
 
     private static void AddIfMatched(
         ImmutableDictionary<string, int>.Builder evidence,

@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Templates shipped with the Agent (plan 15): read-only JSON next to the executable. -->
+    <Content Include="Templates\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Prescriva.Agent.Application\Prescriva.Agent.Application.csproj" />
     <ProjectReference Include="..\Prescriva.Agent.Infrastructure\Prescriva.Agent.Infrastructure.csproj" />
     <ProjectReference Include="..\Prescriva.Agent.Windows\Prescriva.Agent.Windows.csproj" />
