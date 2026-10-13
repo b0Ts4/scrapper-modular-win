@@ -11,6 +11,9 @@ public sealed class JsonConfigurationStore : IConfigurationStore
 {
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
+    /// <summary>The same JSON shape for every configuration document (templates reuse it for their selectors).</summary>
+    internal static JsonSerializerOptions SharedJsonOptions => JsonOptions;
+
     private readonly string _directory;
 
     public JsonConfigurationStore(string directory)
