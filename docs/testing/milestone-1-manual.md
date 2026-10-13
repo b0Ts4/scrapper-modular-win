@@ -76,13 +76,23 @@ What the program is: Delphi VCL with third-party controls (InfoPower `TwwDB*` ed
 | --- | --- | --- |
 | 1 Escolher programa | The Receitas form was **not listed** (owned windows were skipped); when Delphi's hidden application window was visible, the list offered that zero-size window ("PJReceitas") instead, which has no fields. | **Fixed**: the form "FórmulaCerta - Receitas 6.0.1164" is listed; zero-size windows never are (`OpenWindowSourceTests`). Note the window rule includes the program's version, so an update of the program breaks the integration. |
 | 2–3 Marcar campos/botões | Nothing was ever shown under the cursor: one inspection takes 250–330 ms on this program and every 80 ms poll cancelled the one in flight. | **Fixed** (`InspectionControllerTests`): the outline follows the fields; text boxes show as `Document`, buttons as `Button` with their caption; **AutomationId is the control's window handle** (changes every time the program starts) and no label is found. Marking stays possible with Tab/Space in the Agent while the pointer rests on the field. |
-| 4 Testar / Conferir um campo | — | **Fails: `TimedOut`** for every field and for the button. Under .NET 10, enumerating the form's 117 UI Automation elements takes 7–8 s and reading their properties ~28 s (limit 10 s); a cache request does not help (15 s). |
+| 4 Testar / Conferir um campo | — | **Failed: `TimedOut`** for every field and for the button. Under .NET 10, enumerating the form's 117 UI Automation elements takes 7–8 s and reading their properties ~28 s (limit 10 s); a cache request does not help (15 s). **Fixed by plan 14** (second run below). |
 | 5 Ativar | Not reached. | Not reached. |
+
+**Second run, same day, after plan 14 (Win32/Delphi selectors):**
+
+| Step | Result |
+| --- | --- |
+| 2–3 | Fields and the "Histórico Cliente" button marked; AutomationId shown empty (the handle-ID is ignored); a date filter box is marked without its name (its name is its value). |
+| 4 Testar | Both fields **Encontrado**, 100%, 121–212 ms each (signals: window path 40, type, class, position, framework); trigger **Detectado** (click seen through the button's mouse capture - `TFagronButton` raises no Invoke event). *Conferir um campo agora* read the date filter: `Captured`, `14/07/26`. |
+| Restart | The Receitas screen closed and reopened (new process, every window handle new): the saved integration still found both fields and detected the button. |
+| 5 Ativar | Approved and activated; clicking the button was detected and the item was **rejected** because the required "Qtd Potes" was empty ("nenhum evento foi gerado") - the expected rule. Stopped afterwards. |
+
+Not checked: reading a field filled with prescription data (no record was opened or created).
 
 Still open (not fixed, see [current state](../handoffs/current-state.md)):
 
-- Resolution needs a fast path for Win32 windows (enumerate child windows natively, match class + relative position + parent classes) and must not trust an AutomationId that equals the window handle.
-- Win32 text controls without a Value pattern need a native text read (`WM_GETTEXT`) or OCR.
+- Activating a vendor button with the keyboard (Enter/Space) is not detected; only mouse clicks are.
 - After the outline has grown over a large container (e.g. the main window's background), UI Automation hit-testing from inside the Agent returns the Agent's own outline window, so the pointer cannot reach the fields inside it until marking is restarted.
 - The test-mode failure message is in English ("Could not resolve the element for trigger ...").
 
@@ -92,5 +102,5 @@ Still open (not fixed, see [current state](../handoffs/current-state.md)):
 | --- | --- | --- |
 | 2026-10-04 | GitHub Actions `windows-latest` (Windows Server, x64), .NET SDK from `global.json` | All automated rows pass (6 of 6 runs on the final commit) — see the CI runs listed in [current state](../handoffs/current-state.md). |
 | 2026-10-04 | GitHub Actions `windows-latest`, x86 TestTarget pass | 30/30 pass (TestTarget process confirmed 32-bit). |
-| 2026-10-12 | Operator's PC (Windows Server 2022 x64, 100%), FórmulaCerta 6.0 Receitas test screen, SDK 10.0.401 | Steps 1–3 work after two fixes on `fix/formulacerta-inspection`; step 4 fails (`TimedOut`, resolution too slow on this Delphi program). Unit suites 342/342; `OpenWindowSourceTests` 5/5. See the section above. |
+| 2026-10-12 | Operator's PC (Windows Server 2022 x64, 100%), FórmulaCerta 6.0 Receitas test screen, SDK 10.0.401 | First run: steps 1–3 work after two fixes; step 4 fails (`TimedOut`). Second run after plan 14: steps 1–5 pass, also after the program restarts. Unit suites 348/348; integration Automation/Processes/Overlay 52/52, Runtime/RealApps 9 (+1 skipped); EndToEnd not run there (real cursor over the pharmacy system). See the section above. |
 | — | Windows 10/11 desktop, by a person | **Not yet performed.** Only row 2's real-display rendering at non-100% DPI remains person-only; every other row is automated. A final look-over by a person is still recommended before sign-off. |

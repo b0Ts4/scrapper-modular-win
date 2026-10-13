@@ -1,6 +1,6 @@
 # Current state
 
-## Status — 2026-10-12 (first real pharmacy system test: two fixes, resolution too slow on FórmulaCerta; see "First test on a real pharmacy system")
+## Status — 2026-10-12 (first real pharmacy system test: FórmulaCerta works end to end after two fixes and plan 14; see "First test on a real pharmacy system")
 
 ## Status — 2026-10-07 (plan 10 done; see below)
 
@@ -184,11 +184,18 @@ Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's 
 - **Fix — slow programs never showed an element while marking**: one inspection takes 250–330 ms on this program and every 80 ms poll cancelled the one in flight. `InspectionController` now lets a repeated observation of the same point and depth join the inspection in flight. RED `Repeated_observations_of_the_same_point_wait_for_the_slow_inspection_in_flight` (locally), GREEN after.
 - **Fix — Delphi forms missing from the program list**: every Delphi form is owned by the zero-size `TApplication` window, and the list skipped owned windows (or offered the zero-size window, which has no fields). `Win32OpenWindowSource` now lists windows owned by a zero-size owner and never lists zero-size windows. RED `A_form_owned_by_a_zero_size_application_window_is_listed_instead_of_its_owner` (both owner states, locally), GREEN after.
 - Evidence (local, operator's PC): Release build 0 warnings; Domain 74, Application 171, Infrastructure 71, Windows 26; `OpenWindowSourceTests` 5/5. The rest of the integration suite was not run there (it drives the real cursor over the pharmacy system) - CI must run it.
-- **Still blocking FórmulaCerta (not fixed)**:
-  1. Resolution `TimedOut` for every field and the button: under .NET 10 the form exposes 117 UI Automation elements; `FindAll` takes ~8 s and reading their properties ~28 s (limit 10 s); a `CacheRequest` does not help (~15 s). Needs a plan: a native Win32 path (enumerate child windows, match class + relative position + parent classes, then `AutomationElement.FromHandle`).
-  2. AutomationId equals the control's window handle on Win32 controls without an ID (changes every start); the selector must not rely on it.
-  3. Labels are `TLabel` (no window): no label signal at all.
-  4. Text read: edits show as `Document`/`Pane`; capture may need `WM_GETTEXT` or OCR - to be confirmed once resolution works.
+- **Plan 14 — Win32/Delphi selectors** (`docs/superpowers/plans/2026-10-12-win32-delphi-selectors.md`), same day, each test first:
+  - `ElementFingerprint.WindowPath`; the matcher scores it in the AutomationId's slot and weight (weights stay v2, approvals stay valid). RED: `SelectorMatcherTests.WindowPath_*` (locally).
+  - Content hash folds `windowPath` only when present (RED `WindowPathSelectorTests`; `FieldKindTests` characterization unchanged).
+  - Inspector: an AutomationId equal to the element's window handle is dropped and the window path recorded; ancestors/labels dropped; a name kept only for captioned controls (a Delphi date box is named by its value). Resolver: native child-window enumeration for window-path selectors, `FromHandle` for the winner only. Trigger: `Win32ClickWatcher` (mouse capture start/end on the button's window) for window-path buttons.
+  - TestTarget `--layout-variant win32-form`: a native window with VCL-style handle IDs, own window classes, a capturing vendor-style button and a value-named date box. `Win32WindowPathTests` (3): field found and read after a restart; click on a button without Invoke detected; value-named control marked without its name. RED observed locally for each; `SelectorFragilityTests` (window path is not "position only") too.
+  - The `InspectionControllerTests` window-path test only had a compile-time RED (property added with it).
+  - Evidence (local): build 0 warnings; Domain 76, Application 173, Infrastructure 73, Windows 26; integration Automation/Processes/Overlay 52, Runtime/RealApps 9 (+1 skipped). EndToEnd and x86 not run locally - CI must run them.
+  - **FórmulaCerta second run: steps 1–5 pass**, also after the Receitas screen was closed and reopened (new process, new handles). See the manual.
+- **Still open for FórmulaCerta**:
+  1. Activating a vendor button with the keyboard is not detected (mouse only).
+  2. Reading a field filled with real prescription data was not checked (no record opened); the date filter read `14/07/26`.
+  3. ~~Resolution TimedOut~~, ~~volatile AutomationId~~, ~~no labels~~: solved by the window path (plan 14).
   5. After the outline grows over a large container, hit-testing from inside the Agent returns the Agent's own outline window, so inner fields cannot be reached until marking restarts (`OverlayExclusionTests` accepts that outcome; a RED test can put the overlay over the whole TestTarget window and point at a field inside).
   6. Window rule includes the program version ("FórmulaCerta - Receitas 6.0.1164").
   7. Test-mode failure text is English ("Could not resolve the element for trigger ...").
@@ -207,7 +214,7 @@ Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's 
 
 ### Exact next action
 
-0. Push `fix/formulacerta-inspection` and let CI run the whole suite (incl. x86); then write the plan for Win32/Delphi resolution (items 1–4 of the FórmulaCerta section) and repeat the FórmulaCerta walkthrough on the operator's PC.
+0. Push `fix/formulacerta-inspection` and let CI run the whole suite (incl. EndToEnd and x86); review and merge. Then, with the operator, mark the real fields of the Receitas screen and test with a test record that has data.
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
 2. Publisher: create the Partner Center account and reserve the name; send the three identity values (see `docs/release/microsoft-store.md`); then build with them and submit.
 3. A person verifies rows 29–32 on Windows 10/11 (Store Calculator, new Notepad, scaling).
