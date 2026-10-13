@@ -291,7 +291,8 @@ public sealed class InspectionController
             FrameworkId: snapshot.FrameworkId,
             Ancestors: snapshot.Ancestors,
             NearbyLabels: snapshot.NearbyLabels,
-            RelativeBounds: snapshot.RelativeBounds);
+            RelativeBounds: snapshot.RelativeBounds,
+            WindowPath: snapshot.WindowPath);
 
     private void SetState(InspectionState state)
     {

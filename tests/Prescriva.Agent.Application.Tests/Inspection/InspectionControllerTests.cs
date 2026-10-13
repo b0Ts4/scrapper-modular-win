@@ -218,6 +218,20 @@ public sealed class InspectionControllerTests
     }
 
     [Fact]
+    public async Task The_window_path_of_a_Delphi_control_reaches_the_fingerprint()
+    {
+        var inspector = new FakeElementInspector();
+        var delphiEdit = Snapshot("ignored") with { AutomationId = null, WindowPath = "TPanel[0]/TEdit[1]" };
+        inspector.Enqueue(_ => Task.FromResult(InspectionResult.Found(delphiEdit)));
+
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+        await controller.ObservePointerAsync(new ScreenPoint(1, 2));
+
+        Assert.Equal("TPanel[0]/TEdit[1]", controller.CurrentState.Fingerprint?.WindowPath);
+    }
+
+    [Fact]
     public async Task StopAsync_removes_the_highlight()
     {
         var inspector = new FakeElementInspector();
