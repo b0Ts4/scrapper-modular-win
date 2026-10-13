@@ -17,8 +17,8 @@ TestTarget (stand-alone WPF app used as the automation target)
 | `Prescriva.Agent.Domain` (`net10.0`) | Configuration model and validation, element fingerprints and selector scoring, the immutable session engine, domain events, `ConfigurationApproval`. | Windows, WPF, UIA, SQLite, DPAPI |
 | `Prescriva.Agent.Application` (`net10.0`) | Use-case orchestration over interfaces: inspection controller, selector/capture/trigger contracts, `AgentRuntime` + `SessionCoordinator`, test-mode runner and `ConfigurationFingerprint`, outbox/log/protector contracts. | Concrete adapters |
 | `Prescriva.Agent.Infrastructure` (`net10.0`) | JSON configuration store, SQLite event outbox, DPAPI payload protector, retention and capacity policy, JSON-lines technical log. | WPF, UIA |
-| `Prescriva.Agent.Windows` (`net10.0-windows`) | UI Automation adapters (inspector, selector resolver, capture provider, trigger provider) on one STA `AutomationDispatcher`, process discovery, `UiAutomationRuntimeFactories`. | Infrastructure, Desktop |
-| `Prescriva.Agent.Desktop` (`net10.0-windows`, WPF) | Composition root and UI: configurator, inspection overlay, test mode, activation/monitoring. View models are plain `INotifyPropertyChanged`. | — |
+| `Prescriva.Agent.Windows` (`net10.0-windows10.0.19041.0`) | UI Automation adapters (inspector, selector resolver, capture provider, trigger provider) on one STA `AutomationDispatcher`, process discovery, `UiAutomationRuntimeFactories`. | Infrastructure, Desktop |
+| `Prescriva.Agent.Desktop` (`net10.0-windows10.0.19041.0`, WPF) | Composition root and UI: configurator, inspection overlay, test mode, activation/monitoring. View models are plain `INotifyPropertyChanged`. | — |
 
 ## End-to-end flow
 

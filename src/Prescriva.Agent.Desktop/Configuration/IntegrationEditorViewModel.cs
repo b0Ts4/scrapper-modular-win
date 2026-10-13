@@ -99,9 +99,9 @@ public sealed class IntegrationEditorViewModel
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var current = RequireConfiguration();
-        if (current.Stages.Any(stage => stage.Id == id))
+        if (current.Stages.Any(stage => string.Equals(stage.Id, id, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException($"A stage with ID '{id}' already exists.");
+            throw new InvalidOperationException($"Já existe uma etapa com o ID '{id}'.");
         }
 
         Configuration = current with { Stages = current.Stages.Add(new StageDefinition(id, name)) };
@@ -120,9 +120,9 @@ public sealed class IntegrationEditorViewModel
         ArgumentException.ThrowIfNullOrWhiteSpace(meaning);
         ArgumentNullException.ThrowIfNull(selector);
         var current = RequireConfiguration();
-        if (current.Fields.Any(field => field.Id == semanticId))
+        if (current.Fields.Any(field => string.Equals(field.Id, semanticId, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException($"A field with semantic ID '{semanticId}' already exists. Remove it first to replace its selector.");
+            throw new InvalidOperationException($"Já existe um campo com o ID '{semanticId}'. Remova-o antes para trocar o elemento selecionado.");
         }
 
         var field = new FieldDefinition(semanticId, stageId, meaning, required, selector, kind);
@@ -146,9 +146,9 @@ public sealed class IntegrationEditorViewModel
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentException.ThrowIfNullOrWhiteSpace(observedEvent);
         var current = RequireConfiguration();
-        if (current.Triggers.Any(trigger => trigger.Id == semanticId))
+        if (current.Triggers.Any(trigger => string.Equals(trigger.Id, semanticId, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException($"A trigger with semantic ID '{semanticId}' already exists. Replace its actions or remove it first.");
+            throw new InvalidOperationException($"Já existe um gatilho com o ID '{semanticId}'. Substitua as ações dele ou remova-o antes.");
         }
 
         var trigger = new TriggerDefinition(semanticId, stageId, selector, observedEvent, actions);
@@ -172,7 +172,7 @@ public sealed class IntegrationEditorViewModel
         if (users.Length > 0)
         {
             throw new InvalidOperationException(
-                $"Field '{fieldId}' is captured by trigger(s) {string.Join(", ", users.Select(id => $"'{id}'"))}. Change or remove those triggers first.");
+                $"O campo '{fieldId}' é capturado pelo(s) gatilho(s) {string.Join(", ", users.Select(id => $"'{id}'"))}. Altere ou remova esses gatilhos antes.");
         }
 
         Configuration = current with { Fields = current.Fields.Remove(field) };
@@ -191,6 +191,39 @@ public sealed class IntegrationEditorViewModel
         MarkDirty();
     }
 
+    /// <summary>Points a field at another element (marked again); its ID, meaning and kind are kept.</summary>
+    public void SetFieldSelector(string fieldId, ElementFingerprint selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        var current = RequireConfiguration();
+        var field = FindField(fieldId);
+
+        Configuration = current with { Fields = current.Fields.Replace(field, field with { Selector = selector }) };
+        _resolvedHandles.Remove(fieldId);
+        MarkDirty();
+    }
+
+    /// <summary>Changes how a field is read (text, OCR, image...).</summary>
+    public void SetFieldKind(string fieldId, FieldKind kind)
+    {
+        var current = RequireConfiguration();
+        var field = FindField(fieldId);
+
+        Configuration = current with { Fields = current.Fields.Replace(field, field with { Kind = kind }) };
+        MarkDirty();
+    }
+
+    /// <summary>Points a trigger at another button (marked again); its actions are kept.</summary>
+    public void SetTriggerSelector(string triggerId, ElementFingerprint selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        var current = RequireConfiguration();
+        var trigger = FindTrigger(triggerId);
+
+        Configuration = current with { Triggers = current.Triggers.Replace(trigger, trigger with { Selector = selector }) };
+        MarkDirty();
+    }
+
     /// <summary>Removes a trigger.</summary>
     public void RemoveTrigger(string triggerId)
     {
@@ -206,7 +239,7 @@ public sealed class IntegrationEditorViewModel
     {
         if (actions.IsDefaultOrEmpty)
         {
-            throw new ArgumentException("A trigger needs at least one action.", nameof(actions));
+            throw new ArgumentException("O gatilho precisa de pelo menos uma ação.", nameof(actions));
         }
 
         var current = RequireConfiguration();
@@ -225,7 +258,7 @@ public sealed class IntegrationEditorViewModel
         ArgumentException.ThrowIfNullOrWhiteSpace(stageId);
         var current = RequireConfiguration();
         var stage = current.Stages.FirstOrDefault(candidate => candidate.Id == stageId)
-            ?? throw new InvalidOperationException($"No stage with ID '{stageId}' exists in the current configuration.");
+            ?? throw new InvalidOperationException($"Não existe etapa com o ID '{stageId}' nesta integração.");
 
         var users = current.Fields.Where(field => field.StageId == stageId).Select(field => field.Id)
             .Concat(current.Triggers
@@ -235,7 +268,7 @@ public sealed class IntegrationEditorViewModel
         if (users.Length > 0)
         {
             throw new InvalidOperationException(
-                $"Stage '{stageId}' is still used by {string.Join(", ", users.Select(id => $"'{id}'"))}. Remove or change them first.");
+                $"A etapa '{stageId}' ainda é usada por {string.Join(", ", users.Select(id => $"'{id}'"))}. Remova ou altere esses itens antes.");
         }
 
         Configuration = current with { Stages = current.Stages.Remove(stage) };
@@ -311,7 +344,7 @@ public sealed class IntegrationEditorViewModel
         if (!_resolvedHandles.TryGetValue(fieldId, out var handle))
         {
             throw new InvalidOperationException(
-                $"Field '{fieldId}' has not been resolved yet. Call {nameof(ResolveFieldAsync)} first.");
+                $"O campo '{fieldId}' ainda não foi localizado. Clique em 'Localizar' antes.");
         }
 
         return _captureProvider.CaptureAsync(handle, field, cancellationToken);
@@ -330,20 +363,20 @@ public sealed class IntegrationEditorViewModel
             }
         }
 
-        throw new InvalidOperationException($"No field with semantic ID '{fieldId}' exists in the current configuration.");
+        throw new InvalidOperationException($"Não existe campo com o ID '{fieldId}' nesta integração.");
     }
 
     private TriggerDefinition FindTrigger(string triggerId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(triggerId);
         return RequireConfiguration().Triggers.FirstOrDefault(trigger => trigger.Id == triggerId)
-            ?? throw new InvalidOperationException($"No trigger with semantic ID '{triggerId}' exists in the current configuration.");
+            ?? throw new InvalidOperationException($"Não existe gatilho com o ID '{triggerId}' nesta integração.");
     }
 
     private IntegrationConfiguration RequireConfiguration()
     {
         return Configuration
-            ?? throw new InvalidOperationException($"Call {nameof(CreateIntegration)} (or {nameof(ReloadAsync)}) before editing the configuration.");
+            ?? throw new InvalidOperationException("Crie ou recarregue uma integração antes de editá-la.");
     }
 
     private static void ValidateSemanticId(string? semanticId)
@@ -351,7 +384,7 @@ public sealed class IntegrationEditorViewModel
         if (string.IsNullOrWhiteSpace(semanticId) || !SemanticIdPattern.IsMatch(semanticId))
         {
             throw new ArgumentException(
-                $"'{semanticId}' is not a valid semantic ID. A semantic ID must start with a letter and contain only letters, digits and underscores.",
+                $"'{semanticId}' não é um ID válido: comece com uma letra e use só letras sem acento, números e sublinhado (_).",
                 nameof(semanticId));
         }
     }

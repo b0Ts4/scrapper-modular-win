@@ -33,6 +33,18 @@ internal static class FileFieldCapture
             return new Probe(text.Trim(), null, null, "path");
         }
 
+        return ProbeScreen(element, current);
+    }
+
+    /// <summary>
+    /// The control's own on-screen image (PNG), refused when anything covers it. Runs on the
+    /// AutomationDispatcher STA thread. Used directly by OCR fields.
+    /// </summary>
+    public static Probe ProbeScreenOnDispatcherThread(AutomationElement element) =>
+        ProbeScreen(element, element.Current); // live round-trip: throws if the element is gone
+
+    private static Probe ProbeScreen(AutomationElement element, AutomationElement.AutomationElementInformation current)
+    {
         if (current.IsOffscreen)
         {
             return new Probe(null, null, CaptureOutcome.Obscured, "The control is off screen.");

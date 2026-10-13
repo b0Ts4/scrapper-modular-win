@@ -1,0 +1,52 @@
+{
+  "id": "formulacerta_foto_receita",
+  "name": "FórmulaCerta – Foto da receita (pedidos MobyPharma)",
+  "description": "Guarda a foto da receita anexada a um pedido do MobyPharma quando a pessoa clica em Nova Fórmula ou em Novo Produto na janela 'Visualização de Anexos'. A imagem é a que aparece na tela, com a qualidade com que ela é mostrada. Use as posições sugeridas, teste e ajuste o que precisar.",
+  "program": {
+    "processIdentity": "FCMobyPharma.exe",
+    "windowTitleContains": "Visualização de Anexos",
+    "howToOpen": "No FórmulaCerta MobyPharma, abra um pedido com receita anexada e a janela 'Visualização de Anexos'."
+  },
+  "items": [
+    {
+      "id": "foto_receita",
+      "kind": "field",
+      "name": "Foto da receita",
+      "help": "A área grande onde a imagem anexada aparece. É guardada como imagem (PNG) do jeito que está na tela: deixe 'Imagem na tela' selecionado para ver a receita inteira.",
+      "fieldKind": "screenImage",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TScrollBox", "frameworkId": "Win32", "relativeBounds": { "x": 0.1321, "y": 0.2027, "width": 0.8525, "height": 0.7456 }, "windowPath": "TframeVisualizacaoAnexos[0]/TPanel[0]/TScrollBox[0]" }
+    },
+    {
+      "id": "texto_foto_ocr",
+      "kind": "field",
+      "name": "Texto da foto (OCR, opcional)",
+      "help": "A mesma área lida por OCR. Funciona com fotos nítidas de texto escuro sobre fundo claro; em prints escuros a leitura é fraca. Pule este item se não precisar.",
+      "fieldKind": "ocrText",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TScrollBox", "frameworkId": "Win32", "relativeBounds": { "x": 0.1321, "y": 0.2027, "width": 0.8525, "height": 0.7456 }, "windowPath": "TframeVisualizacaoAnexos[0]/TPanel[0]/TScrollBox[0]" }
+    },
+    {
+      "id": "nova_formula",
+      "kind": "button",
+      "name": "Botão Nova Fórmula",
+      "help": "O primeiro botão no alto da janela de anexos. Ao ser clicado, a foto é guardada.",
+      "fieldKind": "text",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.0274, "y": 0.0503, "width": 0.2316, "height": 0.037 }, "windowPath": "TFagronPanel[0]/TFagronButton[2]" },
+      "capturedFields": null,
+      "emitEvent": "foto_receita"
+    },
+    {
+      "id": "novo_produto",
+      "kind": "button",
+      "name": "Botão Novo Produto",
+      "help": "O segundo botão no alto da janela de anexos. Ao ser clicado, a foto também é guardada.",
+      "fieldKind": "text",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.2659, "y": 0.0503, "width": 0.2316, "height": 0.037 }, "windowPath": "TFagronPanel[0]/TFagronButton[1]" },
+      "capturedFields": null,
+      "emitEvent": "foto_receita"
+    }
+  ]
+}

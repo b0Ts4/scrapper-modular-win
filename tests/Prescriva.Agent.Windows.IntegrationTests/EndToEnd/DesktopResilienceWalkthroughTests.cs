@@ -68,7 +68,7 @@ public sealed class DesktopResilienceWalkthroughTests : IDisposable
             //    carried over: activation is refused until it is tested again.
             SetText(agent, "IntegrationIdBox", "walkthrough");
             Press(agent, "ReloadButton");
-            await WaitForTextAsync(agent, "StatusText", "Reloaded 'walkthrough' with 3 field(s)");
+            await WaitForTextAsync(agent, "StatusText", "Integração \'walkthrough\' recarregada com 3 campo(s)");
             Press(agent, "ActivateButton");
             await WaitForTextAsync(agent, "MonitorStatusText", "Ativação recusada");
 

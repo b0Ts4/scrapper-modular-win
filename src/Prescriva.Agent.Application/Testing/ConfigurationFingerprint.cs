@@ -164,6 +164,13 @@ public static class ConfigurationFingerprint
             sb.Append("(null)");
         }
 
+        // Appended only when present, so every selector written before window paths existed
+        // keeps the exact hash its approval is bound to.
+        if (!string.IsNullOrEmpty(selector.WindowPath))
+        {
+            sb.Append(",windowPath=").Append(selector.WindowPath);
+        }
+
         sb.Append(')');
     }
 

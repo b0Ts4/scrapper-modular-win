@@ -30,7 +30,8 @@ public sealed record ElementSnapshot(
     ImmutableArray<AncestorFingerprint> Ancestors = default,
     ImmutableArray<string> NearbyLabels = default,
     RelativeBounds? RelativeBounds = null,
-    string? FrameworkId = null);
+    string? FrameworkId = null,
+    string? WindowPath = null);
 
 /// <summary>
 /// A plain bounding rectangle in screen coordinates.

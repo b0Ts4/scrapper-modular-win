@@ -29,6 +29,23 @@ public sealed class ConfigurationValidatorTests
         Assert.Contains(ConfigurationValidator.Validate(configuration).Errors, error => error.Code == expectedCode);
     }
 
+    [Theory]
+    [InlineData("field", "DUPLICATE_FIELD_ID")]
+    [InlineData("stage", "DUPLICATE_STAGE_ID")]
+    [InlineData("trigger", "DUPLICATE_TRIGGER_ID")]
+    public void Semantic_ids_differing_only_in_letter_case_are_duplicates(string kind, string expectedCode)
+    {
+        var configuration = ValidConfiguration();
+        configuration = kind switch
+        {
+            "field" => configuration with { Fields = configuration.Fields.Add(configuration.Fields[0] with { Id = configuration.Fields[0].Id.ToUpperInvariant() }) },
+            "stage" => configuration with { Stages = configuration.Stages.Add(configuration.Stages[0] with { Id = configuration.Stages[0].Id.ToUpperInvariant() }) },
+            _ => configuration with { Triggers = configuration.Triggers.Add(configuration.Triggers[0] with { Id = configuration.Triggers[0].Id.ToUpperInvariant() }) }
+        };
+
+        Assert.Contains(ConfigurationValidator.Validate(configuration).Errors, error => error.Code == expectedCode);
+    }
+
     [Fact]
     public void Capture_action_cannot_reference_an_unknown_field()
     {

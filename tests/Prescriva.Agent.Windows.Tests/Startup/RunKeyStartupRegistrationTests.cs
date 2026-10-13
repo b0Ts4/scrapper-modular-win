@@ -1,12 +1,13 @@
 using Microsoft.Win32;
+using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Windows.Startup;
 
 namespace Prescriva.Agent.Windows.Tests.Startup;
 
 /// <summary>
-/// "Iniciar com o Windows" writes one per-user value (no administrator rights) whose command
-/// starts the Agent in background mode; disabling removes it. Exercised against an isolated
-/// HKCU subkey, never the real Run key.
+/// "Iniciar com o Windows" outside a package writes one per-user value (no administrator
+/// rights) whose command starts the Agent in background mode; disabling removes it.
+/// Exercised against an isolated HKCU subkey, never the real Run key.
 /// </summary>
 public sealed class RunKeyStartupRegistrationTests : IDisposable
 {
@@ -15,22 +16,21 @@ public sealed class RunKeyStartupRegistrationTests : IDisposable
     public void Dispose() => Registry.CurrentUser.DeleteSubKeyTree(_subKey, throwOnMissingSubKey: false);
 
     [Fact]
-    public void Enabling_writes_a_quoted_background_command_and_disabling_removes_it()
+    public async Task Enabling_writes_a_quoted_background_command_and_disabling_removes_it()
     {
         var registration = new RunKeyStartupRegistration(_subKey);
         const string executable = @"C:\Program Files\Prescriva Agent\Prescriva.Agent.Desktop.exe";
 
-        Assert.False(registration.IsEnabled);
-        registration.Enable(executable);
+        Assert.Equal(StartupRegistrationState.Disabled, await registration.GetStateAsync());
+        Assert.Equal(StartupRegistrationState.Enabled, await registration.EnableAsync(executable));
 
-        Assert.True(registration.IsEnabled);
+        Assert.Equal(StartupRegistrationState.Enabled, await registration.GetStateAsync());
         using (var key = Registry.CurrentUser.OpenSubKey(_subKey))
         {
             Assert.Equal($"\"{executable}\" --background", key!.GetValue(RunKeyStartupRegistration.ValueName));
         }
 
-        registration.Disable();
-        Assert.False(registration.IsEnabled);
+        Assert.Equal(StartupRegistrationState.Disabled, await registration.DisableAsync());
         using (var key = Registry.CurrentUser.OpenSubKey(_subKey))
         {
             Assert.Null(key!.GetValue(RunKeyStartupRegistration.ValueName));
@@ -38,7 +38,7 @@ public sealed class RunKeyStartupRegistrationTests : IDisposable
     }
 
     [Fact]
-    public void Disabling_when_never_enabled_is_harmless_and_other_values_are_kept()
+    public async Task Disabling_when_never_enabled_is_harmless_and_other_values_are_kept()
     {
         using (var key = Registry.CurrentUser.CreateSubKey(_subKey))
         {
@@ -46,9 +46,9 @@ public sealed class RunKeyStartupRegistrationTests : IDisposable
         }
 
         var registration = new RunKeyStartupRegistration(_subKey);
-        registration.Disable();
-        registration.Enable(@"C:\a.exe");
-        registration.Disable();
+        await registration.DisableAsync();
+        await registration.EnableAsync(@"C:\a.exe");
+        await registration.DisableAsync();
 
         using var reopened = Registry.CurrentUser.OpenSubKey(_subKey);
         Assert.Equal("other.exe", reopened!.GetValue("OtherApp"));

@@ -63,7 +63,7 @@ public sealed class DesktopStartWithWindowsTests : IDisposable
             var agent = operatorSession.Window;
             SetText(agent, "IntegrationIdBox", ConfigurationId);
             Press(agent, "ReloadButton");
-            await WaitForTextAsync(agent, "StatusText", $"Reloaded '{ConfigurationId}'");
+            await WaitForTextAsync(agent, "StatusText", $"Integração \'{ConfigurationId}\' recarregada");
             Press(agent, "ActivateButton");
             await WaitForMonitoringAsync(agent);
             await WaitUntilAsync(

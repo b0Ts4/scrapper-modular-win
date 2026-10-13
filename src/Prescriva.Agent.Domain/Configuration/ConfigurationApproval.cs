@@ -1,3 +1,5 @@
+using Prescriva.Agent.Domain.Selectors;
+
 namespace Prescriva.Agent.Domain.Configuration;
 
 /// <summary>
@@ -22,14 +24,20 @@ namespace Prescriva.Agent.Domain.Configuration;
 public sealed record ConfigurationApproval(
     string ConfigurationId,
     string Fingerprint,
-    DateTimeOffset ApprovedAtUtc)
+    DateTimeOffset ApprovedAtUtc,
+    int SelectorWeightsVersion = SelectorWeights.Version)
 {
     /// <summary>
     /// True only when this approval was granted for exactly <paramref name="currentFingerprint"/> -
     /// the configuration's current content hash. False for any other fingerprint, including
     /// one computed from the same configuration ID after any edit at all.
     /// </summary>
+    /// <remarks>
+    /// The approval also expires when the selector rules change (<see cref="SelectorWeights.Version"/>):
+    /// a test passed under other weights says nothing about how elements are found now.
+    /// </remarks>
     public bool IsValidFor(string currentFingerprint) =>
         !string.IsNullOrEmpty(currentFingerprint) &&
-        string.Equals(Fingerprint, currentFingerprint, StringComparison.Ordinal);
+        string.Equals(Fingerprint, currentFingerprint, StringComparison.Ordinal) &&
+        SelectorWeightsVersion == SelectorWeights.Version;
 }

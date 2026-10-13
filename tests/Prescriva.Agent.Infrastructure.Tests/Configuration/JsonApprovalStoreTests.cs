@@ -26,6 +26,30 @@ public sealed class JsonApprovalStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task An_approval_saved_before_selector_weights_were_recorded_loads_under_the_current_weights()
+    {
+        Directory.CreateDirectory(_directory);
+        await File.WriteAllTextAsync(Path.Combine(_directory, "budget-flow.approval.json"),
+            "{\"configurationId\":\"budget-flow\",\"fingerprint\":\"ABC123\",\"approvedAtUtc\":\"2026-10-04T12:30:00+00:00\"}");
+
+        var loaded = await new JsonApprovalStore(_directory).LoadAsync("budget-flow", CancellationToken.None);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(Prescriva.Agent.Domain.Selectors.SelectorWeights.Version, loaded.SelectorWeightsVersion);
+        Assert.True(loaded.IsValidFor("ABC123"));
+    }
+
+    [Fact]
+    public async Task The_selector_weights_version_is_saved_with_the_approval()
+    {
+        await new JsonApprovalStore(_directory).SaveAsync(new ConfigurationApproval("budget-flow", "ABC123", ApprovedAt), CancellationToken.None);
+
+        var json = await File.ReadAllTextAsync(Path.Combine(_directory, "budget-flow.approval.json"));
+
+        Assert.Contains($"\"selectorWeightsVersion\": {Prescriva.Agent.Domain.Selectors.SelectorWeights.Version}", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Missing_approval_loads_as_null()
     {
         Assert.Null(await new JsonApprovalStore(_directory).LoadAsync("budget-flow", CancellationToken.None));

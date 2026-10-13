@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Automation;
@@ -33,7 +34,10 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         _ownsDispatcher = ownsDispatcher;
     }
 
-    public async Task<InspectionResult> FromPointAsync(ScreenPoint point, TimeSpan timeout, CancellationToken cancellationToken)
+    public Task<InspectionResult> FromPointAsync(ScreenPoint point, TimeSpan timeout, CancellationToken cancellationToken) =>
+        FromPointAsync(point, InspectionDepth.Interactive, timeout, cancellationToken);
+
+    public async Task<InspectionResult> FromPointAsync(ScreenPoint point, InspectionDepth depth, TimeSpan timeout, CancellationToken cancellationToken)
     {
         try
         {
@@ -55,7 +59,9 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
                         throw new ElementInspectionFailure(ElementInspectionFailureKind.WindowMissing, "No element was found at the given point.");
                     }
 
-                    return CreateSnapshot(PromoteToInteractiveAncestor(element));
+                    return CreateSnapshot(depth == InspectionDepth.Innermost
+                        ? InnermostAt(element, new System.Windows.Point(point.X, point.Y))
+                        : PromoteToInteractiveAncestor(element));
                 },
                 timeout,
                 cancellationToken)
@@ -133,6 +139,13 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         ControlType.ComboBox, ControlType.TreeItem,
     ];
 
+    /// <summary>Controls whose name is a fixed caption, not data the person typed or the program shows.</summary>
+    private static readonly ControlType[] CaptionedControlTypes =
+    [
+        ControlType.Button, ControlType.SplitButton, ControlType.CheckBox, ControlType.RadioButton,
+        ControlType.TabItem, ControlType.MenuItem, ControlType.Hyperlink, ControlType.Text,
+    ];
+
     private const int MaxCaptionDepth = 3;
 
     /// <summary>
@@ -176,6 +189,62 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         return element;
     }
 
+    /// <summary>Above this many descendants the hit element is reported as is (a huge grid or document).</summary>
+    private const int MaxInnermostCandidates = 3000;
+
+    /// <summary>
+    /// The smallest on-screen element containing <paramref name="point"/> among the hit element
+    /// and its descendants - for a field inside a larger box that hit-testing stops at (custom
+    /// drawn cards, panels with non-hit-testable children), or an image inside a list item.
+    /// Ties go to the deeper element. Never promoted to a container.
+    /// </summary>
+    private static AutomationElement InnermostAt(AutomationElement hit, System.Windows.Point point)
+    {
+        try
+        {
+            var best = hit;
+            var bestArea = Area(hit.Current.BoundingRectangle);
+            var descendants = hit.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+            if (descendants.Count > MaxInnermostCandidates)
+            {
+                return hit;
+            }
+
+            foreach (AutomationElement candidate in descendants)
+            {
+                try
+                {
+                    var current = candidate.Current;
+                    var bounds = current.BoundingRectangle;
+                    if (current.IsOffscreen || bounds.IsEmpty || !bounds.Contains(point))
+                    {
+                        continue;
+                    }
+
+                    var area = Area(bounds);
+                    if (area <= bestArea)
+                    {
+                        best = candidate;
+                        bestArea = area;
+                    }
+                }
+                catch (ElementNotAvailableException)
+                {
+                    // Gone while looking; skip it.
+                }
+            }
+
+            return best;
+        }
+        catch (ElementNotAvailableException)
+        {
+            return hit;
+        }
+    }
+
+    private static double Area(System.Windows.Rect bounds) =>
+        bounds.IsEmpty ? double.MaxValue : bounds.Width * bounds.Height;
+
     private static ElementSnapshot CreateSnapshot(AutomationElement element)
     {
         var current = element.Current;
@@ -193,19 +262,32 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         }
 
         var window = FindTopLevelWindow(element);
+
+        // A Delphi control: its AutomationId is its window handle (new on every start), so its
+        // window path is recorded instead; ancestors and labels are left out because the
+        // path already places it and resolution reads native windows only (plan 14).
+        var windowPath = Win32WindowPath.IsVolatileAutomationId(current.AutomationId, current.NativeWindowHandle)
+            ? Win32WindowPath.Of(new IntPtr(current.NativeWindowHandle))
+            : null;
+        // Many Delphi controls are named by their value (a date box's name is the date): only a
+        // caption - a button's or a tab's - is kept as name, so a configuration never holds a value.
+        var name = windowPath is null || CaptionedControlTypes.Contains(current.ControlType)
+            ? NullIfEmpty(current.Name)
+            : null;
         return new ElementSnapshot(
-            NullIfEmpty(current.AutomationId),
-            NullIfEmpty(current.Name),
+            windowPath is null ? NullIfEmpty(current.AutomationId) : null,
+            name,
             current.ControlType?.ProgrammaticName ?? "ControlType.Unknown",
             NullIfEmpty(current.ClassName),
             new BoundingRectangle(rect.X, rect.Y, rect.Width, rect.Height),
             current.ProcessId,
             processName,
             NullIfEmpty(window?.Current.Name),
-            StructuralSignals.Ancestors(element),
-            StructuralSignals.NearbyLabels(element),
+            windowPath is null ? StructuralSignals.Ancestors(element) : ImmutableArray<Domain.Selectors.AncestorFingerprint>.Empty,
+            windowPath is null ? StructuralSignals.NearbyLabels(element) : ImmutableArray<string>.Empty,
             window is null ? null : StructuralSignals.Relative(rect, window.Current.BoundingRectangle),
-            NullIfEmpty(current.FrameworkId));
+            NullIfEmpty(current.FrameworkId),
+            windowPath);
     }
 
     /// <summary>

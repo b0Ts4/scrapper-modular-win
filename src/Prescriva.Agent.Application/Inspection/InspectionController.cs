@@ -31,6 +31,10 @@ public sealed class InspectionController
     private InspectionState _state = InspectionState.NotStarted;
     private CancellationTokenSource? _pointerCts;
 
+    // The observation still running, so a poll of the same point and depth joins it instead
+    // of cancelling it (a slow program would otherwise never finish one).
+    private (ScreenPoint Point, InspectionDepth Depth, Task Task)? _inFlight;
+
     // The last snapshot/fingerprint from a genuine (non-excluded) Found result. Kept
     // separately from `_state` so that a subsequent observation landing on the Agent's
     // own excluded process - which happens whenever the pointer crosses the Agent's own
@@ -92,7 +96,39 @@ public sealed class InspectionController
     /// movement never queues up a backlog of stale requests - only the most recent
     /// observation is ever allowed to update <see cref="CurrentState"/>.
     /// </summary>
-    public async Task ObservePointerAsync(ScreenPoint point, CancellationToken cancellationToken = default)
+    public Task ObservePointerAsync(ScreenPoint point, CancellationToken cancellationToken = default) =>
+        ObservePointerAsync(point, InspectionDepth.Interactive, cancellationToken);
+
+    /// <inheritdoc cref="ObservePointerAsync(ScreenPoint, CancellationToken)"/>
+    /// <param name="depth">Which element under the pointer to report (see <see cref="InspectionDepth"/>).</param>
+    /// <remarks>
+    /// Only a different point or depth supersedes the inspection in flight. Observing the same
+    /// point again (the pointer resting while it is polled) returns the running inspection, so
+    /// a program slower than the polling interval still gets its element shown.
+    /// </remarks>
+    public Task ObservePointerAsync(ScreenPoint point, InspectionDepth depth, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            if (_inFlight is { } running && running.Point == point && running.Depth == depth && !running.Task.IsCompleted)
+            {
+                return running.Task;
+            }
+        }
+
+        var observation = ObserveAsync(point, depth, cancellationToken);
+        lock (_gate)
+        {
+            if (!observation.IsCompleted)
+            {
+                _inFlight = (point, depth, observation);
+            }
+        }
+
+        return observation;
+    }
+
+    private async Task ObserveAsync(ScreenPoint point, InspectionDepth depth, CancellationToken cancellationToken)
     {
         var cts = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _pointerCts, cts);
@@ -112,7 +148,7 @@ public sealed class InspectionController
         InspectionResult result;
         try
         {
-            result = await _inspector.FromPointAsync(point, _timeout, linked.Token).ConfigureAwait(false);
+            result = await _inspector.FromPointAsync(point, depth, _timeout, linked.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ownToken.IsCancellationRequested)
         {
@@ -137,6 +173,11 @@ public sealed class InspectionController
         previous?.Cancel();
         previous?.Dispose();
 
+        lock (_gate)
+        {
+            _inFlight = null;
+        }
+
         _lastRealSnapshot = null;
         _lastRealFingerprint = null;
         SetState(InspectionState.Stopped());
@@ -160,7 +201,7 @@ public sealed class InspectionController
         if (current.Snapshot is null || current.Fingerprint is null)
         {
             throw new InvalidOperationException(
-                "Cannot confirm a selection: no element is currently displayed.");
+                "Não é possível confirmar: nenhum elemento está destacado agora.");
         }
 
         var confirmed = InspectionState.Confirmed(current.Snapshot, current.Fingerprint);
@@ -201,7 +242,7 @@ public sealed class InspectionController
                     _lastRealSnapshot,
                     _lastRealFingerprint,
                     ImmutableArray.Create(
-                        "Ignored an element belonging to the Agent's own process (expected when the pointer is over the highlight overlay)."));
+                        "Elemento do próprio Agent ignorado (normal quando o cursor está sobre o contorno de destaque)."));
             }
             else
             {
@@ -214,10 +255,10 @@ public sealed class InspectionController
         {
             var warning = result.Outcome switch
             {
-                InspectionOutcome.TimedOut => "The inspection timed out before an element could be resolved.",
-                InspectionOutcome.WindowMissing => result.FailureReason ?? "The target window is no longer available.",
-                InspectionOutcome.ElementUnavailable => result.FailureReason ?? "The element under the pointer is no longer available.",
-                _ => "No element was found at the given point.",
+                InspectionOutcome.TimedOut => "A seleção demorou demais para identificar o elemento.",
+                InspectionOutcome.WindowMissing => result.FailureReason ?? "A janela da aplicação não está mais disponível.",
+                InspectionOutcome.ElementUnavailable => result.FailureReason ?? "O elemento sob o cursor não está mais disponível.",
+                _ => "Nenhum elemento encontrado nesse ponto.",
             };
 
             newState = InspectionState.Active(null, null, ImmutableArray.Create(warning));
@@ -250,7 +291,8 @@ public sealed class InspectionController
             FrameworkId: snapshot.FrameworkId,
             Ancestors: snapshot.Ancestors,
             NearbyLabels: snapshot.NearbyLabels,
-            RelativeBounds: snapshot.RelativeBounds);
+            RelativeBounds: snapshot.RelativeBounds,
+            WindowPath: snapshot.WindowPath);
 
     private void SetState(InspectionState state)
     {

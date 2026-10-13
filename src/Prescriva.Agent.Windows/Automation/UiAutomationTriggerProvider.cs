@@ -112,13 +112,29 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
         AutomationEventHandler handler = (_, _) =>
             channel.Writer.TryWrite(new TriggerSignal(_sessionId, trigger.Id, DateTimeOffset.UtcNow));
 
+        // A Delphi control (window-path selector, plan 14): vendor buttons raise no Invoke
+        // event, so its clicks are read from the button's own mouse capture instead.
+        var nativeClicks = string.IsNullOrWhiteSpace(trigger.Selector.AutomationId) &&
+            !string.IsNullOrWhiteSpace(trigger.Selector.WindowPath);
+        Win32ClickWatcher? clickWatcher = null;
+
         try
         {
             await _dispatcher.RunAsync(
                 _ =>
                 {
-                    System.Windows.Automation.Automation.AddAutomationEventHandler(
-                        InvokePattern.InvokedEvent, element, TreeScope.Element, handler);
+                    if (nativeClicks)
+                    {
+                        clickWatcher = new Win32ClickWatcher(
+                            new IntPtr(element.Current.NativeWindowHandle),
+                            () => channel.Writer.TryWrite(new TriggerSignal(_sessionId, trigger.Id, DateTimeOffset.UtcNow)));
+                    }
+                    else
+                    {
+                        System.Windows.Automation.Automation.AddAutomationEventHandler(
+                            InvokePattern.InvokedEvent, element, TreeScope.Element, handler);
+                    }
+
                     return true;
                 },
                 _timeout,
@@ -160,15 +176,22 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
                 // belt-and-suspenders in case a future change lets one through.
             }
 
-            await _dispatcher.RunAsync(
-                _ =>
-                {
-                    System.Windows.Automation.Automation.RemoveAutomationEventHandler(
-                        InvokePattern.InvokedEvent, element, handler);
-                    return true;
-                },
-                _timeout,
-                CancellationToken.None).ConfigureAwait(false);
+            if (clickWatcher is not null)
+            {
+                clickWatcher.Dispose();
+            }
+            else
+            {
+                await _dispatcher.RunAsync(
+                    _ =>
+                    {
+                        System.Windows.Automation.Automation.RemoveAutomationEventHandler(
+                            InvokePattern.InvokedEvent, element, handler);
+                        return true;
+                    },
+                    _timeout,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
         }
     }
 

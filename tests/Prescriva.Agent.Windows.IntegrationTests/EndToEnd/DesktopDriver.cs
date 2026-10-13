@@ -15,21 +15,22 @@ internal static class DesktopDriver
     internal static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(20);
 
     /// <summary>
-    /// Steps 1-4 of the walkthrough through the real Desktop UI: integration and stage,
-    /// three required fields and the Add/Finish buttons selected with the real cursor,
-    /// then saved. Leaves inspection stopped.
+    /// Steps 1-4 of the walkthrough through the real Desktop UI: the TestTarget chosen from the
+    /// open-program list, integration and stage, three required fields and the Add/Finish
+    /// buttons selected with the real cursor, then saved. Leaves inspection stopped.
     /// </summary>
     internal static async Task ConfigureAndSaveMedicineIntegrationAsync(AutomationElement agent, TestTargetLauncher target)
     {
+        await ChooseProgramAsync(agent, "Test Target", $"PID {target.Window.Current.ProcessId}");
+        Assert.Equal("Prescriva.Agent.TestTarget.exe", Value(agent, "ProcessIdentityBox"));
+        Assert.Equal("Prescriva Agent Test Target", Value(agent, "WindowRuleBox"));
         SetText(agent, "IntegrationIdBox", "walkthrough");
         SetText(agent, "IntegrationNameBox", "Walkthrough");
-        SetText(agent, "ProcessIdentityBox", "Prescriva.Agent.TestTarget.exe");
-        SetText(agent, "WindowRuleBox", "Prescriva Agent Test Target");
         Press(agent, "CreateIntegrationButton");
         SetText(agent, "StageIdBox", "budget");
         SetText(agent, "StageNameBox", "Orçamento");
         Press(agent, "AddStageButton");
-        await WaitForTextAsync(agent, "StatusText", "Added stage 'budget'");
+        await WaitForTextAsync(agent, "StatusText", "Etapa \'budget\' adicionada");
 
         Press(agent, "StartInspectionButton");
         foreach (var (automationId, fieldId) in new[]
@@ -43,35 +44,191 @@ internal static class DesktopDriver
             SetText(agent, "FieldSemanticIdBox", fieldId);
             SetText(agent, "FieldMeaningBox", fieldId);
             Press(agent, "AddFieldButton");
-            await WaitForTextAsync(agent, "StatusText", $"Added field '{fieldId}'");
+            await WaitForTextAsync(agent, "StatusText", $"Campo \'{fieldId}\' adicionado");
         }
 
         await HoverAndConfirmAsync(agent, target, "AddButton");
         SetText(agent, "TriggerSemanticIdBox", "add_item");
-        SetText(agent, "TriggerCaptureFieldsBox", "medication, concentration, quantity");
+        SetCaptureFields(agent, "medication", "concentration", "quantity");
         SetText(agent, "TriggerEmitEventBox", "item_added");
-        SelectComboItem(agent, "TriggerTerminalBox", "Nothing");
+        SelectComboItem(agent, "TriggerTerminalBox", "Nada");
         Press(agent, "AddTriggerButton");
-        await WaitForTextAsync(agent, "StatusText", "Added trigger 'add_item' with 2 action(s)");
+        await WaitForTextAsync(agent, "StatusText", "Gatilho \'add_item\' adicionado com 2 ação(ões)");
 
         await HoverAndConfirmAsync(agent, target, "FinishButton");
         SetText(agent, "TriggerSemanticIdBox", "finish_budget");
-        SetText(agent, "TriggerCaptureFieldsBox", "");
+        SetCaptureFields(agent);
         SetText(agent, "TriggerEmitEventBox", "");
-        SelectComboItem(agent, "TriggerTerminalBox", "Finish session (budget_finished)");
+        SelectComboItem(agent, "TriggerTerminalBox", "Finalizar sessão (budget_finished)");
         Press(agent, "AddTriggerButton");
-        await WaitForTextAsync(agent, "StatusText", "Added trigger 'finish_budget' with 1 action(s)");
+        await WaitForTextAsync(agent, "StatusText", "Gatilho \'finish_budget\' adicionado com 1 ação(ões)");
         Press(agent, "StopInspectionButton");
 
         Press(agent, "SaveButton");
-        await WaitForTextAsync(agent, "StatusText", "Saved. Unsaved changes: False");
+        await WaitForTextAsync(agent, "StatusText", "Salvo. Alterações não salvas: não");
+    }
+
+    /// <summary>
+    /// Step 1: searches the open-program list, selects the one entry whose description
+    /// contains <paramref name="itemText"/> (e.g. its PID) and uses it.
+    /// </summary>
+    internal static async Task ChooseProgramAsync(AutomationElement agent, string search, string itemText)
+    {
+        SetText(agent, "OpenWindowsSearchBox", search);
+        AutomationElement? item = null;
+        await WaitUntilAsync(
+            () =>
+            {
+                // Read the list only while no refresh is running (the button is disabled meanwhile).
+                if (!IsEnabled(agent, "RefreshWindowsButton"))
+                {
+                    return false;
+                }
+
+                var matches = ListItems(agent, "OpenWindowsList").Where(candidate => candidate.Current.Name.Contains(itemText, StringComparison.Ordinal)).ToArray();
+                item = matches.Length == 1 ? matches[0] : null;
+                if (item is null)
+                {
+                    Press(agent, "RefreshWindowsButton");
+                }
+
+                return item is not null;
+            },
+            () => $"program list for '{search}' shows: {string.Join(" | ", ListItems(agent, "OpenWindowsList").Select(candidate => candidate.Current.Name))}");
+        ((SelectionItemPattern)item!.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Press(agent, "UseSelectedWindowButton");
+        await WaitForTextAsync(agent, "StatusText", "Programa escolhido");
+    }
+
+    /// <summary>
+    /// Step 5: <c>Exportar eventos (CSV)...</c> through the real Windows save dialog (file name box
+    /// "1001", Save button "1"), then waits for the Agent to report the export.
+    /// </summary>
+    internal static async Task ExportCsvAsync(AutomationElement agent, int processId, string path)
+    {
+        Press(agent, "ExportCsvButton");
+        // A modal dialog shows in UI Automation under its owner window (or, on some systems, the desktop).
+        var dialogCondition = new AndCondition(
+            new PropertyCondition(AutomationElement.ProcessIdProperty, processId),
+            new PropertyCondition(AutomationElement.ClassNameProperty, "#32770"));
+        AutomationElement? dialog = null;
+        await WaitUntilAsync(
+            () => (dialog = agent.FindFirst(TreeScope.Children, dialogCondition)
+                ?? AutomationElement.RootElement.FindFirst(TreeScope.Children, dialogCondition)) is not null,
+            () => "the save dialog did not open; Agent status: " + Text(agent, "StatusText"));
+        AutomationElement? fileName = null;
+        await WaitUntilAsync(
+            () => (fileName = dialog!.FindFirst(TreeScope.Descendants, new AndCondition(
+                new PropertyCondition(AutomationElement.AutomationIdProperty, "1001"),
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit)))) is not null,
+            () => "the save dialog has no file name box");
+        // The modern file dialog keeps its own copy of the name and ignores ValuePattern.SetValue
+        // when saving, so type the path as a person would.
+        fileName!.SetFocus();
+        await WaitUntilAsync(
+            () =>
+            {
+                SelectAllAndType(fileName, path);
+                return string.Equals(((ValuePattern)fileName.GetCurrentPattern(ValuePattern.Pattern)).Current.Value, path, StringComparison.OrdinalIgnoreCase);
+            },
+            () => "the file name box shows: " + ((ValuePattern)fileName.GetCurrentPattern(ValuePattern.Pattern)).Current.Value);
+        var save = dialog!.FindFirst(TreeScope.Descendants, new AndCondition(
+            new PropertyCondition(AutomationElement.AutomationIdProperty, "1"),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button)));
+        ((InvokePattern)save.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+        await WaitForTextAsync(agent, "StatusText", "exportado(s) para");
+        Assert.Contains(path, Text(agent, "StatusText"), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Focuses <paramref name="box"/>, selects its text (Ctrl+A) and types <paramref name="text"/> with real keyboard input.</summary>
+    private static void SelectAllAndType(AutomationElement box, string text)
+    {
+        box.SetFocus();
+        SendKeys([Key(VkControl, down: true), Key(VkA, down: true), Key(VkA, down: false), Key(VkControl, down: false)]);
+        SendKeys(text.SelectMany(character => new[] { Unicode(character, down: true), Unicode(character, down: false) }).ToArray());
+        Thread.Sleep(200);
+    }
+
+    /// <summary>Presses (<paramref name="down"/>) or releases a key with real keyboard input.</summary>
+    internal static void SetKey(ushort virtualKey, bool down) => SendKeys([Key(virtualKey, down)]);
+
+    internal const ushort VkShift = 0x10;
+    internal const ushort VkControl = 0x11;
+    private const ushort VkA = 0x41;
+    private const uint InputKeyboard = 1;
+    private const uint KeyEventKeyUp = 0x0002;
+    private const uint KeyEventUnicode = 0x0004;
+
+    private static KeyboardInput Key(ushort virtualKey, bool down) =>
+        new() { Type = InputKeyboard, Data = new KeyboardData { VirtualKey = virtualKey, Flags = down ? 0 : KeyEventKeyUp } };
+
+    private static KeyboardInput Unicode(char character, bool down) =>
+        new() { Type = InputKeyboard, Data = new KeyboardData { ScanCode = character, Flags = KeyEventUnicode | (down ? 0 : KeyEventKeyUp) } };
+
+    private static void SendKeys(KeyboardInput[] inputs)
+    {
+        if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<KeyboardInput>()) != inputs.Length)
+        {
+            throw new InvalidOperationException("SendInput failed.");
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInput
+    {
+        public uint Type;
+        public KeyboardData Data;
+    }
+
+    /// <summary>KEYBDINPUT, padded to the size of the INPUT union (MOUSEINPUT is the largest member).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardData
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
+        public uint Padding1;
+        public uint Padding2;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, KeyboardInput[] inputs, int size);
+
+    /// <summary>Opens a step of the Agent's guided configurator (Step1Tab ... Step5Tab).</summary>
+    internal static void GoToStep(AutomationElement agent, string stepAutomationId) =>
+        ((SelectionItemPattern)Find(agent, stepAutomationId).GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+
+    /// <summary>Step 3: checks exactly the "read these fields" boxes named, unchecking the others.</summary>
+    internal static void SetCaptureFields(AutomationElement agent, params string[] fieldIds)
+    {
+        _ = Find(agent, "TriggerNameBox"); // brings step 3 forward
+        var boxes = agent.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.CheckBox))
+            .Cast<AutomationElement>()
+            .Where(box => box.Current.AutomationId.StartsWith("CaptureField_", StringComparison.Ordinal))
+            .ToArray();
+        foreach (var fieldId in fieldIds)
+        {
+            Assert.Contains(boxes, box => box.Current.AutomationId == "CaptureField_" + fieldId);
+        }
+
+        foreach (var box in boxes)
+        {
+            var wanted = fieldIds.Contains(box.Current.AutomationId["CaptureField_".Length..], StringComparer.Ordinal);
+            var toggle = (TogglePattern)box.GetCurrentPattern(TogglePattern.Pattern);
+            if ((toggle.Current.ToggleState == ToggleState.On) != wanted)
+            {
+                toggle.Toggle();
+            }
+        }
     }
 
     /// <summary>Prepares and runs test mode while the "operator" presses Add and Finish, until the run completes.</summary>
     internal static async Task RunTestModeAsync(AutomationElement agent, TestTargetLauncher target)
     {
         Press(agent, "PrepareTestButton");
-        await WaitForTextAsync(agent, "StatusText", "Test prepared");
+        await WaitForTextAsync(agent, "StatusText", "Teste preparado");
         await WaitForTextAsync(agent, "TestStatusText", "Pronto.");
         Press(agent, "RunTestButton");
         await PressUntilAsync(target, ["AddButton", "FinishButton"], () => Text(agent, "TestStatusText").StartsWith("Teste concluído", StringComparison.Ordinal));
@@ -180,9 +337,82 @@ internal static class DesktopDriver
         SetText(target.Window, "QuantityTextBox", quantity);
     }
 
+    /// <summary>
+    /// Finds a control by AutomationId. In the Agent's step-by-step window a control on another
+    /// step (or in a collapsed "advanced" section) is reached the way a person would: by opening
+    /// that step and expanding the section.
+    /// </summary>
     internal static AutomationElement Find(AutomationElement root, string automationId) =>
-        root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, automationId))
+        TryFind(root, automationId)
+        ?? FindOnAnotherStep(root, automationId)
         ?? throw new InvalidOperationException($"Element '{automationId}' not found.");
+
+    private static AutomationElement? TryFind(AutomationElement root, string automationId) =>
+        root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, automationId));
+
+    private static AutomationElement? FindOnAnotherStep(AutomationElement root, string automationId)
+    {
+        var steps = TryFind(root, "WizardSteps");
+        if (steps is null)
+        {
+            return null;
+        }
+
+        if (ExpandSections(root) && TryFind(root, automationId) is { } inSection)
+        {
+            return inSection;
+        }
+
+        foreach (AutomationElement step in steps.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.TabItem)))
+        {
+            ((SelectionItemPattern)step.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                if (TryFind(root, automationId) is { } found)
+                {
+                    return found;
+                }
+
+                if (ExpandSections(root) && TryFind(root, automationId) is { } expanded)
+                {
+                    return expanded;
+                }
+
+                Thread.Sleep(100);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Expands the collapsed sections (Expanders, never combo boxes) on the visible step.</summary>
+    private static bool ExpandSections(AutomationElement root)
+    {
+        var expandedAny = false;
+        var sections = root.FindAll(TreeScope.Descendants, new AndCondition(
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Group),
+            new PropertyCondition(AutomationElement.IsExpandCollapsePatternAvailableProperty, true)));
+        foreach (AutomationElement section in sections)
+        {
+            var pattern = (ExpandCollapsePattern)section.GetCurrentPattern(ExpandCollapsePattern.Pattern);
+            if (pattern.Current.ExpandCollapseState == ExpandCollapseState.Collapsed)
+            {
+                pattern.Expand();
+                expandedAny = true;
+            }
+        }
+
+        return expandedAny;
+    }
+
+    internal static string Value(AutomationElement root, string automationId) =>
+        ((ValuePattern)Find(root, automationId).GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
+
+    internal static AutomationElement[] ListItems(AutomationElement root, string automationId) =>
+        Find(root, automationId)
+            .FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem))
+            .Cast<AutomationElement>()
+            .ToArray();
 
     internal static void SetText(AutomationElement root, string automationId, string value) =>
         ((ValuePattern)Find(root, automationId).GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
@@ -444,7 +674,7 @@ internal static class DesktopDriver
                 var binDirectory = Path.GetDirectoryName(testTargetPath)!;
                 return Path.GetFullPath(Path.Combine(
                     binDirectory, "..", "..", "..", "..", "Prescriva.Agent.Desktop", "bin",
-                    new DirectoryInfo(binDirectory).Parent!.Name, "net10.0-windows", "Prescriva.Agent.Desktop.exe"));
+                    new DirectoryInfo(binDirectory).Parent!.Name, "net10.0-windows10.0.19041.0", "Prescriva.Agent.Desktop.exe"));
             }
         }
 

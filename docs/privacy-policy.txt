@@ -1,0 +1,59 @@
+POLÍTICA DE PRIVACIDADE – RECEITA FÁCIL AGENT
+
+Última atualização: 6 de outubro de 2026
+
+O Receita Fácil Agent é um aplicativo para Windows que lê, de forma visível e somente nos campos que o usuário configurou, dados de orçamentos exibidos em outro programa do mesmo computador (por exemplo, o sistema de uma farmácia), e os registra localmente.
+
+
+1. QUAIS DADOS O APLICATIVO COLETA
+
+Somente os campos configurados: o aplicativo só lê os elementos de tela que o usuário selecionou e confirmou na configuração, e somente quando um botão configurado (por exemplo, "Adicionar" ou "Finalizar") é acionado. Ele não registra o que é digitado no teclado, não lê a área de transferência, não monitora de forma oculta e não captura a tela inteira.
+
+Valores dos campos: por exemplo, nome do medicamento, concentração, quantidade e observações.
+
+Arquivos e imagens (opcional): quando um campo é configurado como "Arquivo / imagem", o aplicativo guarda uma cópia do arquivo indicado no campo (até 10 MB) ou a imagem exibida apenas naquele campo. A captura de imagem é recusada se outra janela estiver cobrindo o campo.
+
+Texto por reconhecimento de imagem (opcional): quando um campo é configurado como "Texto via OCR", o aplicativo reconhece o texto da imagem daquele campo usando o recurso de reconhecimento de texto do próprio Windows, no próprio computador. A imagem é descartada logo após o reconhecimento.
+
+Dados técnicos: um registro técnico com identificadores, códigos de resultado, tempos e níveis de confiança. Os valores capturados nunca são gravados nesse registro.
+
+O aplicativo não coleta dados de identificação do usuário, localização, contatos nem dados de navegação.
+
+
+2. ONDE OS DADOS FICAM E COMO SÃO PROTEGIDOS
+
+Todos os dados ficam somente no computador, na pasta de dados do aplicativo. Esta versão do aplicativo não envia dados a nenhum servidor, nem à Microsoft, nem a terceiros.
+
+Os valores capturados e os arquivos guardados são criptografados com a proteção de dados do Windows, vinculada à conta do Windows que usa o aplicativo.
+
+As configurações guardam apenas como encontrar os campos na tela e o que fazer com eles, nunca os valores capturados.
+
+
+3. POR QUANTO TEMPO OS DADOS SÃO MANTIDOS
+
+Registros ainda não confirmados permanecem até a confirmação. O aplicativo mostra um alerta visível quando a quantidade de registros pendentes cresce.
+
+Registros confirmados são mantidos por 7 dias e depois apagados.
+
+Arquivos que não são mais usados por nenhum registro são apagados automaticamente.
+
+
+4. CONTROLE DO USUÁRIO
+
+O aplicativo sempre mostra quando está monitorando, na janela e no ícone ao lado do relógio do Windows.
+
+A opção "Iniciar com o Windows" vem desativada e só é ligada pelo usuário.
+
+O botão "Limpar dados locais" apaga todos os registros, arquivos guardados e o registro técnico. Desinstalar o aplicativo também remove todos os dados locais.
+
+Nenhuma configuração começa a funcionar sem antes passar pelo modo de teste e ser aprovada pelo usuário.
+
+
+5. COMPARTILHAMENTO
+
+O aplicativo não vende, não aluga e não compartilha dados. Se versões futuras passarem a enviar dados ao servidor da empresa usuária, esta política será atualizada antes dessa função ser disponibilizada, informando o destino, a finalidade e a forma de proteção dos dados.
+
+
+6. CONTATO
+
+Dúvidas sobre esta política: barbosarthur98@gmail.com

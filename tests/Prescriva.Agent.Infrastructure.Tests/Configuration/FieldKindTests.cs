@@ -44,6 +44,21 @@ public sealed class FieldKindTests : IDisposable
     }
 
     [Fact]
+    public async Task A_screen_image_field_round_trips_through_the_json_store_as_a_readable_kind()
+    {
+        var store = new JsonConfigurationStore(_directory);
+        var text = TextOnly();
+        var image = text with { Fields = [text.Fields[0] with { Kind = FieldKind.ScreenImage }] };
+
+        await store.SaveAsync(image, CancellationToken.None);
+        var json = await File.ReadAllTextAsync(Path.Combine(_directory, "budget-flow.json"));
+        var loaded = await store.LoadAsync("budget-flow", CancellationToken.None);
+
+        Assert.Contains("\"kind\": \"screenImage\"", json, StringComparison.Ordinal);
+        Assert.Equal(FieldKind.ScreenImage, loaded.Fields[0].Kind);
+    }
+
+    [Fact]
     public async Task A_file_field_round_trips_through_the_json_store_as_a_readable_kind()
     {
         var store = new JsonConfigurationStore(_directory);
@@ -74,6 +89,32 @@ public sealed class FieldKindTests : IDisposable
 
         Assert.Equal(FieldKind.Text, loaded.Fields[0].Kind);
         Assert.Equal(TextOnlyFingerprintBeforeFieldKinds, ConfigurationFingerprint.Compute(loaded));
+    }
+
+    [Fact]
+    public void Turning_a_field_into_an_OCR_field_changes_the_content_hash()
+    {
+        var text = TextOnly();
+        var ocr = text with { Fields = [text.Fields[0] with { Kind = FieldKind.OcrText }] };
+        var file = text with { Fields = [text.Fields[0] with { Kind = FieldKind.File }] };
+
+        Assert.NotEqual(ConfigurationFingerprint.Compute(text), ConfigurationFingerprint.Compute(ocr));
+        Assert.NotEqual(ConfigurationFingerprint.Compute(file), ConfigurationFingerprint.Compute(ocr));
+    }
+
+    [Fact]
+    public async Task An_OCR_field_round_trips_through_the_json_store_as_a_readable_kind()
+    {
+        var store = new JsonConfigurationStore(_directory);
+        var text = TextOnly();
+        var ocr = text with { Fields = [text.Fields[0] with { Kind = FieldKind.OcrText }] };
+
+        await store.SaveAsync(ocr, CancellationToken.None);
+        var json = await File.ReadAllTextAsync(Path.Combine(_directory, "budget-flow.json"));
+        var loaded = await store.LoadAsync("budget-flow", CancellationToken.None);
+
+        Assert.Contains("\"kind\": \"ocrText\"", json, StringComparison.Ordinal);
+        Assert.Equal(FieldKind.OcrText, loaded.Fields[0].Kind);
     }
 
     private static IntegrationConfiguration TextOnly() => new(

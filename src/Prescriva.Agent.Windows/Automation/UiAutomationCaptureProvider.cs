@@ -56,9 +56,14 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
                 nameof(handle));
         }
 
-        if (field.Kind == FieldKind.File)
+        if (field.Kind.ProducesAttachment())
         {
             return await CaptureFileAsync(uiaHandle, field, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (field.Kind == FieldKind.OcrText)
+        {
+            return await CaptureOcrAsync(uiaHandle, cancellationToken).ConfigureAwait(false);
         }
 
         var stopwatch = Stopwatch.StartNew();
@@ -92,7 +97,8 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
 
     /// <summary>
     /// A file field: the probe (text or screen image) runs on the dispatcher thread; reading
-    /// a file from disk does not, so a large file never blocks UI Automation.
+    /// a file from disk does not, so a large file never blocks UI Automation. A screen-image
+    /// field skips the text: it is always the control's on-screen image.
     /// </summary>
     private async Task<CaptureResult> CaptureFileAsync(UiaResolvedElementHandle handle, FieldDefinition field, CancellationToken cancellationToken)
     {
@@ -100,7 +106,9 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
         try
         {
             var probe = await _dispatcher.RunAsync(
-                _ => FileFieldCapture.ProbeOnDispatcherThread(handle.Element),
+                _ => field.Kind == FieldKind.ScreenImage
+                    ? FileFieldCapture.ProbeScreenOnDispatcherThread(handle.Element)
+                    : FileFieldCapture.ProbeOnDispatcherThread(handle.Element),
                 _timeout,
                 cancellationToken).ConfigureAwait(false);
 
@@ -129,6 +137,46 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
         {
             var outcome = failure.Kind == ElementInspectionFailureKind.TimedOut ? CaptureOutcome.TimedOut : CaptureOutcome.ElementUnavailable;
             return new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("File", false, failure.Message)]);
+        }
+    }
+
+    /// <summary>
+    /// An OCR field: the control's image is taken on the dispatcher thread (refused when
+    /// covered); recognition runs off it. A control that shows nothing reads as empty text.
+    /// </summary>
+    private async Task<CaptureResult> CaptureOcrAsync(UiaResolvedElementHandle handle, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var probe = await _dispatcher.RunAsync(
+                _ => FileFieldCapture.ProbeScreenOnDispatcherThread(handle.Element),
+                _timeout,
+                cancellationToken).ConfigureAwait(false);
+
+            if (probe.Failure is CaptureOutcome.FileUnavailable)
+            {
+                return new CaptureResult(CaptureOutcome.Captured, string.Empty, OcrFieldCapture.ProviderId, 1.0, stopwatch.Elapsed, [new PatternAttempt("ocr", true, probe.Detail)]);
+            }
+
+            if (probe.Failure is { } failure)
+            {
+                return new CaptureResult(failure, null, OcrFieldCapture.ProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("ocr", false, probe.Detail)]);
+            }
+
+            var reading = await OcrFieldCapture.RecognizeAsync(probe.Png!, cancellationToken).ConfigureAwait(false);
+            return reading.Language is null
+                ? new CaptureResult(CaptureOutcome.OcrUnavailable, null, OcrFieldCapture.ProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("ocr", false, "No OCR recognizer language is installed.")])
+                : new CaptureResult(CaptureOutcome.Captured, reading.Text, OcrFieldCapture.ProviderId, 1.0, stopwatch.Elapsed, [new PatternAttempt("ocr:" + reading.Language, true)]);
+        }
+        catch (ElementInspectionFailure failure) when (failure.Kind == ElementInspectionFailureKind.Cancelled)
+        {
+            throw new OperationCanceledException(failure.Message, failure, cancellationToken);
+        }
+        catch (ElementInspectionFailure failure)
+        {
+            var outcome = failure.Kind == ElementInspectionFailureKind.TimedOut ? CaptureOutcome.TimedOut : CaptureOutcome.ElementUnavailable;
+            return new CaptureResult(outcome, null, OcrFieldCapture.ProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("ocr", false, failure.Message)]);
         }
     }
 
@@ -168,6 +216,11 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
                 return (selectionResult, attempts);
             }
 
+            if (TryCaptureViaLabelName(element, attempts, out var labelResult))
+            {
+                return (labelResult, attempts);
+            }
+
             return (null, attempts);
         }
         catch (ElementNotAvailableException ex)
@@ -203,6 +256,24 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
         }
 
         attempts.Add(new PatternAttempt("TextPattern", Succeeded: false, "The element does not support TextPattern."));
+        value = null;
+        return false;
+    }
+
+    /// <summary>
+    /// A plain label (ControlType.Text) - a calculator display, an ERP total - often exposes no
+    /// pattern at all: its text is its Name. Only labels: a button's Name is its caption, not a value.
+    /// </summary>
+    private static bool TryCaptureViaLabelName(AutomationElement element, List<PatternAttempt> attempts, out string? value)
+    {
+        if (element.Current.ControlType == ControlType.Text)
+        {
+            value = element.Current.Name;
+            attempts.Add(new PatternAttempt("Name", Succeeded: true));
+            return true;
+        }
+
+        attempts.Add(new PatternAttempt("Name", Succeeded: false, "Only a label (ControlType.Text) is read through its Name."));
         value = null;
         return false;
     }

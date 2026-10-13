@@ -35,6 +35,32 @@ public sealed class InspectionControllerTests
         Assert.Null(controller.CurrentState.Fingerprint);
     }
 
+    [Theory]
+    [InlineData(InspectionDepth.Interactive)]
+    [InlineData(InspectionDepth.Innermost)]
+    public async Task ObservePointerAsync_asks_the_inspector_for_the_requested_depth(InspectionDepth depth)
+    {
+        var inspector = new FakeElementInspector();
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        await controller.ObservePointerAsync(new ScreenPoint(10, 20), depth);
+
+        Assert.Equal([depth], inspector.Depths);
+    }
+
+    [Fact]
+    public async Task ObservePointerAsync_without_a_depth_asks_for_the_interactive_element()
+    {
+        var inspector = new FakeElementInspector();
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        await controller.ObservePointerAsync(new ScreenPoint(10, 20));
+
+        Assert.Equal([InspectionDepth.Interactive], inspector.Depths);
+    }
+
     [Fact]
     public async Task ObservePointerAsync_found_element_updates_snapshot_bounds_and_fingerprint()
     {
@@ -154,6 +180,57 @@ public sealed class InspectionControllerTests
         Assert.Equal(secondSnapshot, controller.CurrentState.Snapshot);
     }
 
+    /// <summary>
+    /// The Agent polls the pointer every 80 ms. Against a slow program (a Delphi screen took
+    /// 250-330 ms per inspection on a pharmacy PC) every poll used to cancel the one still in
+    /// flight although the pointer had not moved, so no result was ever shown. A repeated
+    /// observation of the same point must wait for the inspection already running instead.
+    /// </summary>
+    [Fact]
+    public async Task Repeated_observations_of_the_same_point_wait_for_the_slow_inspection_in_flight()
+    {
+        var inspector = new FakeElementInspector();
+        var firstCallCts = new TaskCompletionSource<CancellationToken>();
+        var firstCallResult = new TaskCompletionSource<InspectionResult>();
+        inspector.Enqueue(ct =>
+        {
+            firstCallCts.TrySetResult(ct);
+            return firstCallResult.Task;
+        });
+
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+
+        var point = new ScreenPoint(5, 5);
+        var first = controller.ObservePointerAsync(point);
+        var firstToken = await firstCallCts.Task;
+        var second = controller.ObservePointerAsync(point);
+        var third = controller.ObservePointerAsync(point);
+
+        Assert.False(firstToken.IsCancellationRequested);
+        Assert.Equal(1, inspector.CallCount);
+
+        var slowSnapshot = Snapshot("SlowDelphiField");
+        firstCallResult.TrySetResult(InspectionResult.Found(slowSnapshot));
+        await Task.WhenAll(first, second, third);
+
+        Assert.Equal(slowSnapshot, controller.CurrentState.Snapshot);
+    }
+
+    [Fact]
+    public async Task The_window_path_of_a_Delphi_control_reaches_the_fingerprint()
+    {
+        var inspector = new FakeElementInspector();
+        var delphiEdit = Snapshot("ignored") with { AutomationId = null, WindowPath = "TPanel[0]/TEdit[1]" };
+        inspector.Enqueue(_ => Task.FromResult(InspectionResult.Found(delphiEdit)));
+
+        var controller = new InspectionController(inspector);
+        await controller.StartAsync();
+        await controller.ObservePointerAsync(new ScreenPoint(1, 2));
+
+        Assert.Equal("TPanel[0]/TEdit[1]", controller.CurrentState.Fingerprint?.WindowPath);
+    }
+
     [Fact]
     public async Task StopAsync_removes_the_highlight()
     {
@@ -218,7 +295,7 @@ public sealed class InspectionControllerTests
         var state = controller.CurrentState;
         Assert.Null(state.Snapshot);
         Assert.Null(state.Fingerprint);
-        Assert.Contains(state.Warnings, w => w.Contains("own process", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(state.Warnings, w => w.Contains("próprio Agent", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -256,7 +333,7 @@ public sealed class InspectionControllerTests
         Assert.Equal("MedicationTextBox", controller.CurrentState.Snapshot?.AutomationId);
 
         await controller.ObservePointerAsync(new ScreenPoint(3, 4));
-        Assert.Contains(controller.CurrentState.Warnings, w => w.Contains("own process", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(controller.CurrentState.Warnings, w => w.Contains("próprio Agent", StringComparison.OrdinalIgnoreCase));
 
         var confirmed = await controller.ConfirmAsync();
 
@@ -272,8 +349,14 @@ public sealed class InspectionControllerTests
 
         public void Enqueue(Func<CancellationToken, Task<InspectionResult>> factory) => _responses.Enqueue(factory);
 
-        public Task<InspectionResult> FromPointAsync(ScreenPoint point, TimeSpan timeout, CancellationToken cancellationToken)
+        public List<InspectionDepth> Depths { get; } = [];
+
+        public Task<InspectionResult> FromPointAsync(ScreenPoint point, TimeSpan timeout, CancellationToken cancellationToken) =>
+            FromPointAsync(point, InspectionDepth.Interactive, timeout, cancellationToken);
+
+        public Task<InspectionResult> FromPointAsync(ScreenPoint point, InspectionDepth depth, TimeSpan timeout, CancellationToken cancellationToken)
         {
+            Depths.Add(depth);
             CallCount++;
             var factory = _responses.Count > 0
                 ? _responses.Dequeue()

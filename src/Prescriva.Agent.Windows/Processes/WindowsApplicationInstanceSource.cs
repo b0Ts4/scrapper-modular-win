@@ -11,20 +11,24 @@ namespace Prescriva.Agent.Windows.Processes;
 /// <see cref="ApplicationDefinition.ProcessIdentity"/> (the .exe name, no extension - the
 /// same convention <see cref="Automation.AutomationWindowLocator.Find"/> already uses) and,
 /// when <see cref="ApplicationDefinition.WindowRule"/> is non-empty, matching each such
-/// process's main window title against it. Each distinct OS process ID that matches is
-/// reported as its own <see cref="ApplicationInstance"/> with a stable, freshly allocated
+/// process's main window title against it - or, for a Store app whose window is framed by
+/// <c>ApplicationFrameHost</c> (its own main window title is empty), against the title of the
+/// frame holding its content, as <see cref="Win32OpenWindowSource"/> reports it. Each
+/// distinct OS process ID that matches is reported as its own
+/// <see cref="ApplicationInstance"/> with a stable, freshly allocated
 /// <see cref="ApplicationInstance.InstanceId"/> - this is what lets two separately launched
 /// copies of the same configured application (same process name, same window title) be
 /// told apart and tracked as independent instances.
 ///
-/// Uses only <see cref="System.Diagnostics.Process"/> - no UI Automation, so no
-/// <see cref="Automation.AutomationDispatcher"/> involvement is needed here.
+/// Uses only <see cref="System.Diagnostics.Process"/> and window titles - no UI Automation,
+/// so no <see cref="Automation.AutomationDispatcher"/> involvement is needed here.
 /// </summary>
 public sealed class WindowsApplicationInstanceSource : IApplicationInstanceSource
 {
     private static readonly TimeSpan DefaultPollInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly TimeSpan _pollInterval;
+    private readonly Win32OpenWindowSource _windows = new();
 
     public WindowsApplicationInstanceSource(TimeSpan? pollInterval = null)
     {
@@ -43,13 +47,18 @@ public sealed class WindowsApplicationInstanceSource : IApplicationInstanceSourc
         {
 
             var seenThisPass = new HashSet<int>();
+            ILookup<int, string>? framedTitles = null;
             foreach (var process in Process.GetProcessesByName(ProcessIdentity.ToProcessName(application.ProcessIdentity)))
             {
                 using (process)
                 {
                     if (!MatchesWindowRule(process, application.WindowRule))
                     {
-                        continue;
+                        framedTitles ??= _windows.List(CancellationToken.None).ToLookup(window => window.ProcessId, window => window.WindowTitle);
+                        if (!framedTitles[process.Id].Contains(application.WindowRule, StringComparer.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
                     }
 
                     seenThisPass.Add(process.Id);

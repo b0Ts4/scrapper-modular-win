@@ -483,7 +483,7 @@ public sealed class SessionCoordinator
         {
             var failure = captureResult.Outcome switch
             {
-                CaptureOutcome.UnsupportedPattern => CaptureFailure.UnsupportedProvider,
+                CaptureOutcome.UnsupportedPattern or CaptureOutcome.OcrUnavailable => CaptureFailure.UnsupportedProvider,
                 CaptureOutcome.TimedOut or CaptureOutcome.TooLarge => CaptureFailure.Unreadable,
                 _ => CaptureFailure.Unavailable
             };
@@ -492,7 +492,7 @@ public sealed class SessionCoordinator
             return (new CapturedFieldValue(null, failure), transient);
         }
 
-        if (field.Kind == FieldKind.File)
+        if (field.Kind.ProducesAttachment())
         {
             return (await StoreAttachmentAsync(trigger, field, captureResult, cancellationToken).ConfigureAwait(false), false);
         }

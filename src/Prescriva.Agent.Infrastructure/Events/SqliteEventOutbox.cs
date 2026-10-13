@@ -85,7 +85,14 @@ public sealed class SqliteEventOutbox : IEventOutbox
         }
     }
 
-    public async Task<IReadOnlyList<DomainEvent>> ReadPendingAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<DomainEvent>> ReadPendingAsync(CancellationToken cancellationToken) =>
+        ReadAsync([StatusPending], cancellationToken);
+
+    /// <summary>The pending and the delivered events still kept, in append order; never quarantined ones.</summary>
+    public Task<IReadOnlyList<DomainEvent>> ReadExportableAsync(CancellationToken cancellationToken) =>
+        ReadAsync([StatusPending, StatusConfirmed], cancellationToken);
+
+    private async Task<IReadOnlyList<DomainEvent>> ReadAsync(string[] statuses, CancellationToken cancellationToken)
     {
         using var connection = OpenConnection();
 
@@ -96,10 +103,11 @@ public sealed class SqliteEventOutbox : IEventOutbox
                 """
                 SELECT rowid, id, configuration_id, configuration_version, configuration_revision, session_id, sequence, timestamp, type, payload_ciphertext
                 FROM events
-                WHERE status = $status
+                WHERE status IN ($first, $second)
                 ORDER BY rowid ASC;
                 """;
-            select.Parameters.AddWithValue("$status", StatusPending);
+            select.Parameters.AddWithValue("$first", statuses[0]);
+            select.Parameters.AddWithValue("$second", statuses[^1]);
             await using var reader = await select.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {

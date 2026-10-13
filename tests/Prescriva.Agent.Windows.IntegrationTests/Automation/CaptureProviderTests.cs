@@ -83,6 +83,24 @@ public sealed class CaptureProviderTests
     }
 
     [Fact]
+    public async Task CaptureAsync_reads_a_plain_label_through_its_Name_when_it_exposes_no_pattern()
+    {
+        using var target = TestTargetLauncher.Launch();
+        using var dispatcher = new AutomationDispatcher();
+        GetInvokePattern(FindById(target, "AddButton")).Invoke();
+
+        var (resolver, provider) = CreateResolverAndProvider(dispatcher);
+        var fingerprint = BuildFingerprint(target, "ItemCountText", "ControlType.Text");
+        var handle = await ResolveOrFail(resolver, fingerprint);
+
+        var result = await provider.CaptureAsync(handle, BuildField(fingerprint), CancellationToken.None);
+
+        Assert.Equal(CaptureOutcome.Captured, result.Outcome);
+        Assert.Equal("Itens: 1", result.Value);
+        Assert.Contains(result.Attempts, a => a is { PatternName: "Name", Succeeded: true });
+    }
+
+    [Fact]
     public async Task CaptureAsync_returns_UnsupportedPattern_for_a_control_with_no_compatible_pattern()
     {
         using var target = TestTargetLauncher.Launch();

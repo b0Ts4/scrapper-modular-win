@@ -15,7 +15,7 @@ public enum SelectorFragilityWarning
     /// <summary>Another element scored close behind; a small layout change could make the selector ambiguous.</summary>
     NarrowLead,
 
-    /// <summary>No identifier, label or name matched: only position and structure did.</summary>
+    /// <summary>No identifier (AutomationId or window path), label or name matched: only position and structure did.</summary>
     PositionDependent,
 }
 
@@ -54,7 +54,8 @@ public static class SelectorFragility
         }
 
         if (resolution.Evidence is { Count: > 0 } evidence &&
-            !evidence.ContainsKey("automationId") && !evidence.ContainsKey("nearbyLabels") && !evidence.ContainsKey("name"))
+            !evidence.ContainsKey("automationId") && !evidence.ContainsKey("windowPath") &&
+            !evidence.ContainsKey("nearbyLabels") && !evidence.ContainsKey("name"))
         {
             warnings.Add(SelectorFragilityWarning.PositionDependent);
         }

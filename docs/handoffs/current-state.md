@@ -1,5 +1,9 @@
 # Current state
 
+## Status — 2026-10-12 (first real pharmacy system test: FórmulaCerta works end to end after two fixes and plan 14; see "First test on a real pharmacy system")
+
+## Status — 2026-10-07 (plan 10 done; see below)
+
 ## Status — 2026-10-04
 
 **Milestone 1 is functionally complete and verified by automated tests on Windows; a person-driven visual walkthrough on a Windows 10/11 desktop is the only open acceptance item.**
@@ -50,7 +54,7 @@ Plan: `docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`. All 5 task
 - `IntegrationEditorViewModel`: `RemoveField` (refused while captured, forgets the resolved handle — closes the plan-2 stale-handle limitation), `UpdateField`, `RemoveTrigger`, `ReplaceTriggerActions`, `RemoveStage` (refused while used), duplicate IDs refused on add.
 - Desktop: approval state line, Approve records through the service, Activate uses the stored approval for the current content, edit buttons with refusals shown.
 - Evidence: run 37221107495 (push) and 37221111403 (PR) on 18a463c — Domain 58, Infrastructure 43, Application 90, Windows 15, integration 38 (244) + 30 x86, all passing; `DesktopConfigurationLifecycleTests` passed first time.
-- Observed once (PR run 37220266848): the x86 pass hung 5 min in `ElementInspectionTests` (TimedOut or Cancelled test; TestTarget alive). Not reproduced in 6 following runs. xUnit long-running-test diagnostics are now on so a repeat names the test. Suspect an unbounded cross-process UIA call made directly on the test thread (those tests call `target.Window.Current` with no timeout); not yet root-caused.
+- Observed once (PR run 37220266848): the x86 pass hung 5 min in `ElementInspectionTests` (TimedOut or Cancelled test; TestTarget alive). Not reproduced in 6 following runs. **Root-caused 2026-10-05 (plan 8 session)**: the repeat on run 37387532470 named `FromPointAsync_returns_TimedOut_when_the_timeout_is_effectively_immediate`; a race in `AutomationDispatcher.RunAsync` (deadline flipped to cancelled just before the item ran; the item returned without completing the task and disposed the registration whose callback would have) left the caller awaiting forever. Reproduced locally (3 hangs in 20,000 calls), fixed (0 in 200,000), regression test in `AutomationDispatcherTests`.
 
 ### Plan 5 — Selector resilience (2026-10-04)
 
@@ -87,10 +91,126 @@ Plan: `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md`, after
 - Evidence: run 37358301438 on 77da6cb — Domain 68, Infrastructure 62, Application 130, Windows 18, integration 51 (329) + 30 x86, all passing; `DesktopStartWithWindowsTests` (3) passed first time.
 - Not automated: a real Windows sign-in, the tray icon/menu/notification rendering (manual rows 24–25).
 
+### Plan 8 — OCR text fields, and closing the remaining pending items (2026-10-05)
+
+Plan: `docs/superpowers/plans/2026-10-05-ocr-text-fields.md`, from the user's request for OCR; then the user asked to finish everything pending.
+
+- **OCR fields** (`FieldKind.OcrText`): the configured control's on-screen image (refused when covered) is read with the offline Windows OCR (`Windows.Media.Ocr`); Portuguese preferred (pt-BR > pt > profile > first installed); small images enlarged; image discarded; typed `OcrUnavailable` (not retried) with test-mode guidance to install the Portuguese OCR language. TestTarget: "Receita digitalizada" image with deterministic samples. RED observed on CI run 37387532470 (3 `OcrCaptureTests` against a stub); GREEN on run 37387804617 (`OcrCaptureTests` 3/3, `DesktopOcrFieldWalkthroughTests`). The CI runner has only the en-US recognizer (probe step in `ci.yml`), so Portuguese recognition of accented text is a manual row (26).
+- Windows-facing projects target `net10.0-windows10.0.19041.0` (ADR-001 update).
+- **x86 hang root-caused and fixed** (dispatcher race, above).
+- **Dispatcher recovery**: a call running past 30 s (a hung target application) is abandoned on the next call; queued work moves to a fresh STA thread (`RecoveredCount`). Validated locally with a non-STA copy; `AutomationDispatcherTests` on CI.
+- **Selector weights version** recorded on approvals; an approval tested under other weights no longer activates (existing approval files load as the current version).
+- **IDs**: semantic IDs unique ignoring case; loading a missing configuration fails with `CONFIGURATION_NOT_FOUND` (no file path); saving a case-variant of an existing configuration ID fails with `CONFIGURATION_ID_CONFLICT` (on Windows it would overwrite the other file).
+- **Fix found by CI**: the new TestTarget column made the last row taller, pushing the image drop zone off a 1024×768 screen at the default window position (`FileCaptureTests`); compacted, and the test now places the window.
+
+### Plan 9 — Microsoft Store packaging (2026-10-06)
+
+Plan: `docs/superpowers/plans/2026-10-06-store-packaging.md`. User decisions: distribute through the Microsoft Store (it signs, hosts and updates; no certificate to buy — Azure Artifact Signing does not serve Brazil), publisher an individual.
+
+- `IStartupRegistration` is asynchronous with real states (`DisabledByUser` in Task Manager, policy); `PackagedStartupRegistration` (package `StartupTask`) when the process has package identity, the Run key otherwise; `StartupLaunch` starts in the background on `--background` or a startup-task activation.
+- `packaging/`: MSIX manifest template (full trust, startup task off by default), logos, `build-msix.ps1` (self-contained win-x64 publish → makeappx; optional test signing).
+- CI builds the MSIX, signs it with a throwaway test certificate, installs it and runs `PackagedAgentTests` (starts from `WindowsApps` with package identity; the option turns the package's startup task on/off as recorded by Windows; the reopened Agent shows it). Artifact `msix-package` (+ test certificate).
+- `docs/privacy-policy.md` (pt-BR/en) and `docs/release/microsoft-store.md` (Partner Center steps, identity, capability justification, hidden listing, listing text).
+- Evidence: run 37395451712 on 10b4a7a — Domain 74, Infrastructure 68, Application 136, Windows 26, integration 55 (359) + packaged 1 + x86 30, all passing.
+- **Waiting on the publisher**: Partner Center account, reserved name and its three identity values, a public privacy-policy URL with a contact e-mail; then build with that identity and submit. Real sign-in start from the Store package: manual row 27.
+
+### Plan 13 — Selecting a small field inside a larger one (2026-10-09)
+
+Plan: `docs/superpowers/plans/2026-10-09-innermost-selection.md`.
+
+- While marking, **Shift** marks the smallest element under the pointer (`InspectionDepth.Innermost`).
+- **Ctrl**, pressed while the other program is in front, confirms the outlined element.
+- Only the Shift/Ctrl up/down state is read, and only while marking.
+- TestTarget gained a product row `ProductCard` whose price text has no AutomationId: pointing at the price selects the row; Shift selects the price. The case of a program whose hit-test stops at an outer element whose children *are* exposed is handled by the same search, but no TestTarget fixture reproduces it (WPF's UI Automation hit-test ignores `IsHitTestVisible`); it is in manual row 35.
+- RED observed locally for `InspectionControllerTests`. The Windows and E2E tests were pushed with the implementation.
+
+- Evidence: run 37932186976 on 6a0ad74, all green on attempt 2.
+- **Observed once, not root-caused:** on attempt 1, `DesktopResilienceWalkthroughTests` stopped at *Aprovar configuração* (disabled after the first test run). That test does not use the changed code, and it passed on the previous commit and on the re-run. If it recurs, capture the test-mode field results to see which field failed.
+
+### Plan 12 — Screen-image fields (2026-10-09)
+
+Plan: `docs/superpowers/plans/2026-10-09-screen-image-fields.md`.
+
+- New field type *Imagem exibida na tela*: `FieldKind.ScreenImage`.
+  - Always captures the control's on-screen image as PNG, even when the control exposes text.
+  - Refused when anything covers the control.
+  - Stored as an attachment, like file fields.
+- RED observed locally:
+  - `SessionCoordinatorTests` and `IntegrationTestRunnerTests` (behaviour);
+  - `FieldKindTests` (compilation).
+- The new `FileCaptureTests` cases were pushed together with the fix, so their RED was not observed on CI. They would fail without it: the field would be read as text, with no image.
+
+### Plan 11 — CSV export (2026-10-08)
+
+Plan: `docs/superpowers/plans/2026-10-08-csv-export.md`.
+
+- `EventCsvExporter` (Application) writes CSV for Excel pt-BR:
+  - `;` separator, CRLF, RFC 4180 quoting;
+  - one row per event, fixed columns plus one per field;
+  - formula-injection guard that keeps plain numbers;
+  - file fields shown by file name.
+- `IEventOutbox.ReadExportableAsync`: pending and delivered events, never quarantined ones.
+- `RuntimeMonitorViewModel.ExportCsvAsync` writes UTF-8 with BOM.
+- Step 5: *Exportar eventos (CSV)...*, using a save dialog. The status warns that the file is not encrypted.
+- Each step was test-first (RED observed: exporter and outbox locally; view model by compile).
+- `DesktopWalkthroughTests` exports through the real save dialog and checks the rows.
+- Evidence: run 37800907393 on 51d2f03 — Domain 74, Infrastructure 70, Application 164, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
+
+### Plan 10 — Guided configurator and real Windows apps (2026-10-06/07)
+
+Plan: `docs/superpowers/plans/2026-10-06-guided-ui-and-real-apps.md`. All 4 tasks implemented.
+
+- **Open-program list**: `OpenWindowInfo` / `IOpenWindowSource` / `OpenWindowFilter` (Application), `Win32OpenWindowSource` (Windows). Lists visible, titled, unowned, non-cloaked top-level windows, never the Agent's own. Kept in memory only, never logged or saved; only app name, title, process, PID and icon.
+- **Probe of the CI runner** (`scripts/probe-real-apps.ps1`, every build): `windows-latest` (Server 2025) has the **classic** calculator `win32calc` (numeric AutomationIds) and the classic Notepad (text area `15`). The Store Calculator (`CalculatorApp` in `ApplicationFrameHost`) is **absent**, so the UWP hypothesis could not be reproduced on CI.
+- **Bug found by the real-app tests (RED run 37544709491, GREEN afterwards)**: a plain label with no pattern (the Calculator display, a TestTarget label) was `UnsupportedPattern`. Capture now reads a `ControlType.Text` element's Name; a button's Name stays unsupported.
+- **ApplicationFrameHost**: the window locator, instance discovery and test preparation identify a framed Store app by its content process. An empty frame matches nothing. Preparing a test with several identical windows open is refused rather than picking one. Covered by `RealCalculatorTests.The_Store_calculator_...`, which **skips on CI** (no Store Calculator) — **needs human verification on Windows 10/11** (manual row 30).
+- **Guided configurator** (`MainWindow`): five steps (1 Escolher programa, 2 Marcar campos, 3 Marcar botões, 4 Testar, 5 Ativar).
+  - Program list with search, refresh and icons; manual entry under *Opções avançadas*; list of saved integrations (`JsonConfigurationStore.ListIds`).
+  - Field and button lists with edit/remove; capture-field checkboxes; IDs generated from friendly names (`SemanticIdGenerator`); the only stage is created with the first field.
+  - Explained empty states and actionable errors; light theme. All earlier behaviour is kept.
+  - The E2E driver reaches controls on other steps by opening them; assertions are unchanged. The main walkthrough now chooses TestTarget from the list.
+- **Bug found by screenshot review**: the selected step's white header text was inherited by the step content, so test-mode results were drawn white on white. Fixed in 784452e.
+- **Real apps**:
+  - `RealCalculatorTests` (listed by content process, display read after 3 9 2, `=` detected, instance discovered, Store variant skipped with reason);
+  - `RealNotepadTests`;
+  - `DesktopCalculatorWalkthroughTests` — the whole guided flow against the real Calculator, passing on CI.
+- Screenshots of the five steps (CI run 37549925964): `docs/screenshots/guided-ui/`.
+- Evidence: run 37549925964 on 5661329 (same counts as run 37548039030 on f016abb) — Domain 74, Infrastructure 69, Application 150, Windows 26, Windows integration 66 (1 skipped: the Store Calculator), packaged 1, x86 31, Store screenshots 1 — all passing.
+
+### First test on a real pharmacy system — FórmulaCerta 6.0 (2026-10-12)
+
+Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's PC, against the *Saídas > Receitas* test screen (`FCReceitas.exe`, Delphi VCL). Details and per-step results: `docs/testing/milestone-1-manual.md`, section "Real pharmacy system". Nothing was saved or issued in the pharmacy system; the diagnostic report stays on that PC.
+
+- **Fix — slow programs never showed an element while marking**: one inspection takes 250–330 ms on this program and every 80 ms poll cancelled the one in flight. `InspectionController` now lets a repeated observation of the same point and depth join the inspection in flight. RED `Repeated_observations_of_the_same_point_wait_for_the_slow_inspection_in_flight` (locally), GREEN after.
+- **Fix — Delphi forms missing from the program list**: every Delphi form is owned by the zero-size `TApplication` window, and the list skipped owned windows (or offered the zero-size window, which has no fields). `Win32OpenWindowSource` now lists windows owned by a zero-size owner and never lists zero-size windows. RED `A_form_owned_by_a_zero_size_application_window_is_listed_instead_of_its_owner` (both owner states, locally), GREEN after.
+- Evidence (local, operator's PC): Release build 0 warnings; Domain 74, Application 171, Infrastructure 71, Windows 26; `OpenWindowSourceTests` 5/5. The rest of the integration suite was not run there (it drives the real cursor over the pharmacy system) - CI must run it.
+- **Plan 14 — Win32/Delphi selectors** (`docs/superpowers/plans/2026-10-12-win32-delphi-selectors.md`), same day, each test first:
+  - `ElementFingerprint.WindowPath`; the matcher scores it in the AutomationId's slot and weight (weights stay v2, approvals stay valid). RED: `SelectorMatcherTests.WindowPath_*` (locally).
+  - Content hash folds `windowPath` only when present (RED `WindowPathSelectorTests`; `FieldKindTests` characterization unchanged).
+  - Inspector: an AutomationId equal to the element's window handle is dropped and the window path recorded; ancestors/labels dropped; a name kept only for captioned controls (a Delphi date box is named by its value). Resolver: native child-window enumeration for window-path selectors, `FromHandle` for the winner only. Trigger: `Win32ClickWatcher` (mouse capture start/end on the button's window) for window-path buttons.
+  - TestTarget `--layout-variant win32-form`: a native window with VCL-style handle IDs, own window classes, a capturing vendor-style button and a value-named date box. `Win32WindowPathTests` (3): field found and read after a restart; click on a button without Invoke detected; value-named control marked without its name. RED observed locally for each; `SelectorFragilityTests` (window path is not "position only") too.
+  - The `InspectionControllerTests` window-path test only had a compile-time RED (property added with it).
+  - Evidence (local): build 0 warnings; Domain 76, Application 173, Infrastructure 73, Windows 26; integration Automation/Processes/Overlay 52, Runtime/RealApps 9 (+1 skipped). EndToEnd and x86 not run locally - CI must run them.
+  - **FórmulaCerta second run: steps 1–5 pass**, also after the Receitas screen was closed and reopened (new process, new handles). See the manual.
+- **Plan 15 — Templates ("Modelos") with a guided checklist** (`docs/superpowers/plans/2026-10-12-integration-templates.md`), same day:
+  - `IntegrationTemplate`/`TemplateItem`/`TemplateValidator`/`ITemplateStore` (Application), `JsonTemplateStore` (Infrastructure: shipped `Templates\*.json` next to the executable + own templates in `%LOCALAPPDATA%\Prescriva\Agent\templates`; an own template replaces a shipped one with the same ID; broken files left out), `TemplateGuideViewModel` (Desktop: start, suggestion, mark, test field/button, skip, adjust, add, remove, save as own template; buttons read the marked fields). UI: step 1 *Começar por um modelo*, step 2 *Roteiro* card (`MainWindow.Templates.cs`). Editor: `SetFieldSelector`, `SetFieldKind`, `SetTriggerSelector`.
+  - Shipped templates: FórmulaCerta *Orçamento*, *Receita*, *Foto da receita (MobyPharma)*, with suggested window-path positions taken from the real screens.
+  - OCR: a grid's cells come back as separate lines; `OcrText.Rows` rebuilds rows from line positions ("cell | cell"). RED `OcrTextTests.Cells_side_by_side_become_one_row_in_reading_order`.
+  - Tests: `IntegrationTemplateTests` (7), `JsonTemplateStoreTests` (5, incl. every shipped template valid), `TemplateGuideViewModelTests` (14) - their RED was compile-time only (new types). Evidence (local): build 0 warnings; Domain 76, Application 194, Infrastructure 78, Windows 28; integration Automation/Processes/Overlay/Runtime/RealApps 61 (+1 skipped). No EndToEnd test drives the new UI yet - **CI/EndToEnd coverage of the checklist UI is still to write**; it was exercised by hand on FórmulaCerta (manual row 36).
+- **Still open for FórmulaCerta**:
+  1. Activating a vendor button with the keyboard is not detected (mouse only).
+  2. Reading a field filled with real prescription data was not checked (no record opened); the date filter read `14/07/26`.
+  3. ~~Resolution TimedOut~~, ~~volatile AutomationId~~, ~~no labels~~: solved by the window path (plan 14).
+  5. After the outline grows over a large container, hit-testing from inside the Agent returns the Agent's own outline window, so inner fields cannot be reached until marking restarts (`OverlayExclusionTests` accepts that outcome; a RED test can put the overlay over the whole TestTarget window and point at a field inside).
+  6. Window rule includes the program version ("FórmulaCerta - Receitas 6.0.1164").
+  7. Test-mode failure text is English ("Could not resolve the element for trigger ...").
+
 ### Not verified / known issues
 
 - **Person on a Windows 10/11 desktop**: still not performed. Every row of `docs/testing/milestone-1-manual.md` is now automated except rendering on a real display at non-100% DPI scaling; CI is Windows Server 2025 at 100%. A short look-over by a person is still the last sign-off step.
-- Edits are by typed ID (no list selection yet); a field's selector can only be replaced by removing and re-adding it.
+- Fields and buttons are chosen from lists now; a field's selector can still only be replaced by removing and re-adding it.
+- Store (UWP) apps framed by `ApplicationFrameHost` (Windows 10/11 Calculator): implemented but only unit/skip-covered on CI — manual row 30. Windows 11's new Notepad, Electron, Java and canvas apps: see the limitations in the manual walkthrough.
+- Display scaling 125–150% for the new step-by-step window: manual row 32.
 - Older limitations below remain unless marked resolved.
 
 ### Important files
@@ -99,9 +219,11 @@ Plan: `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md`, after
 
 ### Exact next action
 
+0. Push `fix/formulacerta-inspection` and let CI run the whole suite (incl. EndToEnd and x86); add an EndToEnd test of the template checklist (TestTarget `win32-form` + a test template); review and merge. Then, with the operator, run the *Orçamento* template on a quote with a prescriber and components filled in: confirm the prescriber fields' meaning and whether the values are still on screen when *OK* is clicked (otherwise choose *Recálculo*).
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
-2. Review/merge PR #2 (milestone 1 + plans 4–7).
-3. Next plan: OCR (requested by the user) — "text via OCR" field type with the offline Windows OCR over the control's image; then dispatcher recovery or event transport (`docs/roadmap.md`).
+2. Publisher: create the Partner Center account and reserve the name; send the three identity values (see `docs/release/microsoft-store.md`); then build with them and submit.
+3. A person verifies rows 29–32 on Windows 10/11 (Store Calculator, new Notepad, scaling).
+4. Next plans (`docs/roadmap.md`): event transport to the backend (needs the backend's API).
 
 ---
 

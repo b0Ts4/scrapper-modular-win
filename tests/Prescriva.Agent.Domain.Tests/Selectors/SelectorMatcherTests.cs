@@ -26,6 +26,44 @@ public sealed class SelectorMatcherTests
         Assert.Contains("controlType", result.Evidence.Keys);
     }
 
+    /// <summary>
+    /// A Delphi edit: no stable AutomationId, no label - its window path is its identity and
+    /// takes the AutomationId's place and weight.
+    /// </summary>
+    [Fact]
+    public void WindowPath_IdentifiesAControlWithoutAutomationId()
+    {
+        var selector = DelphiEdit("TPanel[0]/TEdit[1]");
+        var candidates = new[]
+        {
+            new ElementCandidate("first", DelphiEdit("TPanel[0]/TEdit[0]")),
+            new ElementCandidate("second", DelphiEdit("TPanel[0]/TEdit[1]")),
+            new ElementCandidate("third", DelphiEdit("TPanel[0]/TEdit[2]")),
+        };
+
+        var result = matcher.Match(selector, candidates, new SelectorWeights());
+
+        Assert.Equal(SelectorMatchStatus.Found, result.Status);
+        Assert.Equal("second", result.CandidateId);
+        Assert.Equal(1.0, result.Confidence);
+        Assert.Equal(new SelectorWeights().AutomationId, result.Evidence["windowPath"]);
+    }
+
+    [Fact]
+    public void WindowPath_that_matches_no_candidate_is_never_guessed_from_type_and_class()
+    {
+        var selector = DelphiEdit("TPanel[0]/TEdit[5]");
+        var candidates = new[] { new ElementCandidate("other", DelphiEdit("TPanel[0]/TEdit[0]")) };
+
+        var result = matcher.Match(selector, candidates, new SelectorWeights());
+
+        Assert.Equal(SelectorMatchStatus.NotFound, result.Status);
+    }
+
+    private static ElementFingerprint DelphiEdit(string windowPath) =>
+        new("fcerta.exe", "Receitas", ControlType: "ControlType.Document", ClassName: "TEdit", FrameworkId: "Win32",
+            WindowPath: windowPath);
+
     [Fact]
     public void PositionOnly_ReturnsNotFound()
     {

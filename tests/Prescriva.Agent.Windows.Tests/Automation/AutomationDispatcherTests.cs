@@ -103,4 +103,67 @@ public sealed class AutomationDispatcherTests
         Assert.Equal(ElementInspectionFailureKind.ElementUnavailable, failure.Kind);
         Assert.IsType<InvalidOperationException>(failure.InnerException);
     }
+
+    [Fact]
+    public async Task Every_call_completes_even_when_its_deadline_expires_while_it_is_being_dequeued()
+    {
+        // Regression: with an (effectively) immediate timeout, the deadline could flip to
+        // "cancelled" just before the queued item ran; the item then returned without
+        // completing the task and disposed the registration whose callback would have -
+        // leaving the caller awaiting forever (the x86 CI hang in ElementInspectionTests).
+        using var dispatcher = new AutomationDispatcher();
+        for (var i = 0; i < 20_000; i++)
+        {
+            var call = dispatcher.RunAsync(_ => i, TimeSpan.Zero, CancellationToken.None);
+            try
+            {
+                await call.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException)
+            {
+                Assert.Fail($"Call {i} never completed.");
+            }
+            catch (ElementInspectionFailure failure)
+            {
+                Assert.Equal(ElementInspectionFailureKind.TimedOut, failure.Kind);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_wedged_call_is_abandoned_and_later_calls_run_on_a_fresh_STA_thread()
+    {
+        // A cross-process UI Automation call into a hung application can block for minutes.
+        using var dispatcher = new AutomationDispatcher(wedgeThreshold: TimeSpan.FromMilliseconds(300));
+        using var release = new ManualResetEventSlim(false);
+        var firstThread = await dispatcher.RunAsync(_ => Environment.CurrentManagedThreadId, TimeSpan.FromSeconds(5), CancellationToken.None);
+
+        var wedged = dispatcher.RunAsync(_ => release.Wait(TimeSpan.FromSeconds(30)), TimeSpan.FromMilliseconds(100), CancellationToken.None);
+        var timedOut = await Assert.ThrowsAsync<ElementInspectionFailure>(() => wedged);
+        Assert.Equal(ElementInspectionFailureKind.TimedOut, timedOut.Kind);
+        await Task.Delay(500);
+
+        var (thread, apartment) = await dispatcher.RunAsync(
+            _ => (Environment.CurrentManagedThreadId, Thread.CurrentThread.GetApartmentState()),
+            TimeSpan.FromSeconds(5),
+            CancellationToken.None);
+
+        Assert.NotEqual(firstThread, thread);
+        Assert.Equal(ApartmentState.STA, apartment);
+        Assert.Equal(1, dispatcher.RecoveredCount);
+        release.Set();
+    }
+
+    [Fact]
+    public async Task A_slow_call_within_the_threshold_is_not_abandoned()
+    {
+        using var dispatcher = new AutomationDispatcher(wedgeThreshold: TimeSpan.FromSeconds(10));
+        var first = await dispatcher.RunAsync(_ => Environment.CurrentManagedThreadId, TimeSpan.FromSeconds(5), CancellationToken.None);
+        await dispatcher.RunAsync(_ => { Thread.Sleep(300); return 0; }, TimeSpan.FromSeconds(5), CancellationToken.None);
+
+        var second = await dispatcher.RunAsync(_ => Environment.CurrentManagedThreadId, TimeSpan.FromSeconds(5), CancellationToken.None);
+
+        Assert.Equal(first, second);
+        Assert.Equal(0, dispatcher.RecoveredCount);
+    }
 }

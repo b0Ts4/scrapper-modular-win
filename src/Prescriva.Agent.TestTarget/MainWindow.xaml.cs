@@ -37,6 +37,12 @@ public partial class MainWindow : Window
 
     private void ApplyLayoutVariant(string variant)
     {
+        if (string.Equals(variant, "win32-form", StringComparison.OrdinalIgnoreCase))
+        {
+            Loaded += (_, _) => Win32Form.Show();
+            return;
+        }
+
         if (string.Equals(variant, "duplicate-controls", StringComparison.OrdinalIgnoreCase))
         {
             // Deliberately reuses the AutomationId "MedicationTextBox" so tests can
@@ -87,6 +93,7 @@ public partial class MainWindow : Window
             string.IsNullOrWhiteSpace(MedicationTextBox.Text) ? $"Medication {_rowCounter}" : MedicationTextBox.Text,
             string.IsNullOrWhiteSpace(ConcentrationTextBox.Text) ? $"{_rowCounter} mg" : ConcentrationTextBox.Text,
             string.IsNullOrWhiteSpace(QuantityTextBox.Text) ? _rowCounter.ToString() : QuantityTextBox.Text));
+        ItemCountText.Text = $"Itens: {_items.Count}";
     }
 
     private void FinishButton_Click(object sender, RoutedEventArgs e)
@@ -172,6 +179,36 @@ public partial class MainWindow : Window
 
         PrescriptionImage.Source = System.Windows.Media.Imaging.BitmapSource.Create(
             width, height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, width * 4);
+    }
+
+    private void ShowScannedTextButton_Click(object sender, RoutedEventArgs e) => ShowScannedText("DIPIRONA 500 MG");
+
+    private void ShowOtherScannedTextButton_Click(object sender, RoutedEventArgs e) => ShowScannedText("AMOXICILINA 875 MG");
+
+    /// <summary>Renders <paramref name="text"/> into a bitmap: black on white, like a scan.</summary>
+    private void ShowScannedText(string text)
+    {
+        const int width = 298;
+        const int height = 34;
+        var visual = new System.Windows.Media.DrawingVisual();
+        using (var context = visual.RenderOpen())
+        {
+            context.DrawRectangle(System.Windows.Media.Brushes.White, null, new Rect(0, 0, width, height));
+            var formatted = new System.Windows.Media.FormattedText(
+                text,
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new System.Windows.Media.Typeface("Arial"),
+                22,
+                System.Windows.Media.Brushes.Black,
+                1.0);
+            context.DrawText(formatted, new Point(8, (height - formatted.Height) / 2));
+        }
+
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        ScannedPrescriptionImage.Source = bitmap;
     }
 
     private sealed record GridRow(string Medication, string Concentration, string Quantity);

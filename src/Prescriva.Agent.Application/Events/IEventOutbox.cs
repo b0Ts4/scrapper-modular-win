@@ -18,6 +18,12 @@ public interface IEventOutbox
     Task<IReadOnlyList<DomainEvent>> ReadPendingAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// The events an operator may export: the pending ones and the delivered (confirmed) ones still
+    /// kept, in append order - never quarantined ones. By default, only the pending events.
+    /// </summary>
+    Task<IReadOnlyList<DomainEvent>> ReadExportableAsync(CancellationToken cancellationToken) => ReadPendingAsync(cancellationToken);
+
+    /// <summary>
     /// Marks a pending event as confirmed (successfully delivered/processed).
     /// </summary>
     Task MarkConfirmedAsync(Guid eventId, CancellationToken cancellationToken);
