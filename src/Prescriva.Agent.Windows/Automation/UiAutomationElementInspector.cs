@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Automation;
@@ -138,6 +139,13 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         ControlType.ComboBox, ControlType.TreeItem,
     ];
 
+    /// <summary>Controls whose name is a fixed caption, not data the person typed or the program shows.</summary>
+    private static readonly ControlType[] CaptionedControlTypes =
+    [
+        ControlType.Button, ControlType.SplitButton, ControlType.CheckBox, ControlType.RadioButton,
+        ControlType.TabItem, ControlType.MenuItem, ControlType.Hyperlink, ControlType.Text,
+    ];
+
     private const int MaxCaptionDepth = 3;
 
     /// <summary>
@@ -254,19 +262,32 @@ public sealed class UiAutomationElementInspector : IElementInspector, IDisposabl
         }
 
         var window = FindTopLevelWindow(element);
+
+        // A Delphi control: its AutomationId is its window handle (new on every start), so its
+        // window path is recorded instead; ancestors and labels are left out because the
+        // path already places it and resolution reads native windows only (plan 14).
+        var windowPath = Win32WindowPath.IsVolatileAutomationId(current.AutomationId, current.NativeWindowHandle)
+            ? Win32WindowPath.Of(new IntPtr(current.NativeWindowHandle))
+            : null;
+        // Many Delphi controls are named by their value (a date box's name is the date): only a
+        // caption - a button's or a tab's - is kept as name, so a configuration never holds a value.
+        var name = windowPath is null || CaptionedControlTypes.Contains(current.ControlType)
+            ? NullIfEmpty(current.Name)
+            : null;
         return new ElementSnapshot(
-            NullIfEmpty(current.AutomationId),
-            NullIfEmpty(current.Name),
+            windowPath is null ? NullIfEmpty(current.AutomationId) : null,
+            name,
             current.ControlType?.ProgrammaticName ?? "ControlType.Unknown",
             NullIfEmpty(current.ClassName),
             new BoundingRectangle(rect.X, rect.Y, rect.Width, rect.Height),
             current.ProcessId,
             processName,
             NullIfEmpty(window?.Current.Name),
-            StructuralSignals.Ancestors(element),
-            StructuralSignals.NearbyLabels(element),
+            windowPath is null ? StructuralSignals.Ancestors(element) : ImmutableArray<Domain.Selectors.AncestorFingerprint>.Empty,
+            windowPath is null ? StructuralSignals.NearbyLabels(element) : ImmutableArray<string>.Empty,
             window is null ? null : StructuralSignals.Relative(rect, window.Current.BoundingRectangle),
-            NullIfEmpty(current.FrameworkId));
+            NullIfEmpty(current.FrameworkId),
+            windowPath);
     }
 
     /// <summary>
