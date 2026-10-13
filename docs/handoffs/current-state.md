@@ -192,6 +192,11 @@ Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's 
   - The `InspectionControllerTests` window-path test only had a compile-time RED (property added with it).
   - Evidence (local): build 0 warnings; Domain 76, Application 173, Infrastructure 73, Windows 26; integration Automation/Processes/Overlay 52, Runtime/RealApps 9 (+1 skipped). EndToEnd and x86 not run locally - CI must run them.
   - **FórmulaCerta second run: steps 1–5 pass**, also after the Receitas screen was closed and reopened (new process, new handles). See the manual.
+- **Plan 15 — Templates ("Modelos") with a guided checklist** (`docs/superpowers/plans/2026-10-12-integration-templates.md`), same day:
+  - `IntegrationTemplate`/`TemplateItem`/`TemplateValidator`/`ITemplateStore` (Application), `JsonTemplateStore` (Infrastructure: shipped `Templates\*.json` next to the executable + own templates in `%LOCALAPPDATA%\Prescriva\Agent\templates`; an own template replaces a shipped one with the same ID; broken files left out), `TemplateGuideViewModel` (Desktop: start, suggestion, mark, test field/button, skip, adjust, add, remove, save as own template; buttons read the marked fields). UI: step 1 *Começar por um modelo*, step 2 *Roteiro* card (`MainWindow.Templates.cs`). Editor: `SetFieldSelector`, `SetFieldKind`, `SetTriggerSelector`.
+  - Shipped templates: FórmulaCerta *Orçamento*, *Receita*, *Foto da receita (MobyPharma)*, with suggested window-path positions taken from the real screens.
+  - OCR: a grid's cells come back as separate lines; `OcrText.Rows` rebuilds rows from line positions ("cell | cell"). RED `OcrTextTests.Cells_side_by_side_become_one_row_in_reading_order`.
+  - Tests: `IntegrationTemplateTests` (7), `JsonTemplateStoreTests` (5, incl. every shipped template valid), `TemplateGuideViewModelTests` (14) - their RED was compile-time only (new types). Evidence (local): build 0 warnings; Domain 76, Application 194, Infrastructure 78, Windows 28; integration Automation/Processes/Overlay/Runtime/RealApps 61 (+1 skipped). No EndToEnd test drives the new UI yet - **CI/EndToEnd coverage of the checklist UI is still to write**; it was exercised by hand on FórmulaCerta (manual row 36).
 - **Still open for FórmulaCerta**:
   1. Activating a vendor button with the keyboard is not detected (mouse only).
   2. Reading a field filled with real prescription data was not checked (no record opened); the date filter read `14/07/26`.
@@ -214,7 +219,7 @@ Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's 
 
 ### Exact next action
 
-0. Push `fix/formulacerta-inspection` and let CI run the whole suite (incl. EndToEnd and x86); review and merge. Then, with the operator, mark the real fields of the Receitas screen and test with a test record that has data.
+0. Push `fix/formulacerta-inspection` and let CI run the whole suite (incl. EndToEnd and x86); add an EndToEnd test of the template checklist (TestTarget `win32-form` + a test template); review and merge. Then, with the operator, run the *Orçamento* template on a quote with a prescriber and components filled in: confirm the prescriber fields' meaning and whether the values are still on screen when *OK* is clicked (otherwise choose *Recálculo*).
 1. A person runs `docs/testing/milestone-1-manual.md` on a Windows 10 or 11 x64 desktop (ideally once at 125–150% display scaling) and records the result in its table; fix anything it finds (with a test first).
 2. Publisher: create the Partner Center account and reserve the name; send the three identity values (see `docs/release/microsoft-store.md`); then build with them and submit.
 3. A person verifies rows 29–32 on Windows 10/11 (Store Calculator, new Notepad, scaling).

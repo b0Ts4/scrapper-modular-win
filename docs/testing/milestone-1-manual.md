@@ -46,6 +46,7 @@ Each step lists its automated coverage. "Automated (CI)" steps run on every push
 | 33 | After row 9, step *5 Ativar*: *Exportar eventos (CSV)...*, save, open the file in Excel. | The status gives the count and warns the CSV is not encrypted; Excel shows one row per event with columns `sequencia`, `data_hora`, `evento`, `integracao`, `sessao`, `itens` (items in the session so far) and one per field, accents correct; a file field shows its file name. | Automated (CI): `DesktopWalkthroughTests` (real save dialog, rows checked), `EventCsvExporterTests`, `RuntimeMonitorViewModelTests`. **Human**: opening in Excel. |
 | 34 | Mark TestTarget's image area ("Mostrar imagem de exemplo") as *Imagem exibida na tela*; test, approve, activate, Add. Then cover the image with another window and press Add. | The event holds the image (PNG of exactly that area, "imagem da tela"); when covered, the capture is refused ("coberto") and no event is generated. | Automated (CI): `FileCaptureTests` (image, control with text, covered), `DesktopFileFieldWalkthroughTests`. **Human**: an image in the real program. |
 | 35 | Step 2, *Começar a marcar*, point at TestTarget's price "R$ 12,90" (inside the product row); then hold **Shift**; then, still over TestTarget, press **Ctrl**. | Without Shift the product row is outlined (`ProductCard`); with Shift the price itself (`Nome='R$ 12,90'`, "[Shift: elemento interno]"); Ctrl confirms it without going back to the Agent. Ctrl typed inside the Agent never confirms. | Automated (CI): `DesktopInnermostSelectionTests`, `ElementInspectionTests`. **Human**: a field inside a larger one in the real program. |
+| 36 | Step 1, *Começar por um modelo*: choose a template with its program's screen open, *Usar este modelo*; in step 2's *Roteiro*, per item *Usar posição sugerida* or *Marcar no programa* (hover + Ctrl), *Testar este item*, *Pular*; adjust a name/kind, add an item, *Salvar como meu modelo*. | The integration is created for the open window; each item shows "testado ✓"/"falhou ✗" with what was read (text, OCR text, image size) or why it failed in words; a button test waits for one click; the saved template appears in step 1. | `TemplateGuideViewModelTests`, `JsonTemplateStoreTests`, `IntegrationTemplateTests`. **Human** (FórmulaCerta, 2026-10-12: see below). |
 | 18 | Repeat rows 2–9 with a 32-bit target application. | Same results. | Automated (CI): x86 pass of the integration suite against a self-contained `win-x86` TestTarget (bitness asserted). |
 
 ## Real Windows applications on the CI runner
@@ -91,6 +92,16 @@ What the program is: Delphi VCL with third-party controls (InfoPower `TwwDB*` ed
 Not checked: reading a field filled with prescription data (no record was opened or created).
 
 **Prescription photos (MobyPharma, same day).** Online orders (`FCMobyPharma.exe`, *Gestão de Pedidos*) show the attached prescription image in *Visualização de Anexos* (`TfrAnexosOmniChannel`); the image is drawn inside a `TScrollBox` (the Delphi `TImage` itself has no window). Marked as *Imagem exibida na tela*: found by window path, 100%, and test mode stored a PNG of the displayed image (~137 KB, ~0.5 s). The same area as *Texto via OCR*: found, but the text read was fragmentary - the attachment was a phone screenshot with white text on black. The trigger chosen there (next attachment) was disabled (one attachment only), so it timed out; the click detection itself was shown on the Receitas screen. Not available: the original image file (the viewer shows no path), parts of a large image scrolled out of view.
+
+**Templates on FórmulaCerta (plan 15, same day).** With the shipped templates and their suggested positions (nothing marked by hand):
+
+| Template | Result |
+| --- | --- |
+| *Foto da receita (MobyPharma)* | The attachment viewer was found by itself; photo: found 100%, image captured (138 KB) - once the viewer was not covered (a covered viewer is reported as such); OCR text: read (weak on that dark phone screenshot); *Nova Fórmula* and *Novo Produto*: "Clique detectado". *Novo Produto* opens FórmulaCerta's retail item dialog, which was cancelled without saving. |
+| *Orçamento* | Posologia, prescriber council, UF, number and name: found 100% and read (empty: no quote loaded); components grid: OCR found 100% and read the header as one row ("Descrição \| Quantidade \| Unid. \| Valor"), image 13 KB. *OK* not clicked (it saves). |
+| *Receita* | Posologia and the four prescriber fields: found 100% and read (empty). |
+
+The prescriber row's meaning (council, UF, number, name) is inferred from its layout and still has to be confirmed on a screen with a prescriber filled in; so does whether the components are still on screen when *OK* is clicked.
 
 Still open (not fixed, see [current state](../handoffs/current-state.md)):
 
