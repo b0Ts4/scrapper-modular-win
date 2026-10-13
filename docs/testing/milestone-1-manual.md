@@ -90,6 +90,8 @@ What the program is: Delphi VCL with third-party controls (InfoPower `TwwDB*` ed
 
 Not checked: reading a field filled with prescription data (no record was opened or created).
 
+**Prescription photos (MobyPharma, same day).** Online orders (`FCMobyPharma.exe`, *Gestão de Pedidos*) show the attached prescription image in *Visualização de Anexos* (`TfrAnexosOmniChannel`); the image is drawn inside a `TScrollBox` (the Delphi `TImage` itself has no window). Marked as *Imagem exibida na tela*: found by window path, 100%, and test mode stored a PNG of the displayed image (~137 KB, ~0.5 s). The same area as *Texto via OCR*: found, but the text read was fragmentary - the attachment was a phone screenshot with white text on black. The trigger chosen there (next attachment) was disabled (one attachment only), so it timed out; the click detection itself was shown on the Receitas screen. Not available: the original image file (the viewer shows no path), parts of a large image scrolled out of view.
+
 Still open (not fixed, see [current state](../handoffs/current-state.md)):
 
 - Activating a vendor button with the keyboard (Enter/Space) is not detected; only mouse clicks are.
