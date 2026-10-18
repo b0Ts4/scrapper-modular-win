@@ -54,6 +54,60 @@
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.2679, "y": 0.48, "width": 0.2273, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TwwDBEdit[0]" }
     },
     {
+      "id": "quantidade",
+      "kind": "field",
+      "name": "Quantidade (volume: nº de cápsulas, mL, g...)",
+      "help": "Linha Forma Farmacêutica: o campo Volume. Em cápsulas é o número de cápsulas (ex.: 90,00 com unidade CAP).",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.1974, "y": 0.515, "width": 0.0682, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]" }
+    },
+    {
+      "id": "quantidade_unidade",
+      "kind": "field",
+      "name": "Unidade da quantidade (CAP, ML, G...)",
+      "help": "A caixinha logo à direita do Volume: CAP = cápsulas.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.2679, "y": 0.515, "width": 0.0586, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[2]" }
+    },
+    {
+      "id": "qtd_prescrita",
+      "kind": "field",
+      "name": "Quantidade prescrita",
+      "help": "O campo Qtd.Prescrita (ex.: 90 cápsulas prescritas).",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.3278, "y": 0.5867, "width": 0.0574, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[0]" }
+    },
+    {
+      "id": "qtd_potes",
+      "kind": "field",
+      "name": "Quantidade de potes",
+      "help": "O campo Qtd. Potes.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.5867, "width": 0.0574, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[6]" }
+    },
+    {
+      "id": "numero_orcamento",
+      "kind": "field",
+      "name": "Número do orçamento",
+      "help": "O número grande em 'Nº Orçamento', no alto à direita. Junta as fórmulas do mesmo orçamento. Num orçamento novo pode só existir depois de gravar: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.5933, "y": 0.2217, "width": 0.1256, "height": 0.05 }, "windowPath": "TFagronGroupBox[1]/TwwDBEdit[1]" }
+    },
+    {
+      "id": "serie_formula",
+      "kind": "field",
+      "name": "Série da fórmula (nº da fórmula no orçamento)",
+      "help": "A caixinha à direita do número do orçamento: qual fórmula do orçamento é esta (0, 1, 2...). Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.7249, "y": 0.2217, "width": 0.0311, "height": 0.05 }, "windowPath": "TFagronGroupBox[1]/TwwDBEdit[0]" }
+    },
+    {
       "id": "componentes_imagem",
       "kind": "field",
       "name": "Componentes e quantidades (imagem da grade - fonte)",

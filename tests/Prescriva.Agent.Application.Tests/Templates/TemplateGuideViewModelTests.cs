@@ -254,6 +254,22 @@ public sealed class TemplateGuideViewModelTests
     }
 
     [Fact]
+    public void A_send_and_keep_button_sends_each_formula_and_keeps_the_prescription_file_for_the_next()
+    {
+        var (guide, editor) = StartTwoPrograms(okRole: TemplateButtonRole.SendAndKeep);
+        guide.UseSuggestion("anexo");
+        guide.Mark("posologia", Selector("TPanel[0]/TEdit[1]"));
+
+        guide.Mark("ok", Selector("TButton[2]"));
+
+        var actions = editor.Configuration!.Triggers.Single(trigger => trigger.Id == "ok").Actions;
+        Assert.Equal(2, actions.Length);
+        Assert.Equal(["posologia"], Assert.IsType<CaptureFieldsAction>(actions[0]).FieldIds.ToArray());
+        Assert.Equal("receita", Assert.IsType<EmitEventAction>(actions[1]).EventType);
+        Assert.Equal("botão (envia e mantém)", guide.Item("ok").KindText);
+    }
+
+    [Fact]
     public async Task Testing_a_file_field_names_the_copied_file()
     {
         var (guide, _) = StartTwoPrograms();
@@ -268,7 +284,7 @@ public sealed class TemplateGuideViewModelTests
         Assert.Contains("53 KB", guide.Item("anexo").LastResult, StringComparison.Ordinal);
     }
 
-    private (TemplateGuideViewModel Guide, IntegrationEditorViewModel Editor) StartTwoPrograms(bool viewerOpen = true)
+    private (TemplateGuideViewModel Guide, IntegrationEditorViewModel Editor) StartTwoPrograms(bool viewerOpen = true, TemplateButtonRole okRole = TemplateButtonRole.CaptureAndSend)
     {
         var viewer = new TemplateProgram("FCMobyPharma.exe", "Anexos", "Abra o anexo.");
         var template = new IntegrationTemplate("receita_completa", "Receita completa", "x", IntegrationTemplateTests.Sample().Program,
@@ -278,7 +294,7 @@ public sealed class TemplateGuideViewModelTests
                 Program: viewer, FileSource: new FileSource("%LOCALAPPDATA%\\Temp", "anexo_*", 120)),
             new TemplateItem("posologia", TemplateItemKind.Field, "Posologia", "x"),
             new TemplateItem("nova_formula", TemplateItemKind.Button, "Nova Fórmula", "x", CapturedFields: ["anexo"], Program: viewer, Role: TemplateButtonRole.CaptureOnly),
-            new TemplateItem("ok", TemplateItemKind.Button, "OK", "x", CapturedFields: ["posologia"], EmitEvent: "receita"),
+            new TemplateItem("ok", TemplateItemKind.Button, "OK", "x", CapturedFields: ["posologia"], EmitEvent: "receita", Role: okRole),
             new TemplateItem("cancelar", TemplateItemKind.Button, "Cancelar", "x", Role: TemplateButtonRole.Discard),
         ]);
         var editor = new IntegrationEditorViewModel(new FakeStore(), _resolver, _capture);

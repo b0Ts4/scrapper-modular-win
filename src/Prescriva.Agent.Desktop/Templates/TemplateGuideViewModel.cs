@@ -77,6 +77,7 @@ public sealed class GuideItem
         {
             TemplateButtonRole.CaptureOnly => "botão (guarda)",
             TemplateButtonRole.Discard => "botão (descarta)",
+            TemplateButtonRole.SendAndKeep => "botão (envia e mantém)",
             _ => "botão (envia)",
         }
         : FieldKind switch
@@ -365,7 +366,8 @@ public sealed class TemplateGuideViewModel
 
     /// <summary>
     /// What a button does, by its role: send = read its fields, emit one event with everything
-    /// kept so far, clear; keep = read its fields only; discard = clear.
+    /// kept so far, clear; send and keep = the same without clearing; keep = read its fields only;
+    /// discard = clear.
     /// </summary>
     private ImmutableArray<TriggerActionDefinition> ActionsFor(GuideItem button, string? exclude = null)
     {
@@ -390,7 +392,7 @@ public sealed class TemplateGuideViewModel
             string.Join(",", marked),
             string.IsNullOrWhiteSpace(button.EmitEvent) ? "item_added" : button.EmitEvent,
             transitionStageId: null,
-            clearState: marked.Length > 0,
+            clearState: marked.Length > 0 && button.Role != TemplateButtonRole.SendAndKeep,
             TriggerTerminalAction.None);
     }
 

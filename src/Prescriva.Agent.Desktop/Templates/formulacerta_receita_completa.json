@@ -1,7 +1,7 @@
 {
   "id": "formulacerta_receita_completa",
   "name": "FórmulaCerta – Receita completa (anexo + orçamento)",
-  "description": "Uma extração só com tudo da receita: o arquivo original da receita anexada ao pedido (inteiro, mesmo que a atendente veja só uma parte) é guardado quando ela clica em Nova Fórmula ou Novo Produto na janela de anexos; quando ela clica OK no orçamento, o Agent lê posologia, prescritor (conselho, UF, CRM e nome) e a imagem da grade de componentes (a fonte dos componentes e quantidades, para a sua IA ler; o texto por OCR vai junto só para conferência) e gera um único evento 'receita' com tudo junto. Cancelar no orçamento descarta o que foi guardado. Nada na tela é mexido. Teste item por item e ajuste o que precisar.",
+  "description": "Uma extração só com tudo da receita: o arquivo original da receita anexada ao pedido (inteiro, mesmo que a atendente veja só uma parte) é guardado quando ela clica em Nova Fórmula ou Novo Produto na janela de anexos; a cada OK no orçamento (uma vez por fórmula), o Agent lê número do orçamento e da fórmula, posologia, quantidade (nº de cápsulas e unidade, quantidade prescrita, potes), prescritor (conselho, UF, CRM e nome) e a imagem da grade de componentes (a fonte dos componentes e quantidades, para a sua IA ler; o texto por OCR vai junto só para conferência) e gera um evento 'receita' por fórmula, cada um com o arquivo da receita junto. Cancelar no orçamento descarta o que foi guardado. Nada na tela é mexido. Teste item por item e ajuste o que precisar.",
   "program": {
     "processIdentity": "FCMobyPharma.exe",
     "windowTitleContains": "MobyPharma",
@@ -76,6 +76,72 @@
       "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
     },
     {
+      "id": "quantidade",
+      "kind": "field",
+      "name": "Quantidade (volume: nº de cápsulas, mL, g...)",
+      "help": "Linha Forma Farmacêutica: o campo Volume. Em cápsulas é o número de cápsulas (ex.: 90,00 com unidade CAP).",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.1974, "y": 0.515, "width": 0.0682, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "quantidade_unidade",
+      "kind": "field",
+      "name": "Unidade da quantidade (CAP, ML, G...)",
+      "help": "A caixinha logo à direita do Volume: CAP = cápsulas.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.2679, "y": 0.515, "width": 0.0586, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[2]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "qtd_prescrita",
+      "kind": "field",
+      "name": "Quantidade prescrita",
+      "help": "O campo Qtd.Prescrita (ex.: 90 cápsulas prescritas).",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.3278, "y": 0.5867, "width": 0.0574, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[0]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "qtd_potes",
+      "kind": "field",
+      "name": "Quantidade de potes",
+      "help": "O campo Qtd. Potes.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.5867, "width": 0.0574, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[6]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "numero_orcamento",
+      "kind": "field",
+      "name": "Número do orçamento",
+      "help": "O número grande em 'Nº Orçamento', no alto à direita. Junta as fórmulas do mesmo orçamento. Num orçamento novo pode só existir depois de gravar: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.5933, "y": 0.2217, "width": 0.1256, "height": 0.05 }, "windowPath": "TFagronGroupBox[1]/TwwDBEdit[1]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "serie_formula",
+      "kind": "field",
+      "name": "Série da fórmula (nº da fórmula no orçamento)",
+      "help": "A caixinha à direita do número do orçamento: qual fórmula do orçamento é esta (0, 1, 2...). Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.7249, "y": 0.2217, "width": 0.0311, "height": 0.05 }, "windowPath": "TFagronGroupBox[1]/TwwDBEdit[0]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
       "id": "componentes_imagem",
       "kind": "field",
       "name": "Componentes e quantidades (imagem da grade - fonte)",
@@ -125,14 +191,14 @@
     {
       "id": "ok_orcamento",
       "kind": "button",
-      "name": "OK do orçamento (envia a receita completa)",
-      "help": "O botão OK no alto, à direita, da tela de Orçamentos. Ao ser clicado, o Agent lê os campos do orçamento e gera UM evento 'receita' com eles e com o arquivo guardado. Se no teste os campos vierem vazios (o clique já limpou a tela), use outro botão clicado antes de gravar, como Recálculo.",
+      "name": "OK do orçamento (envia cada fórmula)",
+      "help": "O botão OK no alto, à direita, da tela de Orçamentos. A cada clique (uma vez por fórmula: depois do OK o FórmulaCerta pergunta se há mais fórmulas), o Agent lê os campos da fórmula e gera um evento 'receita' com eles e com o arquivo da receita. O arquivo continua guardado para as próximas fórmulas do mesmo orçamento, até o próximo Nova Fórmula/Novo Produto ou Cancelar. Se no teste os campos vierem vazios (o clique já limpou a tela), use outro botão clicado antes de gravar, como Recálculo.",
       "required": true,
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.805, "y": 0.1783, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronButton[8]" },
-      "capturedFields": [ "posologia", "prescritor_conselho", "prescritor_uf", "prescritor_crm", "prescritor_nome", "componentes_imagem", "componentes_ocr" ],
+      "capturedFields": [ "posologia", "prescritor_conselho", "prescritor_uf", "prescritor_crm", "prescritor_nome", "quantidade", "quantidade_unidade", "qtd_prescrita", "qtd_potes", "numero_orcamento", "serie_formula", "componentes_imagem", "componentes_ocr" ],
       "emitEvent": "receita",
       "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." },
-      "role": "captureAndSend"
+      "role": "sendAndKeep"
     },
     {
       "id": "cancelar_orcamento",

@@ -53,6 +53,12 @@ public enum TemplateButtonRole
 
     /// <summary>Throws away what was kept (e.g. "Cancelar").</summary>
     Discard,
+
+    /// <summary>
+    /// Reads its fields and sends one event with everything kept so far, but keeps it all: e.g. the
+    /// OK of each formula of a quote, so the prescription file kept once goes with every formula.
+    /// </summary>
+    SendAndKeep,
 }
 
 /// <summary>

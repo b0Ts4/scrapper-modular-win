@@ -106,7 +106,9 @@ Not checked: reading a field filled with prescription data (no record was opened
 
 **Components on a filled quote (2026-10-18).** *Orçamento* template on a quote opened in consult mode (nothing saved): every item found 100%; posologia and prescriber council/UF/number read as on screen (council code, UF, number, name - the inferred order is right). Components grid: image captured (19 KB); OCR read the header correctly but the data row with errors (a code digit dropped, `LI` → `U` in the drug name, decimal comma lost, unit and value missing); enlarging, grey-scale and black-and-white variants did not help. Decision: the grid **image** is the source of the components (read by the receiving AI) and the OCR text, now `componentes_ocr`, is a cross-check only - see [the FórmulaCerta prescription event](../integrations/formulacerta-receita.md).
 
-Still to confirm with a person: whether the components are still on screen when *OK* is clicked.
+Quantity fields mapped on the same quote: *Volume* 90,00 + unit CAP (number of capsules), *Qtd.Prescrita* 90, *Qtd. Potes* 1, quote number and formula series. The operator reports that after *OK* FórmulaCerta asks whether there are more formulas and then closes the screen; *Receita completa*'s *OK* therefore sends one event per formula and keeps the prescription file (role *send and keep*).
+
+Still to confirm with a person, on a test quote: whether the formula's fields and components are still on screen (not covered by the "more formulas?" question) when *OK* is clicked, and whether a new quote already has its number then.
 
 Still open (not fixed, see [current state](../handoffs/current-state.md)):
 
