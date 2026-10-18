@@ -56,6 +56,11 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
                 nameof(handle));
         }
 
+        if (field.Kind == FieldKind.RecentFile)
+        {
+            return await CaptureRecentFileAsync(uiaHandle, field, cancellationToken).ConfigureAwait(false);
+        }
+
         if (field.Kind.ProducesAttachment())
         {
             return await CaptureFileAsync(uiaHandle, field, cancellationToken).ConfigureAwait(false);
@@ -93,6 +98,40 @@ public sealed class UiAutomationCaptureProvider : ICaptureProvider, IDisposable
             var attempts = new[] { new PatternAttempt("n/a", Succeeded: false, failure.Message) };
             return new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, attempts);
         }
+    }
+
+    /// <summary>
+    /// A recent-file field (plan 16): its element (the viewer) must still be there - checked on
+    /// the dispatcher thread -, then the newest file the program wrote is copied whole. The
+    /// screen is never captured, so how much of the image the person sees does not matter.
+    /// </summary>
+    private async Task<CaptureResult> CaptureRecentFileAsync(UiaResolvedElementHandle handle, FieldDefinition field, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            await _dispatcher.RunAsync(_ => handle.Element.Current.ControlType, _timeout, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ElementInspectionFailure failure) when (failure.Kind == ElementInspectionFailureKind.Cancelled)
+        {
+            throw new OperationCanceledException(failure.Message, failure, cancellationToken);
+        }
+        catch (ElementInspectionFailure failure)
+        {
+            var outcome = failure.Kind == ElementInspectionFailureKind.TimedOut ? CaptureOutcome.TimedOut : CaptureOutcome.ElementUnavailable;
+            return new CaptureResult(outcome, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed, [new PatternAttempt("RecentFile", false, failure.Message)]);
+        }
+
+        var path = field.FileSource is { } source ? RecentFileFinder.Find(source, DateTime.Now) : null;
+        if (path is null)
+        {
+            return new CaptureResult(CaptureOutcome.FileUnavailable, null, CaptureResult.UiaProviderId, 0, stopwatch.Elapsed,
+                [new PatternAttempt("RecentFile", false, "no recent file")]);
+        }
+
+        var (fileOutcome, file) = await FileFieldCapture.ReadFileAsync(path, cancellationToken).ConfigureAwait(false);
+        return new CaptureResult(fileOutcome, null, CaptureResult.UiaProviderId, fileOutcome == CaptureOutcome.Captured ? 1.0 : 0, stopwatch.Elapsed,
+            [new PatternAttempt("RecentFile", fileOutcome == CaptureOutcome.Captured)], file);
     }
 
     /// <summary>
