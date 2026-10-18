@@ -42,11 +42,26 @@ public enum TemplateItemKind
     Button,
 }
 
+/// <summary>What a button does with the values (plan 16).</summary>
+public enum TemplateButtonRole
+{
+    /// <summary>Reads its fields, sends one event with everything kept so far, then clears (the default).</summary>
+    CaptureAndSend,
+
+    /// <summary>Reads its fields and keeps them for a later send (e.g. the attachment when "Nova Fórmula" is clicked).</summary>
+    CaptureOnly,
+
+    /// <summary>Throws away what was kept (e.g. "Cancelar").</summary>
+    Discard,
+}
+
 /// <summary>
 /// One checklist entry. <see cref="Help"/> says what it is and where to find it.
 /// <see cref="Suggested"/> is a position to try first (its process and window are replaced by
-/// the chosen program's); without it the person marks the item. A button reads
-/// <see cref="CapturedFields"/>, or every field when none are listed.
+/// the chosen program's - or by <see cref="Program"/>'s open window for an item of another
+/// program); without it the person marks the item. A button reads <see cref="CapturedFields"/>,
+/// or every field when none are listed, and acts according to its <see cref="Role"/>. A
+/// <see cref="FieldKind.RecentFile"/> field says where its file is found in <see cref="FileSource"/>.
 /// </summary>
 public sealed record TemplateItem(
     string Id,
@@ -57,7 +72,10 @@ public sealed record TemplateItem(
     bool Required = true,
     ElementFingerprint? Suggested = null,
     ImmutableArray<string> CapturedFields = default,
-    string? EmitEvent = "item_added")
+    string? EmitEvent = "item_added",
+    TemplateProgram? Program = null,
+    FileSource? FileSource = null,
+    TemplateButtonRole Role = TemplateButtonRole.CaptureAndSend)
 {
     /// <summary>The suggested position aimed at <paramref name="application"/>, or null when there is none.</summary>
     public ElementFingerprint? SuggestionFor(ApplicationDefinition application)
@@ -115,6 +133,12 @@ public static class TemplateValidator
             if (string.IsNullOrWhiteSpace(item.Name))
             {
                 errors.Add($"O item '{id}' precisa de um nome.");
+            }
+
+            if (item.Kind == TemplateItemKind.Field && item.FieldKind == FieldKind.RecentFile &&
+                (item.FileSource is null || string.IsNullOrWhiteSpace(item.FileSource.Folder) || string.IsNullOrWhiteSpace(item.FileSource.Pattern)))
+            {
+                errors.Add($"O item '{id}' é um arquivo aberto pelo programa e precisa dizer a pasta e o nome do arquivo.");
             }
         }
 

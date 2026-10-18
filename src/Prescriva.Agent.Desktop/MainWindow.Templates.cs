@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Prescriva.Agent.Application.Configuration;
 using Prescriva.Agent.Application.Inspection;
+using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Application.Templates;
 using Prescriva.Agent.Desktop.Configuration;
 using Prescriva.Agent.Desktop.Templates;
@@ -95,7 +96,7 @@ public partial class MainWindow
         {
             var application = new ApplicationDefinition(chosen.ProcessName + ".exe", chosen.WindowTitle);
             var integrationId = SemanticIdGenerator.FromName(template.Id, _configurationStore.ListIds(), "integracao");
-            Guide.Start(template, application, integrationId);
+            Guide.Start(template, application, integrationId, LocateOpenWindow);
             ProcessIdentityBox.Text = application.ProcessIdentity;
             WindowRuleBox.Text = application.WindowRule;
             IntegrationIdBox.Text = integrationId;
@@ -110,6 +111,12 @@ public partial class MainWindow
             SetStatus($"Não foi possível usar o modelo: {ex.Message}");
         }
     }
+
+    /// <summary>The open window of another program a checklist item lives in (plan 16), from the last refreshed list.</summary>
+    private ApplicationDefinition? LocateOpenWindow(TemplateProgram program) =>
+        _openWindows.Select(item => item.Info).FirstOrDefault(window => program.Matches(window.ProcessName, window.WindowTitle)) is { } found
+            ? new ApplicationDefinition(found.ProcessName + ".exe", found.WindowTitle)
+            : null;
 
     /// <summary>Another integration is created or opened: the checklist no longer applies.</summary>
     private void LeaveGuide()
@@ -155,7 +162,10 @@ public partial class MainWindow
         }
 
         GuideItemNameText.Text = $"{item.Name} ({item.KindText}) — {item.StatusText}";
-        GuideItemHelpText.Text = item.Help + (item.HasSuggestion ? " Há uma posição sugerida para este item." : " Sem posição sugerida: marque-o no programa.");
+        GuideItemHelpText.Text = item.Help
+            + (item.Program is { } program ? $" Fica na janela '{program.WindowTitleContains}'." : string.Empty)
+            + (item.FileSource is { } source ? $" Arquivo: '{source.Pattern}' em {source.Folder}." : string.Empty)
+            + (item.HasSuggestion ? " Há uma posição sugerida para este item." : " Sem posição sugerida: marque-o no programa.");
         GuideItemResultText.Text = item.LastResult;
         GuideItemResultText.Foreground = item.Status switch
         {
@@ -172,15 +182,23 @@ public partial class MainWindow
             FieldKind.ScreenImage => 3,
             _ => 0,
         };
-        GuideAdjustKindBox.IsEnabled = item.Kind == Application.Templates.TemplateItemKind.Field;
+        // A file the program opens is found by the template's folder and pattern: its kind stays.
+        GuideAdjustKindBox.IsEnabled = item.Kind == Application.Templates.TemplateItemKind.Field && item.FieldKind != FieldKind.RecentFile;
     }
 
-    private void GuideUseSuggestionButton_Click(object sender, RoutedEventArgs e) =>
+    private async void GuideUseSuggestionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedGuideItem?.Program is not null)
+        {
+            await RefreshOpenWindowsAsync(); // the other program's window may have been opened since
+        }
+
         GuideAction(item =>
         {
             Guide.UseSuggestion(item.Id);
             return $"'{item.Name}' marcado com a posição sugerida. Agora clique em 'Testar este item'.";
         });
+    }
 
     private async void GuideMarkButton_Click(object sender, RoutedEventArgs e)
     {
@@ -255,13 +273,15 @@ public partial class MainWindow
     private void GuideAdjustButton_Click(object sender, RoutedEventArgs e) =>
         GuideAction(item =>
         {
-            Guide.Adjust(item.Id, GuideAdjustNameBox.Text, GuideAdjustKindBox.SelectedIndex switch
-            {
-                1 => FieldKind.File,
-                2 => FieldKind.OcrText,
-                3 => FieldKind.ScreenImage,
-                _ => FieldKind.Text,
-            }, GuideAdjustRequiredBox.IsChecked == true);
+            Guide.Adjust(item.Id, GuideAdjustNameBox.Text, item.FieldKind == FieldKind.RecentFile
+                ? FieldKind.RecentFile
+                : GuideAdjustKindBox.SelectedIndex switch
+                {
+                    1 => FieldKind.File,
+                    2 => FieldKind.OcrText,
+                    3 => FieldKind.ScreenImage,
+                    _ => FieldKind.Text,
+                }, GuideAdjustRequiredBox.IsChecked == true);
             return $"'{item.Name}' ajustado.";
         });
 
@@ -345,7 +365,9 @@ public partial class MainWindow
             return false;
         }
 
-        using var provider = new UiAutomationTriggerProvider(_automationDispatcher, Guid.NewGuid(), processId: processIds[0]);
+        // A button of another program (plan 16) is watched in that program.
+        var provider = ProcessRouting.Triggers(application!.ProcessIdentity, _runtimeFactories.CreateTriggerProvider,
+            new ApplicationInstance(Guid.NewGuid(), processIds[0]), Guid.NewGuid());
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         wait.CancelAfter(ClickWait);
         try

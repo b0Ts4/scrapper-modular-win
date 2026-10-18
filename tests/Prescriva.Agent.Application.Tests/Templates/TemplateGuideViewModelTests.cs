@@ -209,6 +209,87 @@ public sealed class TemplateGuideViewModelTests
         Assert.Equal(string.Empty, doctor.Suggested.WindowRule);
     }
 
+    /// <summary>Plan 16: the attachment lives in another program; its suggestion is aimed at that program's open window.</summary>
+    [Fact]
+    public void An_item_of_another_program_is_aimed_at_that_programs_window_and_keeps_its_file_source()
+    {
+        var (guide, editor) = StartTwoPrograms();
+
+        guide.UseSuggestion("anexo");
+
+        var field = editor.Configuration!.Fields.Single(candidate => candidate.Id == "anexo");
+        Assert.Equal("FCMobyPharma.exe", field.Selector.ProcessIdentity);
+        Assert.Equal("Visualização de Anexos", field.Selector.WindowRule);
+        Assert.Equal(FieldKind.RecentFile, field.Kind);
+        Assert.Equal(new FileSource("%LOCALAPPDATA%\\Temp", "anexo_*", 120), field.FileSource);
+    }
+
+    [Fact]
+    public void An_item_whose_program_is_not_open_has_no_usable_suggestion()
+    {
+        var (guide, _) = StartTwoPrograms(viewerOpen: false);
+
+        var error = Assert.Throws<InvalidOperationException>(() => guide.UseSuggestion("anexo"));
+        Assert.Contains("A janela 'Anexos' não está aberta", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Abra o anexo.", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Button_roles_keep_send_or_discard_what_was_captured()
+    {
+        var (guide, editor) = StartTwoPrograms();
+        guide.UseSuggestion("anexo");
+        guide.Mark("posologia", Selector("TPanel[0]/TEdit[1]"));
+
+        guide.Mark("nova_formula", Selector("TButton[1]") with { ProcessIdentity = "FCMobyPharma.exe" });
+        guide.Mark("ok", Selector("TButton[2]"));
+        guide.Mark("cancelar", Selector("TButton[3]"));
+
+        var actions = editor.Configuration!.Triggers.ToDictionary(trigger => trigger.Id, trigger => trigger.Actions);
+        Assert.Equal(["anexo"], Assert.IsType<CaptureFieldsAction>(Assert.Single(actions["nova_formula"])).FieldIds.ToArray());
+        Assert.Equal(["posologia"], Assert.IsType<CaptureFieldsAction>(actions["ok"][0]).FieldIds.ToArray());
+        Assert.Equal("receita", Assert.IsType<EmitEventAction>(actions["ok"][1]).EventType);
+        Assert.IsType<ClearStateAction>(actions["ok"][2]);
+        Assert.IsType<ClearStateAction>(Assert.Single(actions["cancelar"]));
+    }
+
+    [Fact]
+    public async Task Testing_a_file_field_names_the_copied_file()
+    {
+        var (guide, _) = StartTwoPrograms();
+        guide.UseSuggestion("anexo");
+        _resolver.Next = SelectorResolution.Found(new FakeHandle(), 1.0);
+        _capture.Next = new CaptureResult(CaptureOutcome.Captured, null, "uia", 1.0, TimeSpan.Zero, [],
+            new CapturedAttachment(new byte[54_713], "anexo_20261018_183315390.pdf", "application/pdf", AttachmentSource.File));
+
+        await guide.TestAsync("anexo");
+
+        Assert.Contains("anexo_20261018_183315390.pdf", guide.Item("anexo").LastResult, StringComparison.Ordinal);
+        Assert.Contains("53 KB", guide.Item("anexo").LastResult, StringComparison.Ordinal);
+    }
+
+    private (TemplateGuideViewModel Guide, IntegrationEditorViewModel Editor) StartTwoPrograms(bool viewerOpen = true)
+    {
+        var viewer = new TemplateProgram("FCMobyPharma.exe", "Anexos", "Abra o anexo.");
+        var template = new IntegrationTemplate("receita_completa", "Receita completa", "x", IntegrationTemplateTests.Sample().Program,
+        [
+            new TemplateItem("anexo", TemplateItemKind.Field, "Anexo", "O arquivo da receita.", FieldKind.RecentFile, Required: false,
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TScrollBox", WindowPath: "TPanel[0]/TScrollBox[0]"),
+                Program: viewer, FileSource: new FileSource("%LOCALAPPDATA%\\Temp", "anexo_*", 120)),
+            new TemplateItem("posologia", TemplateItemKind.Field, "Posologia", "x"),
+            new TemplateItem("nova_formula", TemplateItemKind.Button, "Nova Fórmula", "x", CapturedFields: ["anexo"], Program: viewer, Role: TemplateButtonRole.CaptureOnly),
+            new TemplateItem("ok", TemplateItemKind.Button, "OK", "x", CapturedFields: ["posologia"], EmitEvent: "receita"),
+            new TemplateItem("cancelar", TemplateItemKind.Button, "Cancelar", "x", Role: TemplateButtonRole.Discard),
+        ]);
+        var editor = new IntegrationEditorViewModel(new FakeStore(), _resolver, _capture);
+        var guide = new TemplateGuideViewModel(editor, (_, _) => Task.FromResult(_clickSeen));
+        guide.Start(template, Program, "receita_teste",
+            program => viewerOpen && program.Matches("FCMobyPharma", "Visualização de Anexos")
+                ? new ApplicationDefinition("FCMobyPharma.exe", "Visualização de Anexos")
+                : null);
+        return (guide, editor);
+    }
+
     private (TemplateGuideViewModel Guide, IntegrationEditorViewModel Editor) Start()
     {
         var editor = new IntegrationEditorViewModel(new FakeStore(), _resolver, _capture);

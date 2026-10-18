@@ -1,0 +1,148 @@
+{
+  "id": "formulacerta_receita_completa",
+  "name": "FórmulaCerta – Receita completa (anexo + orçamento)",
+  "description": "Uma extração só com tudo da receita: o arquivo original da receita anexada ao pedido (inteiro, mesmo que a atendente veja só uma parte) é guardado quando ela clica em Nova Fórmula ou Novo Produto na janela de anexos; quando ela clica OK no orçamento, o Agent lê posologia, prescritor (conselho, UF, CRM e nome) e componentes com quantidades e gera um único evento 'receita' com tudo junto. Cancelar no orçamento descarta o que foi guardado. Nada na tela é mexido. Teste item por item e ajuste o que precisar.",
+  "program": {
+    "processIdentity": "FCMobyPharma.exe",
+    "windowTitleContains": "MobyPharma",
+    "howToOpen": "Abra o FórmulaCerta MobyPharma (gestão de pedidos). Para testar todos os itens, abra também um pedido com receita anexada (janela 'Visualização de Anexos') e a tela de Orçamentos."
+  },
+  "items": [
+    {
+      "id": "anexo_receita",
+      "kind": "field",
+      "name": "Arquivo da receita (original)",
+      "help": "A receita anexada ao pedido, copiada inteira do arquivo que o MobyPharma grava ao abrir o anexo (PDF ou imagem) - não é um print da tela. Para testar, deixe a janela 'Visualização de Anexos' aberta com a receita.",
+      "fieldKind": "recentFile",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TScrollBox", "frameworkId": "Win32", "relativeBounds": { "x": 0.1321, "y": 0.2027, "width": 0.8525, "height": 0.7456 }, "windowPath": "TframeVisualizacaoAnexos[0]/TPanel[0]/TScrollBox[0]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCMobyPharma.exe", "windowTitleContains": "Visualização de Anexos", "howToOpen": "No MobyPharma, abra o pedido e dê dois cliques no anexo da receita." },
+      "fileSource": { "folder": "%LOCALAPPDATA%\\Temp", "pattern": "anexo_*", "maxAgeMinutes": 240 }
+    },
+    {
+      "id": "posologia",
+      "kind": "field",
+      "name": "Posologia",
+      "help": "Tela de Orçamentos, aba Fórmula: o campo largo 'Posologia'.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBComboBox", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.55, "width": 0.6938, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBComboBox[2]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos (por exemplo com Nova Fórmula no pedido)." }
+    },
+    {
+      "id": "prescritor_conselho",
+      "kind": "field",
+      "name": "Conselho do prescritor (CRM, CRO...)",
+      "help": "Tela de Orçamentos, 1ª caixinha da linha 'Prescritor'. Posição deduzida do layout: confira no teste com um prescritor preenchido.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.0993, "y": 0.48, "width": 0.0455, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[5]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "prescritor_uf",
+      "kind": "field",
+      "name": "UF do registro do prescritor",
+      "help": "Tela de Orçamentos, 2ª caixinha da linha 'Prescritor'. Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBLookupCombo", "frameworkId": "Win32", "relativeBounds": { "x": 0.1471, "y": 0.48, "width": 0.049, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[4]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "prescritor_crm",
+      "kind": "field",
+      "name": "Número do registro (CRM)",
+      "help": "Tela de Orçamentos, 3º campo da linha 'Prescritor'. Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.1974, "y": 0.48, "width": 0.0682, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TwwDBEdit[1]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "prescritor_nome",
+      "kind": "field",
+      "name": "Nome do prescritor (médico)",
+      "help": "Tela de Orçamentos, o campo mais largo da linha 'Prescritor'. Posição deduzida do layout: confira no teste.",
+      "fieldKind": "text",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.2679, "y": 0.48, "width": 0.2273, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TwwDBEdit[0]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "componentes",
+      "kind": "field",
+      "name": "Componentes e quantidades (texto da grade)",
+      "help": "Tela de Orçamentos, a grade de baixo, lida por OCR: cada componente vira uma linha 'código | descrição | quantidade | unidade | valor'. Só o que está visível na grade é lido.",
+      "fieldKind": "ocrText",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "componentes_imagem",
+      "kind": "field",
+      "name": "Componentes (imagem da grade)",
+      "help": "A mesma grade guardada como imagem, para conferir o OCR (ou para a sua IA ler).",
+      "fieldKind": "screenImage",
+      "required": false,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
+    },
+    {
+      "id": "nova_formula",
+      "kind": "button",
+      "name": "Nova Fórmula (guarda o arquivo da receita)",
+      "help": "Primeiro botão no alto da janela de anexos. Ao ser clicado, o arquivo da receita é guardado, sem enviar nada ainda.",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.0274, "y": 0.0503, "width": 0.2316, "height": 0.037 }, "windowPath": "TFagronPanel[0]/TFagronButton[2]" },
+      "capturedFields": [ "anexo_receita" ],
+      "emitEvent": null,
+      "program": { "processIdentity": "FCMobyPharma.exe", "windowTitleContains": "Visualização de Anexos", "howToOpen": "No MobyPharma, abra o pedido e dê dois cliques no anexo da receita." },
+      "role": "captureOnly"
+    },
+    {
+      "id": "novo_produto",
+      "kind": "button",
+      "name": "Novo Produto (guarda o arquivo da receita)",
+      "help": "Segundo botão no alto da janela de anexos. Também guarda o arquivo da receita, sem enviar nada ainda.",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.2659, "y": 0.0503, "width": 0.2316, "height": 0.037 }, "windowPath": "TFagronPanel[0]/TFagronButton[1]" },
+      "capturedFields": [ "anexo_receita" ],
+      "emitEvent": null,
+      "program": { "processIdentity": "FCMobyPharma.exe", "windowTitleContains": "Visualização de Anexos", "howToOpen": "No MobyPharma, abra o pedido e dê dois cliques no anexo da receita." },
+      "role": "captureOnly"
+    },
+    {
+      "id": "ok_orcamento",
+      "kind": "button",
+      "name": "OK do orçamento (envia a receita completa)",
+      "help": "O botão OK no alto, à direita, da tela de Orçamentos. Ao ser clicado, o Agent lê os campos do orçamento e gera UM evento 'receita' com eles e com o arquivo guardado. Se no teste os campos vierem vazios (o clique já limpou a tela), use outro botão clicado antes de gravar, como Recálculo.",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.805, "y": 0.1783, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronButton[8]" },
+      "capturedFields": [ "posologia", "prescritor_conselho", "prescritor_uf", "prescritor_crm", "prescritor_nome", "componentes", "componentes_imagem" ],
+      "emitEvent": "receita",
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." },
+      "role": "captureAndSend"
+    },
+    {
+      "id": "cancelar_orcamento",
+      "kind": "button",
+      "name": "Cancelar do orçamento (descarta)",
+      "help": "O botão Cancelar, abaixo do OK, na tela de Orçamentos. Ao ser clicado, o arquivo guardado é descartado e nada é enviado.",
+      "required": true,
+      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.805, "y": 0.23, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronButton[7]" },
+      "capturedFields": null,
+      "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." },
+      "role": "discard"
+    }
+  ]
+}

@@ -33,7 +33,17 @@ public sealed class GuideItem
         Suggested = item.Suggested;
         CapturedFields = item.CapturedFields;
         EmitEvent = item.EmitEvent;
+        Program = item.Program;
+        FileSource = item.FileSource;
+        Role = item.Role;
     }
+
+    /// <summary>The program of an item that lives outside the integration's main program (plan 16), or null.</summary>
+    public TemplateProgram? Program { get; }
+
+    public FileSource? FileSource { get; }
+
+    public TemplateButtonRole Role { get; }
 
     public string Id { get; }
 
@@ -63,12 +73,18 @@ public sealed class GuideItem
     public bool HasSuggestion => Suggested is not null;
 
     public string KindText => Kind == TemplateItemKind.Button
-        ? "botão"
+        ? Role switch
+        {
+            TemplateButtonRole.CaptureOnly => "botão (guarda)",
+            TemplateButtonRole.Discard => "botão (descarta)",
+            _ => "botão (envia)",
+        }
         : FieldKind switch
         {
             FieldKind.OcrText => "texto via OCR",
             FieldKind.ScreenImage => "imagem da tela",
             FieldKind.File => "arquivo / imagem",
+            FieldKind.RecentFile => "arquivo aberto pelo programa",
             _ => "texto",
         };
 
@@ -99,6 +115,7 @@ public sealed class TemplateGuideViewModel
     private readonly IntegrationEditorViewModel _editor;
     private readonly Func<TriggerDefinition, CancellationToken, Task<bool>> _waitForClick;
     private readonly List<GuideItem> _items = [];
+    private Func<TemplateProgram, ApplicationDefinition?> _locate = _ => null;
 
     /// <param name="waitForClick">Watches one button until it is clicked once (true) or the wait ends (false).</param>
     public TemplateGuideViewModel(IntegrationEditorViewModel editor, Func<TriggerDefinition, CancellationToken, Task<bool>> waitForClick)
@@ -118,7 +135,9 @@ public sealed class TemplateGuideViewModel
     public int DoneCount => _items.Count(item => item.Status is GuideItemStatus.Passed or GuideItemStatus.Skipped);
 
     /// <summary>Creates the integration for <paramref name="application"/> and lists every item as to do.</summary>
-    public void Start(IntegrationTemplate template, ApplicationDefinition application, string integrationId)
+    /// <param name="locate">Finds the open window of another program an item lives in (plan 16), or null when it is not open.</param>
+    public void Start(IntegrationTemplate template, ApplicationDefinition application, string integrationId,
+        Func<TemplateProgram, ApplicationDefinition?>? locate = null)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(application);
@@ -131,8 +150,11 @@ public sealed class TemplateGuideViewModel
         _editor.CreateIntegration(integrationId, template.Name, application);
         _editor.AddStage(StageId, "Principal");
         Template = template;
+        _locate = locate ?? (_ => null);
         _items.Clear();
-        _items.AddRange(template.Items.Select(item => new GuideItem(item with { Suggested = item.SuggestionFor(application) })));
+        // An item of another program is aimed at that program's window when it is used (it may open later).
+        _items.AddRange(template.Items.Select(item => new GuideItem(
+            item.Program is null ? item with { Suggested = item.SuggestionFor(application) } : item)));
     }
 
     /// <summary>Leaves the checklist (another integration was created or opened); the integration itself is untouched.</summary>
@@ -155,6 +177,14 @@ public sealed class TemplateGuideViewModel
             throw new InvalidOperationException($"'{item.Name}' não tem posição sugerida: marque-o no programa.");
         }
 
+        if (item.Program is { } program)
+        {
+            var window = _locate(program)
+                ?? throw new InvalidOperationException($"A janela '{program.WindowTitleContains}' não está aberta. {program.HowToOpen}");
+            Mark(id, item.Suggested with { ProcessIdentity = window.ProcessIdentity, WindowRule = window.WindowRule });
+            return;
+        }
+
         Mark(id, item.Suggested);
     }
 
@@ -173,7 +203,7 @@ public sealed class TemplateGuideViewModel
             }
             else
             {
-                _editor.AddField(item.Id, StageId, item.Name, item.Required, selector, item.FieldKind);
+                _editor.AddField(item.Id, StageId, item.Name, item.Required, selector, item.FieldKind, item.FileSource);
             }
         }
         else if (configuration.Triggers.Any(trigger => trigger.Id == item.Id))
@@ -296,7 +326,10 @@ public sealed class TemplateGuideViewModel
                 item.Required,
                 (item.Selector ?? item.Suggested) is { } position ? position with { ProcessIdentity = string.Empty, WindowRule = string.Empty } : null,
                 item.CapturedFields.IsDefaultOrEmpty ? default : item.CapturedFields.Where(fieldIds.Contains).ToImmutableArray(),
-                item.EmitEvent)).ToImmutableArray(),
+                item.EmitEvent,
+                item.Program,
+                item.FileSource,
+                item.Role)).ToImmutableArray(),
         };
     }
 
@@ -330,13 +363,29 @@ public sealed class TemplateGuideViewModel
         }
     }
 
+    /// <summary>
+    /// What a button does, by its role: send = read its fields, emit one event with everything
+    /// kept so far, clear; keep = read its fields only; discard = clear.
+    /// </summary>
     private ImmutableArray<TriggerActionDefinition> ActionsFor(GuideItem button, string? exclude = null)
     {
+        if (button.Role == TemplateButtonRole.Discard)
+        {
+            return [new ClearStateAction()];
+        }
+
         var marked = _items
             .Where(item => item.Kind == TemplateItemKind.Field && item.Selector is not null && item.Id != exclude)
             .Where(item => button.CapturedFields.IsDefaultOrEmpty || button.CapturedFields.Contains(item.Id))
             .Select(item => item.Id)
             .ToArray();
+        if (button.Role == TemplateButtonRole.CaptureOnly)
+        {
+            // Nothing marked yet to keep: a trigger needs an action, and clearing would throw away
+            // what other buttons kept, so it only stays in the same stage until its fields are marked.
+            return marked.Length > 0 ? [new CaptureFieldsAction([.. marked])] : [new TransitionStageAction(StageId)];
+        }
+
         return TriggerActionsBuilder.Build(
             string.Join(",", marked),
             string.IsNullOrWhiteSpace(button.EmitEvent) ? "item_added" : button.EmitEvent,
@@ -369,8 +418,10 @@ public sealed class TemplateGuideViewModel
 
         if (result.Attachment is { } attachment)
         {
-            var kilobytes = Math.Round(attachment.Content.LongLength / 1024.0, MidpointRounding.AwayFromZero);
-            return found + $"Imagem capturada ({kilobytes.ToString(CultureInfo.InvariantCulture)} KB).";
+            var kilobytes = Math.Round(attachment.Content.LongLength / 1024.0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
+            return found + (attachment.Source == AttachmentSource.File
+                ? $"Arquivo copiado inteiro ({kilobytes} KB, {attachment.FileName})."
+                : $"Imagem capturada ({kilobytes} KB).");
         }
 
         return string.IsNullOrEmpty(result.Value)

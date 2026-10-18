@@ -113,7 +113,7 @@ public sealed class IntegrationEditorViewModel
     /// <c>InspectionState.Fingerprint</c>. Rejects an invalid semantic ID before touching
     /// the configuration - it is never partially applied.
     /// </summary>
-    public void AddField(string semanticId, string stageId, string meaning, bool required, ElementFingerprint selector, FieldKind kind = FieldKind.Text)
+    public void AddField(string semanticId, string stageId, string meaning, bool required, ElementFingerprint selector, FieldKind kind = FieldKind.Text, FileSource? fileSource = null)
     {
         ValidateSemanticId(semanticId);
         ArgumentException.ThrowIfNullOrWhiteSpace(stageId);
@@ -125,7 +125,7 @@ public sealed class IntegrationEditorViewModel
             throw new InvalidOperationException($"Já existe um campo com o ID '{semanticId}'. Remova-o antes para trocar o elemento selecionado.");
         }
 
-        var field = new FieldDefinition(semanticId, stageId, meaning, required, selector, kind);
+        var field = new FieldDefinition(semanticId, stageId, meaning, required, selector, kind, fileSource);
         Configuration = current with { Fields = current.Fields.Add(field) };
         MarkDirty();
     }
