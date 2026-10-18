@@ -1,7 +1,7 @@
 {
   "id": "formulacerta_receita_completa",
   "name": "FórmulaCerta – Receita completa (anexo + orçamento)",
-  "description": "Uma extração só com tudo da receita: o arquivo original da receita anexada ao pedido (inteiro, mesmo que a atendente veja só uma parte) é guardado quando ela clica em Nova Fórmula ou Novo Produto na janela de anexos; quando ela clica OK no orçamento, o Agent lê posologia, prescritor (conselho, UF, CRM e nome) e componentes com quantidades e gera um único evento 'receita' com tudo junto. Cancelar no orçamento descarta o que foi guardado. Nada na tela é mexido. Teste item por item e ajuste o que precisar.",
+  "description": "Uma extração só com tudo da receita: o arquivo original da receita anexada ao pedido (inteiro, mesmo que a atendente veja só uma parte) é guardado quando ela clica em Nova Fórmula ou Novo Produto na janela de anexos; quando ela clica OK no orçamento, o Agent lê posologia, prescritor (conselho, UF, CRM e nome) e a imagem da grade de componentes (a fonte dos componentes e quantidades, para a sua IA ler; o texto por OCR vai junto só para conferência) e gera um único evento 'receita' com tudo junto. Cancelar no orçamento descarta o que foi guardado. Nada na tela é mexido. Teste item por item e ajuste o que precisar.",
   "program": {
     "processIdentity": "FCMobyPharma.exe",
     "windowTitleContains": "MobyPharma",
@@ -76,21 +76,22 @@
       "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
     },
     {
-      "id": "componentes",
+      "id": "componentes_imagem",
       "kind": "field",
-      "name": "Componentes e quantidades (texto da grade)",
-      "help": "Tela de Orçamentos, a grade de baixo, lida por OCR: cada componente vira uma linha 'código | descrição | quantidade | unidade | valor'. Só o que está visível na grade é lido.",
-      "fieldKind": "ocrText",
+      "name": "Componentes e quantidades (imagem da grade - fonte)",
+      "help": "Tela de Orçamentos, a grade de baixo, guardada como imagem: é a FONTE dos componentes (código, descrição, quantidade, unidade). Quem recebe o evento (a sua IA) lê os componentes desta imagem. Só o que está visível na grade aparece: com muitos componentes, confira se a grade mostra todos.",
+      "fieldKind": "screenImage",
       "required": false,
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" },
       "capturedFields": null,
       "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." }
     },
     {
-      "id": "componentes_imagem",
+      "id": "componentes_ocr",
       "kind": "field",
-      "name": "Componentes (imagem da grade)",
-      "help": "A mesma grade guardada como imagem, para conferir o OCR (ou para a sua IA ler).",
+      "name": "Componentes (texto por OCR - só conferência)",
+      "help": "A mesma grade lida por OCR, uma linha por componente ('código | descrição | quantidade...'). PODE TER ERROS (dígitos, letras e vírgulas trocados): serve só para conferir o que foi lido da imagem, nunca como valor final. Pode ser removido.",
+      "fieldKind": "ocrText",
       "fieldKind": "screenImage",
       "required": false,
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" },
@@ -128,7 +129,7 @@
       "help": "O botão OK no alto, à direita, da tela de Orçamentos. Ao ser clicado, o Agent lê os campos do orçamento e gera UM evento 'receita' com eles e com o arquivo guardado. Se no teste os campos vierem vazios (o clique já limpou a tela), use outro botão clicado antes de gravar, como Recálculo.",
       "required": true,
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.805, "y": 0.1783, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronButton[8]" },
-      "capturedFields": [ "posologia", "prescritor_conselho", "prescritor_uf", "prescritor_crm", "prescritor_nome", "componentes", "componentes_imagem" ],
+      "capturedFields": [ "posologia", "prescritor_conselho", "prescritor_uf", "prescritor_crm", "prescritor_nome", "componentes_imagem", "componentes_ocr" ],
       "emitEvent": "receita",
       "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." },
       "role": "captureAndSend"

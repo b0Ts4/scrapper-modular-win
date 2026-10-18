@@ -54,20 +54,20 @@
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBEdit", "frameworkId": "Win32", "relativeBounds": { "x": 0.2679, "y": 0.48, "width": 0.2273, "height": 0.0317 }, "windowPath": "TFagronPageControl[0]/TcxTabSheet[0]/TFagronPanel[0]/TwwDBEdit[0]" }
     },
     {
-      "id": "componentes",
+      "id": "componentes_imagem",
       "kind": "field",
-      "name": "Componentes e quantidades (texto da grade)",
-      "help": "A grade da parte de baixo (Código, Descrição, Quantidade, Unid.). O FórmulaCerta não expõe as células, então a grade inteira é lida por OCR: cada linha da grade vira uma linha de texto. Só aparece o que está visível: se houver muitos componentes, confira se a grade mostra todos.",
-      "fieldKind": "ocrText",
+      "name": "Componentes e quantidades (imagem da grade - fonte)",
+      "help": "A grade da parte de baixo (Código, Descrição, Quantidade, Unid.) guardada como imagem: é a FONTE dos componentes, que quem recebe o evento (a sua IA) lê. O FórmulaCerta não expõe as células. Só aparece o que está visível: se houver muitos componentes, confira se a grade mostra todos.",
+      "fieldKind": "screenImage",
       "required": false,
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" }
     },
     {
-      "id": "componentes_imagem",
+      "id": "componentes_ocr",
       "kind": "field",
-      "name": "Componentes (imagem da grade)",
-      "help": "A mesma grade guardada como imagem, para conferir o que o OCR leu (ou para a sua IA ler).",
-      "fieldKind": "screenImage",
+      "name": "Componentes (texto por OCR - só conferência)",
+      "help": "A mesma grade lida por OCR, uma linha por componente. PODE TER ERROS (dígitos, letras e vírgulas trocados): serve só para conferir o que foi lido da imagem, nunca como valor final. Pode ser removido.",
+      "fieldKind": "ocrText",
       "required": false,
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" }
     },
