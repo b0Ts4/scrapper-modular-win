@@ -73,6 +73,23 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void A_recent_file_field_needs_a_folder_and_a_pattern()
+    {
+        var configuration = ValidConfiguration();
+        var field = configuration.Fields[0] with { Kind = FieldKind.RecentFile };
+
+        var withoutSource = ConfigurationValidator.Validate(configuration with { Fields = configuration.Fields.SetItem(0, field) });
+        var withSource = ConfigurationValidator.Validate(configuration with
+        {
+            Fields = configuration.Fields.SetItem(0, field with { FileSource = new FileSource("%TEMP%", "anexo_*", 60) }),
+        });
+
+        Assert.Contains(withoutSource.Errors, error => error.Code == "MISSING_FILE_SOURCE");
+        Assert.True(withSource.IsValid);
+        Assert.True(FieldKind.RecentFile.ProducesAttachment());
+    }
+
+    [Fact]
     public void Unknown_schema_version_is_rejected()
     {
         Assert.Contains(ConfigurationValidator.Validate(ValidConfiguration() with { SchemaVersion = 2 }).Errors,

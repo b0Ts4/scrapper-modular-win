@@ -79,6 +79,13 @@ public static class ConfigurationFingerprint
                     sb.Append(",kind=").Append(field.Kind);
                 }
 
+                // Likewise only for fields that have one (recent-file fields, plan 16).
+                if (field?.FileSource is { } source)
+                {
+                    sb.Append(",fileSource=").Append(source.Folder).Append('|').Append(source.Pattern)
+                        .Append('|').Append(source.MaxAgeMinutes.ToString(CultureInfo.InvariantCulture));
+                }
+
                 sb
                     .Append(",selector=");
                 AppendSelector(sb, field?.Selector);

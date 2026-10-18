@@ -47,6 +47,10 @@ public static class ConfigurationValidator
                 if (field is null) continue;
                 if (!stages.Contains(field.StageId)) Add("UNKNOWN_STAGE_REFERENCE", $"fields[{i}].stageId", "Field stage does not exist.");
                 if (string.IsNullOrWhiteSpace(field.Meaning)) Add("INVALID_FIELD_MEANING", $"fields[{i}].meaning", "Field meaning is required.");
+                if (field.Kind == FieldKind.RecentFile &&
+                    (field.FileSource is null || string.IsNullOrWhiteSpace(field.FileSource.Folder) ||
+                     string.IsNullOrWhiteSpace(field.FileSource.Pattern) || field.FileSource.MaxAgeMinutes <= 0))
+                    Add("MISSING_FILE_SOURCE", $"fields[{i}].fileSource", "A recent-file field needs a folder, a file pattern and a maximum age.");
                 ValidateSelector(field.Selector, $"fields[{i}].selector", Add);
             }
         }
