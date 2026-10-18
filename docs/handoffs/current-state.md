@@ -1,5 +1,7 @@
 # Current state
 
+## Status — 2026-10-18 (plan 16: whole prescription file + one extraction across MobyPharma and Orçamentos; end-to-end event still to be seen on the operator's PC)
+
 ## Status — 2026-10-12 (first real pharmacy system test: FórmulaCerta works end to end after two fixes and plan 14; see "First test on a real pharmacy system")
 
 ## Status — 2026-10-07 (plan 10 done; see below)
@@ -197,6 +199,12 @@ Branch `fix/formulacerta-inspection` (from `master` 41995f4), on the operator's 
   - Shipped templates: FórmulaCerta *Orçamento*, *Receita*, *Foto da receita (MobyPharma)*, with suggested window-path positions taken from the real screens.
   - OCR: a grid's cells come back as separate lines; `OcrText.Rows` rebuilds rows from line positions ("cell | cell"). RED `OcrTextTests.Cells_side_by_side_become_one_row_in_reading_order`.
   - Tests: `IntegrationTemplateTests` (7), `JsonTemplateStoreTests` (5, incl. every shipped template valid), `TemplateGuideViewModelTests` (14) - their RED was compile-time only (new types). Evidence (local): build 0 warnings; Domain 76, Application 194, Infrastructure 78, Windows 28; integration Automation/Processes/Overlay/Runtime/RealApps 61 (+1 skipped). No EndToEnd test drives the new UI yet - **CI/EndToEnd coverage of the checklist UI is still to write**; it was exercised by hand on FórmulaCerta (manual row 36).
+- **Plan 16 — Whole prescription file and one extraction across two programs** (`docs/superpowers/plans/2026-10-18-attachment-file-and-cross-program.md`, 2026-10-18, branch `feature/attachment-file-cross-program`):
+  - MobyPharma writes every opened attachment to `%TEMP%[\<session>]\anexo_YYYYMMDD_HHMMSSmmm.<ext>`; `FieldKind.RecentFile` + `FileSource` copy the newest one whole while the viewer is open (`RecentFileFinder`, `UiAutomationCaptureProvider`), so the attendant's zoom/scroll does not matter and the screen is never touched.
+  - `ProcessRouting` (Application): fields/buttons of another program are resolved/watched there (`ApplicationInstance.AnyProcess`, mapped to an unscoped provider in `UiAutomationRuntimeFactories`); used by `AgentRuntime`, test mode and the checklist's click test.
+  - Templates: per-item `Program`, `FileSource`, `Role` (send / keep / discard). New shipped template *Receita completa (anexo + orçamento)*: main program MobyPharma's order window; attachment kept on *Nova Fórmula*/*Novo Produto*; one `receita` event on the Orçamentos *OK*; *Cancelar* discards.
+  - Tests first: `ConfigurationValidatorTests` (file source), `RecentFileFieldTests`, `RecentFileFinderTests`, `RecentFileCaptureTests` (RED observed), `ProcessRoutingTests`, `AgentRuntimeTests.A_button_of_another_program_...` (RED observed), `TemplateGuideViewModelTests` (4 new). Several REDs were compile-time only (new types).
+  - Evidence (local): build 0 warnings; Domain 77, Application 204, Infrastructure 80, Windows 31; integration (non-clicking folders) 63 (+1 skipped). FórmulaCerta: the file item copied the whole original PDF (43 KB). Not seen yet: the end-to-end `receita` event (Nova Fórmula was disabled on the open order; Orçamentos not open).
 - **Still open for FórmulaCerta**:
   1. Activating a vendor button with the keyboard is not detected (mouse only).
   2. Reading a field filled with real prescription data was not checked (no record opened); the date filter read `14/07/26`.
