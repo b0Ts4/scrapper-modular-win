@@ -208,8 +208,9 @@ public sealed class AgentRuntime
             sessionId,
             initialStageId,
             configuration,
-            _triggerProviderFactory(instance, sessionId),
-            _selectorResolverFactory(instance),
+            // Fields and buttons of another program are resolved and watched there (plan 16).
+            ProcessRouting.Triggers(configuration.Application.ProcessIdentity, _triggerProviderFactory, instance, sessionId),
+            ProcessRouting.Resolver(configuration.Application.ProcessIdentity, _selectorResolverFactory, instance),
             _captureProviderFactory(instance),
             _outbox,
             _log,

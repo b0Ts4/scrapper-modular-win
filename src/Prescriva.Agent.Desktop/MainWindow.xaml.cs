@@ -674,10 +674,11 @@ public partial class MainWindow : Window
         int? processId = running[0];
 
         var instance = new ApplicationInstance(Guid.NewGuid(), processId.Value);
+        var mainProcess = configuration.Application.ProcessIdentity;
         var runner = new IntegrationTestRunner(
-            _runtimeFactories.CreateSelectorResolver(instance),
+            ProcessRouting.Resolver(mainProcess, _runtimeFactories.CreateSelectorResolver, instance),
             _runtimeFactories.CreateCaptureProvider(instance),
-            _runtimeFactories.CreateTriggerProvider(instance, Guid.NewGuid()),
+            ProcessRouting.Triggers(mainProcess, _runtimeFactories.CreateTriggerProvider, instance, Guid.NewGuid()),
             triggerTimeout: TimeSpan.FromSeconds(15));
         _testModeViewModel = new TestModeViewModel(runner, Dispatcher, approvals: _approvalService);
         TestModeHost.Attach(_testModeViewModel, configuration);

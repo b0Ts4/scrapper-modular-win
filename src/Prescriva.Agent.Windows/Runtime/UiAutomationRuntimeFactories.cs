@@ -30,14 +30,18 @@ public sealed class UiAutomationRuntimeFactories
     public ITriggerProvider CreateTriggerProvider(ApplicationInstance instance, Guid sessionId)
     {
         ArgumentNullException.ThrowIfNull(instance);
-        return new UiAutomationTriggerProvider(_dispatcher, sessionId, processId: instance.ProcessId);
+        return new UiAutomationTriggerProvider(_dispatcher, sessionId, processId: ProcessIdOf(instance));
     }
 
     public ISelectorResolver CreateSelectorResolver(ApplicationInstance instance)
     {
         ArgumentNullException.ThrowIfNull(instance);
-        return new UiAutomationSelectorResolver(_dispatcher, processId: instance.ProcessId);
+        return new UiAutomationSelectorResolver(_dispatcher, processId: ProcessIdOf(instance));
     }
+
+    /// <summary><see cref="ApplicationInstance.AnyProcess"/> is not scoped: any instance of the selector's own program.</summary>
+    private static int? ProcessIdOf(ApplicationInstance instance) =>
+        instance.ProcessId == ApplicationInstance.AnyProcess.ProcessId ? null : instance.ProcessId;
 
     public ICaptureProvider CreateCaptureProvider(ApplicationInstance instance)
     {

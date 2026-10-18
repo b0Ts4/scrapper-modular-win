@@ -200,6 +200,49 @@ public sealed class AgentRuntimeTests
         Assert.False(source.WasWatched);
     }
 
+    /// <summary>
+    /// Plan 16: a button of another program (the attachment viewer's "Nova Fórmula") is watched
+    /// in that program, and its occurrence goes to the session of the main program's instance.
+    /// </summary>
+    [Fact]
+    public async Task A_button_of_another_program_is_watched_there_and_feeds_the_main_instances_session()
+    {
+        var source = new FakeApplicationInstanceSource();
+        var outbox = new FakeEventOutbox();
+        var providers = new ConcurrentDictionary<int, FakeTriggerProvider>();
+        var runtime = new AgentRuntime(
+            source,
+            triggerProviderFactory: (instance, sessionId) => providers.GetOrAdd(instance.ProcessId, _ => new FakeTriggerProvider(sessionId)),
+            selectorResolverFactory: _ => new UnusedSelectorResolver(),
+            captureProviderFactory: _ => new UnusedCaptureProvider(),
+            outbox,
+            new FakeTechnicalLog());
+        var configuration = BuildConfiguration() with
+        {
+            Triggers = [new TriggerDefinition(MarkTriggerId, StageId, new ElementFingerprint("Other.Program.exe", "Anexos", AutomationId: "NovaFormula"), "Invoke",
+                [new EmitEventAction("item_added")])],
+        };
+        var approval = new ConfigurationApproval(configuration.Id, ConfigurationFingerprint.Compute(configuration), DateTimeOffset.UtcNow);
+        using var activationCts = new CancellationTokenSource();
+        var activateTask = runtime.ActivateAsync(configuration, approval, activationCts.Token);
+        try
+        {
+            var main = new ApplicationInstance(Guid.NewGuid(), ProcessId: 1001);
+            source.Enqueue(new ApplicationInstanceChange(main, ApplicationInstanceChangeKind.Started));
+            await WaitUntilAsync(() => providers.ContainsKey(ApplicationInstance.AnyProcess.ProcessId), TimeSpan.FromSeconds(5));
+
+            providers[ApplicationInstance.AnyProcess.ProcessId].FireOnce(MarkTriggerId);
+            await WaitUntilAsync(() => outbox.Appended.Count >= 1, TimeSpan.FromSeconds(5));
+
+            Assert.Equal(runtime.ActiveSessions[main.InstanceId].SessionId, outbox.Appended[0].SessionId);
+        }
+        finally
+        {
+            activationCts.Cancel();
+            await activateTask;
+        }
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;

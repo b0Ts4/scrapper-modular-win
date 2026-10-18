@@ -9,7 +9,14 @@ namespace Prescriva.Agent.Application.Runtime;
 /// is the OS process ID, present for diagnostics and for Windows-layer factories that need
 /// to scope a resolver/capture provider/trigger provider to this specific process.
 /// </summary>
-public sealed record ApplicationInstance(Guid InstanceId, int ProcessId);
+public sealed record ApplicationInstance(Guid InstanceId, int ProcessId)
+{
+    /// <summary>
+    /// Not one instance: whatever instance of an item's own program is running (process ID 0).
+    /// Used for the fields and buttons of an integration that live in another program (plan 16).
+    /// </summary>
+    public static readonly ApplicationInstance AnyProcess = new(Guid.Empty, 0);
+}
 
 public enum ApplicationInstanceChangeKind
 {
