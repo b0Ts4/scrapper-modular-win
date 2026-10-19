@@ -43,6 +43,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (string.Equals(variant, "win32-questions", StringComparison.OrdinalIgnoreCase))
+        {
+            Loaded += (_, _) => Win32Form.ShowQuestions();
+            return;
+        }
+
         if (string.Equals(variant, "duplicate-controls", StringComparison.OrdinalIgnoreCase))
         {
             // Deliberately reuses the AutomationId "MedicationTextBox" so tests can

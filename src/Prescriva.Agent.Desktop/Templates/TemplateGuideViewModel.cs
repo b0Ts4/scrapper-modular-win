@@ -36,7 +36,17 @@ public sealed class GuideItem
         Program = item.Program;
         FileSource = item.FileSource;
         Role = item.Role;
+        Observe = item.Observe;
+        UniqueBy = item.UniqueBy;
     }
+
+    /// <summary>What starts a button item: a click, or a window of the program appearing (plan 17).</summary>
+    public TemplateTriggerEvent Observe { get; }
+
+    /// <summary>Fields whose unchanged values keep the button from sending again (plan 17), or none.</summary>
+    public ImmutableArray<string> UniqueBy { get; }
+
+    private bool IsWindow => Observe == TemplateTriggerEvent.WindowShown;
 
     /// <summary>The program of an item that lives outside the integration's main program (plan 16), or null.</summary>
     public TemplateProgram? Program { get; }
@@ -73,12 +83,12 @@ public sealed class GuideItem
     public bool HasSuggestion => Suggested is not null;
 
     public string KindText => Kind == TemplateItemKind.Button
-        ? Role switch
+        ? (IsWindow ? "pergunta que aparece" : "botão") + Role switch
         {
-            TemplateButtonRole.CaptureOnly => "botão (guarda)",
-            TemplateButtonRole.Discard => "botão (descarta)",
-            TemplateButtonRole.SendAndKeep => "botão (envia e mantém)",
-            _ => "botão (envia)",
+            TemplateButtonRole.CaptureOnly => " (guarda)",
+            TemplateButtonRole.Discard => " (descarta)",
+            TemplateButtonRole.SendAndKeep => " (envia e mantém)",
+            _ => " (envia)",
         }
         : FieldKind switch
         {
@@ -213,14 +223,18 @@ public sealed class TemplateGuideViewModel
         }
         else
         {
-            _editor.AddTrigger(item.Id, StageId, selector, "Invoke", ActionsFor(item));
+            _editor.AddTrigger(item.Id, StageId, selector,
+                item.Observe == TemplateTriggerEvent.WindowShown ? TriggerEvents.WindowShown : TriggerEvents.Invoke,
+                ActionsFor(item));
         }
 
         item.Selector = selector;
         item.Status = GuideItemStatus.Marked;
-        item.LastResult = item.Kind == TemplateItemKind.Button
-            ? "Marcado. Clique em 'Testar este item' e depois clique o botão no programa."
-            : "Marcado. Clique em 'Testar este item' para ver o que é lido.";
+        item.LastResult = item.Kind != TemplateItemKind.Button
+            ? "Marcado. Clique em 'Testar este item' para ver o que é lido."
+            : item.Observe == TemplateTriggerEvent.WindowShown
+                ? "Marcado. Clique em 'Testar este item' e faça a pergunta aparecer no programa."
+                : "Marcado. Clique em 'Testar este item' e depois clique o botão no programa.";
         RebuildButtons();
     }
 
@@ -238,6 +252,12 @@ public sealed class TemplateGuideViewModel
         {
             var trigger = RequireConfiguration().Triggers.Single(candidate => candidate.Id == item.Id);
             var clicked = await _waitForClick(trigger, cancellationToken).ConfigureAwait(true);
+            if (item.Observe == TemplateTriggerEvent.WindowShown)
+            {
+                Record(item, clicked, clicked ? "Pergunta detectada." : "A pergunta não apareceu no tempo de espera. Teste de novo e faça-a aparecer no programa.");
+                return;
+            }
+
             Record(item, clicked, clicked ? "Clique detectado." : "Nenhum clique detectado no tempo de espera. Teste de novo e clique o botão no programa.");
             return;
         }
@@ -330,7 +350,9 @@ public sealed class TemplateGuideViewModel
                 item.EmitEvent,
                 item.Program,
                 item.FileSource,
-                item.Role)).ToImmutableArray(),
+                item.Role,
+                item.Observe,
+                item.UniqueBy.IsDefaultOrEmpty ? default : item.UniqueBy.Where(fieldIds.Contains).ToImmutableArray())).ToImmutableArray(),
         };
     }
 
@@ -388,12 +410,18 @@ public sealed class TemplateGuideViewModel
             return marked.Length > 0 ? [new CaptureFieldsAction([.. marked])] : [new TransitionStageAction(StageId)];
         }
 
-        return TriggerActionsBuilder.Build(
+        var actions = TriggerActionsBuilder.Build(
             string.Join(",", marked),
             string.IsNullOrWhiteSpace(button.EmitEvent) ? "item_added" : button.EmitEvent,
             transitionStageId: null,
             clearState: marked.Length > 0 && button.Role != TemplateButtonRole.SendAndKeep,
             TriggerTerminalAction.None);
+
+        // Not sent again while the marked unique-by fields keep the values of its last event.
+        var uniqueBy = button.UniqueBy.IsDefaultOrEmpty ? [] : button.UniqueBy.Where(marked.Contains).ToImmutableArray();
+        return uniqueBy.IsEmpty
+            ? actions
+            : [.. actions.Select(action => action is EmitEventAction emit ? emit with { UniqueBy = uniqueBy } : action)];
     }
 
     private static void Record(GuideItem item, bool passed, string message)

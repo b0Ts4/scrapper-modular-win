@@ -1,7 +1,7 @@
 {
   "id": "formulacerta_receita_completa",
   "name": "FórmulaCerta – Receita completa (anexo + orçamento)",
-  "description": "Uma extração só com tudo da receita: o arquivo original da receita anexada ao pedido (inteiro, mesmo que a atendente veja só uma parte) é guardado quando ela clica em Nova Fórmula ou Novo Produto na janela de anexos; a cada OK no orçamento (uma vez por fórmula), o Agent lê número do orçamento e da fórmula, posologia, quantidade (nº de cápsulas e unidade, quantidade prescrita, potes), prescritor (conselho, UF, CRM e nome) e a imagem da grade de componentes (a fonte dos componentes e quantidades, para a sua IA ler; o texto por OCR vai junto só para conferência) e gera um evento 'receita' por fórmula, cada um com o arquivo da receita junto. Cancelar no orçamento descarta o que foi guardado. Nada na tela é mexido. Teste item por item e ajuste o que precisar.",
+  "description": "Uma extração só com tudo da receita: o arquivo original da receita anexada ao pedido (inteiro, mesmo que a atendente veja só uma parte) é guardado quando ela clica em Nova Fórmula ou Novo Produto na janela de anexos; a cada fórmula gravada no orçamento (quando o FórmulaCerta pergunta 'Mais Fórmula(s)?'), o Agent lê número do orçamento e da fórmula, posologia, quantidade (nº de cápsulas e unidade, quantidade prescrita, potes), prescritor (conselho, UF, CRM e nome) e a imagem da grade de componentes (a fonte dos componentes e quantidades, para a sua IA ler; o texto por OCR vai junto só para conferência) e gera um evento 'receita' por fórmula, cada um com o arquivo da receita junto. Cancelar no orçamento descarta o que foi guardado. Nada na tela é mexido. Teste item por item e ajuste o que precisar.",
   "program": {
     "processIdentity": "FCMobyPharma.exe",
     "windowTitleContains": "MobyPharma",
@@ -189,16 +189,18 @@
       "role": "captureOnly"
     },
     {
-      "id": "ok_orcamento",
+      "id": "mais_formulas",
       "kind": "button",
-      "name": "OK do orçamento (envia cada fórmula)",
-      "help": "O botão OK no alto, à direita, da tela de Orçamentos. A cada clique (uma vez por fórmula: depois do OK o FórmulaCerta pergunta se há mais fórmulas), o Agent lê os campos da fórmula e gera um evento 'receita' com eles e com o arquivo da receita. O arquivo continua guardado para as próximas fórmulas do mesmo orçamento, até o próximo Nova Fórmula/Novo Produto ou Cancelar. Se no teste os campos vierem vazios (o clique já limpou a tela), use outro botão clicado antes de gravar, como Recálculo.",
+      "name": "Pergunta 'Mais Fórmula(s)?' (envia cada fórmula)",
+      "help": "Depois do OK, o FórmulaCerta faz algumas perguntas e, com a fórmula já gravada, pergunta 'Mais Fórmula(s)?' numa janela com o título 'Orçamento <número>'. Quando essa pergunta aparece, o Agent lê os campos da fórmula (ainda na tela, e o número do orçamento já existe) e gera um evento 'receita' com eles e com o arquivo da receita - não precisa clicar nada. O arquivo continua guardado para as próximas fórmulas do mesmo orçamento, até o próximo Nova Fórmula/Novo Produto ou Cancelar. A pergunta final 'Deseja efetuar a inclusão do orçamento?' tem o mesmo título: ela não repete o envio porque o número do orçamento e a série da fórmula são os mesmos. Para testar, grave uma fórmula de teste até essa pergunta aparecer.",
       "required": true,
-      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.805, "y": 0.1783, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronButton[8]" },
+      "suggested": { "processIdentity": "", "windowRule": "", "name": "Orçamento ", "className": "TMessageForm", "frameworkId": "Win32" },
       "capturedFields": [ "posologia", "prescritor_conselho", "prescritor_uf", "prescritor_crm", "prescritor_nome", "quantidade", "quantidade_unidade", "qtd_prescrita", "qtd_potes", "numero_orcamento", "serie_formula", "componentes_imagem", "componentes_ocr" ],
       "emitEvent": "receita",
       "program": { "processIdentity": "FCReceitas.exe", "windowTitleContains": "Orçamentos", "howToOpen": "Abra a tela de Orçamentos." },
-      "role": "sendAndKeep"
+      "role": "sendAndKeep",
+      "observe": "windowShown",
+      "uniqueBy": [ "numero_orcamento", "serie_formula" ]
     },
     {
       "id": "cancelar_orcamento",

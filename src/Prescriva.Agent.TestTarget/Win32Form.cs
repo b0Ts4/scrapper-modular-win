@@ -52,6 +52,40 @@ internal static class Win32Form
         Child(DateClass, DateText, WsChild | WsVisible | WsBorder, 240, 10, 110, 24, panel);
     }
 
+    public const string QuestionClass = "TPrescrivaQuestion";
+
+    /// <summary>The titles shown in turn, one question window at a time (see <see cref="ShowQuestions"/>).</summary>
+    public static readonly string[] QuestionTitles = ["Outro aviso 1", "Orçamento 42"];
+
+    private static IntPtr _question;
+    private static int _nextQuestion;
+
+    /// <summary>
+    /// The form, then a modal-like question window like a Delphi <c>TMessageForm</c>, replaced
+    /// every second, its title taking each of <see cref="QuestionTitles"/> in turn (plan 17).
+    /// Shown with <c>--layout-variant win32-questions</c>.
+    /// </summary>
+    public static void ShowQuestions()
+    {
+        Show();
+        Register(QuestionClass);
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) =>
+        {
+            if (_question != IntPtr.Zero)
+            {
+                DestroyWindow(_question);
+            }
+
+            var title = QuestionTitles[_nextQuestion++ % QuestionTitles.Length];
+            _question = Create(WsExTopmost, QuestionClass, title, WsOverlappedWindow | WsVisible, 480, 40, 260, 120, IntPtr.Zero);
+        };
+        timer.Start();
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyWindow(IntPtr handle);
+
     public const string DateText = "14/07/26";
     private const string DateClass = "TPrescrivaDate";
 

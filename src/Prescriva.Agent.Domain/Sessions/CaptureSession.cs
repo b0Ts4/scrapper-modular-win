@@ -9,7 +9,8 @@ public sealed record CaptureSession(
     long LastSequence,
     ImmutableDictionary<string, string> Values,
     ImmutableArray<ImmutableDictionary<string, string>> ConfirmedItems,
-    ImmutableHashSet<Guid> UsedEventIds)
+    ImmutableHashSet<Guid> UsedEventIds,
+    ImmutableDictionary<string, string>? LastUniqueKeys = null)
 {
     public static CaptureSession Start(Guid id, string stageId) => new(
         id, stageId, SessionState.Active, 0,

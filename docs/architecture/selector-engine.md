@@ -32,6 +32,8 @@ Consequences, each covered by `SelectorMatcherTests`: an `AutomationId` alone is
 
 **Two programs, one integration (plan 16).** The integration's application is its main program (one session per instance). A field or button whose selector names another process is resolved and watched in that process - any running instance - through `ProcessRouting`; its values join the main instance's session, so a button in one program can keep a value (e.g. the prescription file) that a button in the other program sends.
 
+**A window that appears (plan 17).** A trigger with `ObservedEvent = WindowShown` resolves nothing beforehand: it fires when a top-level window of the selector's program appears whose window class equals the selector's `ClassName` and whose title starts with its `Name` (ignoring case) - e.g. FórmulaCerta's "Mais Fórmula(s)?" question, which comes once a formula is saved, while its OK button raises no event the Agent can see. `Win32WindowShownWatcher` listens out of context to `EVENT_OBJECT_SHOW` of the program's process (or of every process with its name) and reads only the class and title of top-level windows. Several questions sharing a title are told apart with `EmitEventAction.UniqueBy` (no event while the listed fields keep the values of the last one).
+
 **Known limits.** Labels are detected only as `LabeledBy` or a preceding sibling `Text` (not labels above a field in a different container); the weights version is not yet stored with each configuration.
 
 **Approvals and weights.** An approval records the `SelectorWeights.Version` it was tested under; when the weights change, existing approvals stop activating until the integration is tested again (approval files written before the version was recorded load as the current version).

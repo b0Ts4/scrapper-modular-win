@@ -375,6 +375,48 @@ public sealed class SessionEngineTests
             original, SessionFailureCode.UnsupportedAction);
     }
 
+    [Fact]
+    public void An_event_unique_by_fields_is_not_sent_again_while_those_values_are_the_same()
+    {
+        var engine = Engine(new("formula_saved", "entry", Selector(), "WindowShown",
+            [new CaptureFieldsAction(["name", "note"]), new EmitEventAction("receita", UniqueBy: ["name"])]));
+
+        var first = engine.Apply(Start(), new("formula_saved", [FirstId]), Values("Formula 0"), Now);
+        var repeated = engine.Apply(first.Session, new("formula_saved", [SecondId]),
+            new Dictionary<string, CapturedFieldValue> { ["name"] = new("Formula 0"), ["note"] = new("changed") }, Now);
+        var next = engine.Apply(repeated.Session, new("formula_saved", [ThirdId]), Values("Formula 1"), Now);
+
+        Assert.Single(first.Events);
+        Assert.Equal(SessionTransitionStatus.Applied, repeated.Status);
+        Assert.Empty(repeated.Events);
+        Assert.Equal("changed", repeated.Session.Values["note"]);
+        Assert.Equal("Formula 1", Assert.Single(next.Events).Payload.Fields["name"]);
+    }
+
+    [Fact]
+    public void Clearing_the_session_forgets_the_last_unique_event()
+    {
+        var engine = Engine(new("formula_saved", "entry", Selector(), "WindowShown",
+            [new CaptureFieldsAction(["name"]), new EmitEventAction("receita", UniqueBy: ["name"])]));
+
+        var first = engine.Apply(Start(), new("formula_saved", [FirstId]), Values("Formula 0"), Now);
+        var cleared = engine.Apply(first.Session, new("clear", []), Values(), Now);
+        var again = engine.Apply(cleared.Session, new("formula_saved", [SecondId]), Values("Formula 0"), Now);
+
+        Assert.Single(again.Events);
+    }
+
+    [Fact]
+    public void An_emit_unique_by_an_unknown_field_is_invalid()
+    {
+        var configuration = new IntegrationConfiguration(1, "unique", "Unique", new("erp.exe", "Budget"),
+            [new("name", "entry", "Name", false, Selector())],
+            [new("entry", "Entry")],
+            [new("ok", "entry", Selector(), "Invoke", [new CaptureFieldsAction(["name"]), new EmitEventAction("receita", UniqueBy: ["missing"])])]);
+
+        Assert.Contains(ConfigurationValidator.Validate(configuration).Errors, error => error.Code == "UNKNOWN_FIELD_REFERENCE");
+    }
+
     private sealed record UnsupportedAction : TriggerActionDefinition;
 
     private static void AssertRejected(SessionTransitionResult result, CaptureSession original, SessionFailureCode code)

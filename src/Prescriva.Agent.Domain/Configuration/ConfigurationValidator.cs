@@ -88,6 +88,10 @@ public static class ConfigurationValidator
                         case EmitEventAction emit when string.IsNullOrWhiteSpace(emit.EventType):
                             Add("INVALID_EVENT_TYPE", path, "Event type is required.");
                             break;
+                        case EmitEventAction { UniqueBy: { IsDefault: false } uniqueBy }:
+                            foreach (var fieldId in uniqueBy)
+                                if (!fields.Contains(fieldId)) Add("UNKNOWN_FIELD_REFERENCE", path, "Unique-by field does not exist.");
+                            break;
                         case null:
                             Add("INVALID_TRIGGER_ACTION", path, "Trigger action is required.");
                             break;

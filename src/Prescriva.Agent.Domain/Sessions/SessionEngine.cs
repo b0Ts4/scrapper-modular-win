@@ -51,8 +51,16 @@ public sealed class SessionEngine
         var current = session;
         var events = ImmutableArray.CreateBuilder<DomainEvent>();
 
-        SessionFailure? Emit(string type)
+        SessionFailure? Emit(string type, ImmutableArray<string>? uniqueBy = null)
         {
+            string? uniqueKey = null;
+            if (uniqueBy is { IsDefaultOrEmpty: false } keyFields)
+            {
+                uniqueKey = string.Join('\u001f', keyFields.Select(field => current.Values.GetValueOrDefault(field) ?? string.Empty));
+                if (current.LastUniqueKeys?.GetValueOrDefault(type) == uniqueKey)
+                    return null;
+            }
+
             foreach (var field in configuration.Fields.Where(field => field.Required))
                 if (!current.Values.TryGetValue(field.Id, out var value) || string.IsNullOrWhiteSpace(value))
                     return new(SessionFailureCode.MissingRequiredField, field.Id);
@@ -71,7 +79,10 @@ public sealed class SessionEngine
             {
                 LastSequence = current.LastSequence + 1,
                 UsedEventIds = current.UsedEventIds.Add(id),
-                ConfirmedItems = type == "item_added" ? current.ConfirmedItems.Add(current.Values) : current.ConfirmedItems
+                ConfirmedItems = type == "item_added" ? current.ConfirmedItems.Add(current.Values) : current.ConfirmedItems,
+                LastUniqueKeys = uniqueKey is null
+                    ? current.LastUniqueKeys
+                    : (current.LastUniqueKeys ?? ImmutableDictionary<string, string>.Empty).SetItem(type, uniqueKey)
             };
             events.Add(new(id, configuration.Id, configuration.SchemaVersion, session.Id,
                 current.LastSequence, now, type, new(current.Values, current.ConfirmedItems), revision));
@@ -106,7 +117,7 @@ public sealed class SessionEngine
                     current = current with { CurrentStageId = transition.StageId };
                     break;
                 case EmitEventAction emit:
-                    if (Emit(emit.EventType) is { } emitFailure)
+                    if (Emit(emit.EventType, emit.UniqueBy) is { } emitFailure)
                         return Reject(emitFailure);
                     break;
                 case ClearStateAction:
@@ -134,6 +145,7 @@ public sealed class SessionEngine
     private static CaptureSession Clear(CaptureSession session) => session with
     {
         Values = ImmutableDictionary<string, string>.Empty,
-        ConfirmedItems = []
+        ConfirmedItems = [],
+        LastUniqueKeys = null
     };
 }

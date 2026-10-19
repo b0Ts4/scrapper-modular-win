@@ -62,8 +62,11 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
         _sessionId = sessionId;
         _timeout = timeout ?? DefaultTimeout;
         _livenessPollInterval = livenessPollInterval ?? DefaultLivenessPollInterval;
+        _processId = processId;
         _resolver = new UiAutomationSelectorResolver(dispatcher, processId: processId);
     }
+
+    private readonly int? _processId;
 
     /// <inheritdoc />
     public event EventHandler<string>? WatchEstablished;
@@ -74,15 +77,25 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
     {
         ArgumentNullException.ThrowIfNull(trigger);
 
-        // Only "Invoke" is understood today (buttons via InvokePattern). Any other
+        if (string.Equals(trigger.ObservedEvent, TriggerEvents.WindowShown, StringComparison.OrdinalIgnoreCase))
+        {
+            await foreach (var shown in WatchWindowShownAsync(trigger, cancellationToken).ConfigureAwait(false))
+            {
+                yield return shown;
+            }
+
+            yield break;
+        }
+
+        // Otherwise only "Invoke" is understood (buttons via InvokePattern). Any other
         // configured event is a configuration problem this provider cannot act on -
         // surfacing it immediately, rather than silently watching nothing, matches how
         // ConfigurationValidator already requires ObservedEvent to be non-empty.
-        if (!string.Equals(trigger.ObservedEvent, "Invoke", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(trigger.ObservedEvent, TriggerEvents.Invoke, StringComparison.OrdinalIgnoreCase))
         {
             throw new NotSupportedException(
                 $"Observed event '{trigger.ObservedEvent}' on trigger '{trigger.Id}' is not supported by " +
-                $"{nameof(UiAutomationTriggerProvider)}. Only 'Invoke' is currently supported.");
+                $"{nameof(UiAutomationTriggerProvider)}. Only '{TriggerEvents.Invoke}' and '{TriggerEvents.WindowShown}' are supported.");
         }
 
         var resolution = await _resolver.ResolveAsync(trigger.Selector, cancellationToken).ConfigureAwait(false);
@@ -192,6 +205,37 @@ public sealed class UiAutomationTriggerProvider : ITriggerProvider, IDisposable
                     _timeout,
                     CancellationToken.None).ConfigureAwait(false);
             }
+        }
+    }
+
+    /// <summary>
+    /// A window that appears (plan 17): nothing exists to resolve beforehand, so the program's
+    /// window-show events are watched for a top-level window of the selector's class whose title
+    /// starts with the selector's name, until the watch is cancelled.
+    /// </summary>
+    private async IAsyncEnumerable<TriggerSignal> WatchWindowShownAsync(
+        TriggerDefinition trigger,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(trigger.Selector.ClassName) || string.IsNullOrWhiteSpace(trigger.Selector.Name))
+        {
+            throw new ElementInspectionFailure(
+                ElementInspectionFailureKind.ElementUnavailable,
+                $"Trigger '{trigger.Id}' watches a window that appears but does not say its window class and the start of its title.");
+        }
+
+        var channel = Channel.CreateUnbounded<TriggerSignal>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        using var watcher = new Win32WindowShownWatcher(
+            trigger.Selector.ProcessIdentity,
+            _processId,
+            trigger.Selector.ClassName,
+            trigger.Selector.Name,
+            () => channel.Writer.TryWrite(new TriggerSignal(_sessionId, trigger.Id, DateTimeOffset.UtcNow)));
+        WatchEstablished?.Invoke(this, trigger.Id);
+
+        await foreach (var signal in channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return signal;
         }
     }
 

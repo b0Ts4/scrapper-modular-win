@@ -8,7 +8,12 @@ public sealed record CaptureFieldsAction(ImmutableArray<string> FieldIds) : Trig
 
 public sealed record TransitionStageAction(string StageId) : TriggerActionDefinition;
 
-public sealed record EmitEventAction(string EventType) : TriggerActionDefinition;
+/// <summary>
+/// Emits an event. With <see cref="UniqueBy"/>, no event is emitted while those fields hold the
+/// same values as in the last event of this type in the session (e.g. one event per formula of a
+/// quote, however many times the program asks its questions).
+/// </summary>
+public sealed record EmitEventAction(string EventType, ImmutableArray<string>? UniqueBy = null) : TriggerActionDefinition;
 
 public sealed record ClearStateAction : TriggerActionDefinition;
 

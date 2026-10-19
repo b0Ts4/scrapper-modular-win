@@ -126,15 +126,18 @@
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" }
     },
     {
-      "id": "ok",
+      "id": "mais_formulas",
       "kind": "button",
-      "name": "Botão OK (confirma o orçamento)",
-      "help": "O botão OK no alto, à direita. Quando ele é clicado o Agent lê os campos acima. Se no teste os valores vierem vazios (a tela já foi limpa pelo clique), escolha outro botão que a pessoa clica antes de gravar, como Recálculo.",
+      "name": "Pergunta 'Mais Fórmula(s)?' (fórmula gravada)",
+      "help": "Depois do OK, o FórmulaCerta faz algumas perguntas e, com a fórmula já gravada, pergunta 'Mais Fórmula(s)?' numa janela com o título 'Orçamento <número>'. Quando essa pergunta aparece, o Agent lê os campos da fórmula (ainda na tela, e o número do orçamento já existe) e envia um evento por fórmula - não precisa clicar nada. A pergunta final 'Deseja efetuar a inclusão do orçamento?' tem o mesmo título: ela não repete o envio porque o número do orçamento e a série da fórmula são os mesmos. Para testar, grave uma fórmula de teste até essa pergunta aparecer.",
       "fieldKind": "text",
       "required": true,
-      "suggested": { "processIdentity": "", "windowRule": "", "className": "TFagronButton", "frameworkId": "Win32", "relativeBounds": { "x": 0.805, "y": 0.1783, "width": 0.1734, "height": 0.0483 }, "windowPath": "TFagronButton[8]" },
+      "suggested": { "processIdentity": "", "windowRule": "", "name": "Orçamento ", "className": "TMessageForm", "frameworkId": "Win32" },
       "capturedFields": null,
-      "emitEvent": "orcamento_lido"
+      "emitEvent": "orcamento_lido",
+      "role": "sendAndKeep",
+      "observe": "windowShown",
+      "uniqueBy": [ "numero_orcamento", "serie_formula" ]
     }
   ]
 }

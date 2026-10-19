@@ -254,6 +254,39 @@ public sealed class TemplateGuideViewModelTests
     }
 
     [Fact]
+    public void A_question_that_appears_becomes_a_window_trigger_sending_each_formula_once()
+    {
+        var program = IntegrationTemplateTests.Sample().Program;
+        var template = new IntegrationTemplate("orcamento", "Orçamento", "x", program,
+        [
+            new TemplateItem("numero", TemplateItemKind.Field, "Número", "x", Required: false,
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TwwDBEdit", WindowPath: "TFagronGroupBox[1]/TwwDBEdit[1]")),
+            new TemplateItem("mais_formulas", TemplateItemKind.Button, "Pergunta 'Mais Fórmula(s)?'", "x",
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, Name: "Orçamento ", ClassName: "TMessageForm", FrameworkId: "Win32"),
+                EmitEvent: "receita", Role: TemplateButtonRole.SendAndKeep,
+                Observe: TemplateTriggerEvent.WindowShown, UniqueBy: ["numero"]),
+        ]);
+        var editor = new IntegrationEditorViewModel(new FakeStore(), _resolver, _capture);
+        var guide = new TemplateGuideViewModel(editor, (_, _) => Task.FromResult(_clickSeen));
+        guide.Start(template, Program, "orcamento_teste");
+
+        guide.UseSuggestion("numero");
+        guide.UseSuggestion("mais_formulas");
+
+        var trigger = editor.Configuration!.Triggers.Single();
+        Assert.Equal(TriggerEvents.WindowShown, trigger.ObservedEvent);
+        Assert.Equal("TMessageForm", trigger.Selector.ClassName);
+        Assert.Equal("Orçamento ", trigger.Selector.Name);
+        var emit = Assert.IsType<EmitEventAction>(trigger.Actions[1]);
+        Assert.Equal(["numero"], emit.UniqueBy!.Value.ToArray());
+        Assert.Equal(2, trigger.Actions.Length);
+        Assert.Equal("pergunta que aparece (envia e mantém)", guide.Item("mais_formulas").KindText);
+        var saved = guide.ToTemplate("meu", "Meu").Items.Single(item => item.Id == "mais_formulas");
+        Assert.Equal(TemplateTriggerEvent.WindowShown, saved.Observe);
+        Assert.Equal(["numero"], saved.UniqueBy.ToArray());
+    }
+
+    [Fact]
     public void A_send_and_keep_button_sends_each_formula_and_keeps_the_prescription_file_for_the_next()
     {
         var (guide, editor) = StartTwoPrograms(okRole: TemplateButtonRole.SendAndKeep);

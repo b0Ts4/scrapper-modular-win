@@ -61,6 +61,20 @@ public enum TemplateButtonRole
     SendAndKeep,
 }
 
+/// <summary>What starts a button item (plan 17).</summary>
+public enum TemplateTriggerEvent
+{
+    /// <summary>The button is clicked (the default).</summary>
+    Click,
+
+    /// <summary>
+    /// A window of the program appears - its suggested position gives the window class
+    /// (<see cref="ElementFingerprint.ClassName"/>) and the start of its title
+    /// (<see cref="ElementFingerprint.Name"/>), e.g. FórmulaCerta's "Mais Fórmula(s)?" question.
+    /// </summary>
+    WindowShown,
+}
+
 /// <summary>
 /// One checklist entry. <see cref="Help"/> says what it is and where to find it.
 /// <see cref="Suggested"/> is a position to try first (its process and window are replaced by
@@ -68,6 +82,8 @@ public enum TemplateButtonRole
 /// program); without it the person marks the item. A button reads <see cref="CapturedFields"/>,
 /// or every field when none are listed, and acts according to its <see cref="Role"/>. A
 /// <see cref="FieldKind.RecentFile"/> field says where its file is found in <see cref="FileSource"/>.
+/// A button is started as said by <see cref="Observe"/>; with <see cref="UniqueBy"/> it does not
+/// send again while those fields keep the values of its last event.
 /// </summary>
 public sealed record TemplateItem(
     string Id,
@@ -81,7 +97,9 @@ public sealed record TemplateItem(
     string? EmitEvent = "item_added",
     TemplateProgram? Program = null,
     FileSource? FileSource = null,
-    TemplateButtonRole Role = TemplateButtonRole.CaptureAndSend)
+    TemplateButtonRole Role = TemplateButtonRole.CaptureAndSend,
+    TemplateTriggerEvent Observe = TemplateTriggerEvent.Click,
+    ImmutableArray<string> UniqueBy = default)
 {
     /// <summary>The suggested position aimed at <paramref name="application"/>, or null when there is none.</summary>
     public ElementFingerprint? SuggestionFor(ApplicationDefinition application)
@@ -154,6 +172,20 @@ public static class TemplateValidator
             foreach (var missing in button.CapturedFields.Where(id => !fieldIds.Contains(id)))
             {
                 errors.Add($"O botão '{button.Id}' lê o campo '{missing}', que não está no modelo.");
+            }
+        }
+
+        foreach (var button in template.Items.Where(item => item?.Kind == TemplateItemKind.Button))
+        {
+            foreach (var missing in (button.UniqueBy.IsDefault ? ImmutableArray<string>.Empty : button.UniqueBy).Where(id => !fieldIds.Contains(id)))
+            {
+                errors.Add($"O botão '{button.Id}' não repete o envio pelo campo '{missing}', que não está no modelo.");
+            }
+
+            if (button.Observe == TemplateTriggerEvent.WindowShown &&
+                (string.IsNullOrWhiteSpace(button.Suggested?.ClassName) || string.IsNullOrWhiteSpace(button.Suggested?.Name)))
+            {
+                errors.Add($"O item '{button.Id}' espera uma janela aparecer e precisa dizer a classe da janela e o começo do título.");
             }
         }
 

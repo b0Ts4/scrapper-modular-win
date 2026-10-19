@@ -87,6 +87,24 @@ public sealed class JsonTemplateStoreTests : IDisposable
         Assert.All(listed, entry => Assert.Empty(TemplateValidator.Validate(entry.Template)));
     }
 
+    /// <summary>FórmulaCerta's Orçamentos OK is not a detectable click (plan 17): the shipped quote templates send on the "Mais Fórmula(s)?" question, once per formula.</summary>
+    [Theory]
+    [InlineData("formulacerta_orcamento")]
+    [InlineData("formulacerta_receita_completa")]
+    public async Task The_shipped_quote_templates_send_when_the_more_formulas_question_appears(string id)
+    {
+        var shipped = Path.Combine(RepositoryRoot(), "src", "Prescriva.Agent.Desktop", "Templates");
+        var listed = await new JsonTemplateStore(shipped, Own).ListAsync(CancellationToken.None);
+
+        var question = listed.Single(entry => entry.Template.Id == id).Template.Items.Single(item => item.Id == "mais_formulas");
+
+        Assert.Equal(TemplateTriggerEvent.WindowShown, question.Observe);
+        Assert.Equal("TMessageForm", question.Suggested!.ClassName);
+        Assert.Equal("Orçamento ", question.Suggested.Name);
+        Assert.Equal(TemplateButtonRole.SendAndKeep, question.Role);
+        Assert.Equal(["numero_orcamento", "serie_formula"], question.UniqueBy.ToArray());
+    }
+
     private static IntegrationTemplate Template(string id, string name) => new(
         id,
         name,

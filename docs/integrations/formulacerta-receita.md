@@ -16,7 +16,7 @@ Applies to the shipped templates *FórmulaCerta – Receita completa*, *Orçamen
 
 ## One event per formula
 
-A quote can have several formulas: after *OK* FórmulaCerta asks whether there are more formulas, then closes the screen. In *Receita completa* the *OK* button has the role *send and keep*: each *OK* sends one `receita` event for that formula and keeps the prescription file, so every formula of the quote carries it. The file is replaced on the next *Nova Fórmula*/*Novo Produto* and thrown away on *Cancelar*. Group the events by `numero_orcamento`. Caveat: a quote started without *Nova Fórmula*/*Novo Produto* (e.g. from the Receitas screen) would carry the last kept file - check that the file matches the quote.
+A quote can have several formulas: after *OK* FórmulaCerta asks a few questions and, with the formula saved, "Mais Fórmula(s)?", then at the end "Deseja efetuar a inclusão do orçamento?" (same window title). The *OK* click itself cannot be seen by the Agent, so the templates send when "Mais Fórmula(s)?" appears (role *send and keep*, unique by `numero_orcamento` + `serie_formula`): one `receita` event per formula, never two for the same formula, each keeping the prescription file. The file is replaced on the next *Nova Fórmula*/*Novo Produto* and thrown away on *Cancelar*. Group the events by `numero_orcamento`. Caveat: a quote started without *Nova Fórmula*/*Novo Produto* (e.g. from the Receitas screen) would carry the last kept file - check that the file matches the quote.
 
 ## Why the image is the source
 
