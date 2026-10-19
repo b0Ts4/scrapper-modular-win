@@ -525,7 +525,10 @@ public partial class MainWindow : Window
                     TriggerEmitEventBox.Text,
                     TriggerTransitionStageBox.Text,
                     TriggerClearStateBox.IsChecked == true,
-                    (TriggerTerminalAction)Math.Max(0, TriggerTerminalBox.SelectedIndex))),
+                    (TriggerTerminalAction)Math.Max(0, TriggerTerminalBox.SelectedIndex),
+                    // Not edited here: the "not sent again" fields of a template's trigger are kept.
+                    _editorViewModel.Configuration?.Triggers.FirstOrDefault(trigger => trigger.Id == TriggerSemanticIdBox.Text.Trim())?
+                        .Actions.OfType<EmitEventAction>().FirstOrDefault()?.UniqueBy)),
             $"Ações do gatilho '{TriggerSemanticIdBox.Text.Trim()}' substituídas.");
 
     private void RemoveTriggerButton_Click(object sender, RoutedEventArgs e) =>
@@ -679,7 +682,8 @@ public partial class MainWindow : Window
             ProcessRouting.Resolver(mainProcess, _runtimeFactories.CreateSelectorResolver, instance),
             _runtimeFactories.CreateCaptureProvider(instance),
             ProcessRouting.Triggers(mainProcess, _runtimeFactories.CreateTriggerProvider, instance, Guid.NewGuid()),
-            triggerTimeout: TimeSpan.FromSeconds(15));
+            triggerTimeout: TimeSpan.FromSeconds(15),
+            windowShownTimeout: TimeSpan.FromMinutes(3));
         _testModeViewModel = new TestModeViewModel(runner, Dispatcher, approvals: _approvalService);
         TestModeHost.Attach(_testModeViewModel, configuration);
         TestModeHost.Approved -= OnTestApproved;

@@ -41,7 +41,13 @@ public enum RuntimeDiagnosticCode
     /// session ends. Occurrences while it is failing are not observed; the session's other
     /// triggers keep running.
     /// </summary>
-    TriggerWatchFailed
+    TriggerWatchFailed,
+
+    /// <summary>
+    /// An event was not emitted because its unique-by fields kept the values of the last such
+    /// event in the session (plan 17: e.g. a second question for the same formula).
+    /// </summary>
+    EventSuppressed
 }
 
 /// <summary>

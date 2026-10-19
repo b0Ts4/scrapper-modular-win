@@ -297,6 +297,34 @@ public sealed class IntegrationTestRunnerTests
         Assert.Null(report.ToApproval(DateTimeOffset.UtcNow));
     }
 
+    /// <summary>
+    /// A question window (plan 17) only appears after the person goes through the program's own
+    /// steps, so test mode waits longer for it than for a click.
+    /// </summary>
+    [Fact]
+    public async Task A_trigger_on_a_window_that_appears_is_waited_for_longer_than_a_click()
+    {
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, "Dipirona", "uia", 0.9, TimeSpan.Zero, []),
+        });
+        var triggerProvider = new FakeTriggerProvider();
+        var configuration = BuildConfiguration();
+        configuration = configuration with { Triggers = [configuration.Triggers[0] with { ObservedEvent = TriggerEvents.WindowShown }] };
+
+        var runner = new IntegrationTestRunner(resolver, captureProvider, triggerProvider,
+            triggerTimeout: TimeSpan.FromMilliseconds(50), windowShownTimeout: TimeSpan.FromSeconds(5));
+        var run = runner.RunAsync(configuration);
+        await Task.Delay(300);
+        triggerProvider.FireOnce(TriggerId);
+
+        Assert.Equal(TriggerCheckOutcome.Detected, Assert.Single((await run).TriggerResults).Outcome);
+    }
+
     [Fact]
     public void Editing_the_configuration_after_approval_invalidates_that_approval()
     {

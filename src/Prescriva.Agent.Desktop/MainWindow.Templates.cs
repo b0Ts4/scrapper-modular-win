@@ -28,6 +28,13 @@ public partial class MainWindow
 {
     private static readonly TimeSpan ClickWait = TimeSpan.FromSeconds(20);
 
+    // A question window (plan 17) comes after the person goes through the program's own steps
+    // (FórmulaCerta: about eight confirmations before "Mais Fórmula(s)?").
+    private static readonly TimeSpan WindowWait = TimeSpan.FromMinutes(3);
+
+    private static TimeSpan WaitFor(TriggerDefinition trigger) =>
+        trigger.ObservedEvent == TriggerEvents.WindowShown ? WindowWait : ClickWait;
+
     private JsonTemplateStore? _templateStore;
     private TemplateGuideViewModel? _guide;
     private IReadOnlyList<StoredTemplate> _templates = [];
@@ -245,7 +252,9 @@ public partial class MainWindow
         {
             if (item.Kind == Application.Templates.TemplateItemKind.Button && item.Selector is not null)
             {
-                GuideItemResultText.Text = $"Agora clique '{item.Name}' no programa ({ClickWait.TotalSeconds:0} segundos)...";
+                GuideItemResultText.Text = item.Observe == Application.Templates.TemplateTriggerEvent.WindowShown
+                    ? $"Agora faça aparecer '{item.Name}' no programa (até {WindowWait.TotalMinutes:0} minutos)..."
+                    : $"Agora clique '{item.Name}' no programa ({ClickWait.TotalSeconds:0} segundos)...";
                 SetStatus(GuideItemResultText.Text);
             }
 
@@ -369,7 +378,7 @@ public partial class MainWindow
         var provider = ProcessRouting.Triggers(application!.ProcessIdentity, _runtimeFactories.CreateTriggerProvider,
             new ApplicationInstance(Guid.NewGuid(), processIds[0]), Guid.NewGuid());
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        wait.CancelAfter(ClickWait);
+        wait.CancelAfter(WaitFor(trigger));
         try
         {
             await foreach (var _ in provider.WatchAsync(trigger, wait.Token))

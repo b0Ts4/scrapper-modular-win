@@ -64,6 +64,9 @@ public static class ConfigurationValidator
                 if (!stages.Contains(trigger.StageId)) Add("UNKNOWN_STAGE_REFERENCE", $"triggers[{i}].stageId", "Trigger stage does not exist.");
                 if (string.IsNullOrWhiteSpace(trigger.ObservedEvent)) Add("INVALID_OBSERVED_EVENT", $"triggers[{i}].observedEvent", "Observed event is required.");
                 ValidateSelector(trigger.Selector, $"triggers[{i}].selector", Add);
+                if (string.Equals(trigger.ObservedEvent, TriggerEvents.WindowShown, StringComparison.OrdinalIgnoreCase) &&
+                    (string.IsNullOrWhiteSpace(trigger.Selector?.ClassName) || string.IsNullOrWhiteSpace(trigger.Selector?.Name)))
+                    Add("INVALID_WINDOW_TRIGGER", $"triggers[{i}].selector", "A window trigger needs the window class and the start of its title.");
                 if (trigger.Actions.IsDefaultOrEmpty)
                 {
                     Add("MISSING_TRIGGER_ACTIONS", $"triggers[{i}].actions", "Trigger must have at least one action.");

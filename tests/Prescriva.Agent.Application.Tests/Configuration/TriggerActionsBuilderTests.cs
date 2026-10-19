@@ -27,6 +27,16 @@ public sealed class TriggerActionsBuilderTests
             action => Assert.Equal("item_added", Assert.IsType<EmitEventAction>(action).EventType));
     }
 
+    /// <summary>Editing a trigger by hand keeps its "not sent again" fields (plan 17).</summary>
+    [Fact]
+    public void The_emitted_event_keeps_its_unique_by_fields()
+    {
+        var actions = TriggerActionsBuilder.Build("numero,serie", "receita", "", clearState: false, TriggerTerminalAction.None,
+            uniqueBy: ["numero", "serie"]);
+
+        Assert.Equal(["numero", "serie"], actions.OfType<EmitEventAction>().Single().UniqueBy!.Value.ToArray());
+    }
+
     [Fact]
     public void Finish_button_with_nothing_else_is_a_single_finish_action()
     {

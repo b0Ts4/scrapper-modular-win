@@ -28,7 +28,8 @@ public static class TriggerActionsBuilder
         string? emitEventType,
         string? transitionStageId,
         bool clearState,
-        TriggerTerminalAction terminal)
+        TriggerTerminalAction terminal,
+        ImmutableArray<string>? uniqueBy = null)
     {
         var actions = ImmutableArray.CreateBuilder<TriggerActionDefinition>();
 
@@ -43,7 +44,7 @@ public static class TriggerActionsBuilder
 
         if (!string.IsNullOrWhiteSpace(emitEventType))
         {
-            actions.Add(new EmitEventAction(emitEventType.Trim()));
+            actions.Add(new EmitEventAction(emitEventType.Trim(), uniqueBy is { IsDefaultOrEmpty: false } ? uniqueBy : null));
         }
 
         if (clearState)

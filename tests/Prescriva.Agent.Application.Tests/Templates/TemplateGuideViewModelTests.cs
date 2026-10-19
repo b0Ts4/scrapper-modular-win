@@ -286,6 +286,57 @@ public sealed class TemplateGuideViewModelTests
         Assert.Equal(["numero"], saved.UniqueBy.ToArray());
     }
 
+    /// <summary>
+    /// A key with one of its fields skipped would tell fewer events apart (every formula of a
+    /// quote by its number alone): then nothing is left out - each question sends.
+    /// </summary>
+    [Fact]
+    public void Skipping_a_field_of_the_unique_key_sends_every_time_instead_of_narrowing_the_key()
+    {
+        var (guide, editor) = StartQuestion();
+        guide.UseSuggestion("numero");
+        guide.UseSuggestion("serie");
+        guide.UseSuggestion("mais_formulas");
+
+        guide.Skip("serie");
+
+        var emit = editor.Configuration!.Triggers.Single().Actions.OfType<EmitEventAction>().Single();
+        Assert.Null(emit.UniqueBy);
+    }
+
+    /// <summary>A question marked by hand (its window or a button in it) keeps the suggested window class and title start.</summary>
+    [Fact]
+    public void A_question_marked_by_hand_keeps_the_window_class_and_title_start_of_its_suggestion()
+    {
+        var (guide, editor) = StartQuestion();
+
+        guide.Mark("mais_formulas", Selector("TMessageForm[0]/TButton[0]") with { ClassName = "TButton", Name = "Sim" });
+
+        var trigger = editor.Configuration!.Triggers.Single();
+        Assert.Equal("TMessageForm", trigger.Selector.ClassName);
+        Assert.Equal("Orçamento ", trigger.Selector.Name);
+        Assert.Null(trigger.Selector.WindowPath);
+    }
+
+    private (TemplateGuideViewModel Guide, IntegrationEditorViewModel Editor) StartQuestion()
+    {
+        var template = new IntegrationTemplate("orcamento", "Orçamento", "x", IntegrationTemplateTests.Sample().Program,
+        [
+            new TemplateItem("numero", TemplateItemKind.Field, "Número", "x", Required: false,
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TwwDBEdit", WindowPath: "TFagronGroupBox[1]/TwwDBEdit[1]")),
+            new TemplateItem("serie", TemplateItemKind.Field, "Série", "x", Required: false,
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TwwDBEdit", WindowPath: "TFagronGroupBox[1]/TwwDBEdit[0]")),
+            new TemplateItem("mais_formulas", TemplateItemKind.Button, "Pergunta", "x",
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, Name: "Orçamento ", ClassName: "TMessageForm", FrameworkId: "Win32"),
+                EmitEvent: "receita", Role: TemplateButtonRole.SendAndKeep,
+                Observe: TemplateTriggerEvent.WindowShown, UniqueBy: ["numero", "serie"]),
+        ]);
+        var editor = new IntegrationEditorViewModel(new FakeStore(), _resolver, _capture);
+        var guide = new TemplateGuideViewModel(editor, (_, _) => Task.FromResult(_clickSeen));
+        guide.Start(template, Program, "orcamento_teste");
+        return (guide, editor);
+    }
+
     [Fact]
     public void A_send_and_keep_button_sends_each_formula_and_keeps_the_prescription_file_for_the_next()
     {

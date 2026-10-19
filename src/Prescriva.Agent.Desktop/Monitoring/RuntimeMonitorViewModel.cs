@@ -396,6 +396,8 @@ public sealed class RuntimeMonitorViewModel : INotifyPropertyChanged
             $"Gatilho '{diagnostic.TriggerId}' rejeitado: {DescribeFailure(diagnostic.FailureCode, diagnostic.FieldId)} Nenhum evento foi gerado.",
         RuntimeDiagnosticCode.SessionIgnored =>
             $"Gatilho '{diagnostic.TriggerId}' ignorado: não pertence à etapa atual da sessão.",
+        RuntimeDiagnosticCode.EventSuppressed =>
+            $"Evento '{diagnostic.EventType}' não repetido (gatilho '{diagnostic.TriggerId}'): os campos que o identificam são os mesmos do último envio.",
         RuntimeDiagnosticCode.SelectorFallback =>
             $"Campo '{diagnostic.FieldId}' encontrado com confiança baixa ({diagnostic.Confidence:P0}). Revise o seletor.",
         RuntimeDiagnosticCode.SessionClosed =>

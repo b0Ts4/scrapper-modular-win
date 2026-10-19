@@ -50,15 +50,21 @@ public sealed class SessionEngine
 
         var current = session;
         var events = ImmutableArray.CreateBuilder<DomainEvent>();
+        var suppressed = ImmutableArray.CreateBuilder<string>();
 
         SessionFailure? Emit(string type, ImmutableArray<string>? uniqueBy = null)
         {
+            // Only a complete key tells two events apart: with a blank key value the event is always sent.
             string? uniqueKey = null;
-            if (uniqueBy is { IsDefaultOrEmpty: false } keyFields)
+            if (uniqueBy is { IsDefaultOrEmpty: false } keyFields &&
+                keyFields.All(field => !string.IsNullOrWhiteSpace(current.Values.GetValueOrDefault(field))))
             {
-                uniqueKey = string.Join('\u001f', keyFields.Select(field => current.Values.GetValueOrDefault(field) ?? string.Empty));
+                uniqueKey = string.Join('\u001f', keyFields.Select(field => current.Values[field]));
                 if (current.LastUniqueKeys?.GetValueOrDefault(type) == uniqueKey)
+                {
+                    suppressed.Add(type);
                     return null;
+                }
             }
 
             foreach (var field in configuration.Fields.Where(field => field.Required))
@@ -139,7 +145,7 @@ public sealed class SessionEngine
                 break;
         }
 
-        return new(current, events.ToImmutable(), [], SessionTransitionStatus.Applied);
+        return new(current, events.ToImmutable(), [], SessionTransitionStatus.Applied, suppressed.ToImmutable());
     }
 
     private static CaptureSession Clear(CaptureSession session) => session with

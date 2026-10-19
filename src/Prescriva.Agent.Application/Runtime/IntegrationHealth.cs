@@ -90,6 +90,7 @@ public sealed class IntegrationHealthTracker
 
             case RuntimeDiagnosticCode.SessionRejected:
             case RuntimeDiagnosticCode.SessionIgnored:
+            case RuntimeDiagnosticCode.EventSuppressed:
                 ClearOccurrence(diagnostic.TriggerId);
                 break;
 

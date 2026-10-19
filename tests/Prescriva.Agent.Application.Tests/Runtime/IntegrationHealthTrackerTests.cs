@@ -43,6 +43,19 @@ public sealed class IntegrationHealthTrackerTests
         Assert.Equal(IntegrationHealthState.Healthy, tracker.Current.State);
     }
 
+    /// <summary>An occurrence whose event was not repeated (plan 17) ends like any other: its weak match does not linger.</summary>
+    [Fact]
+    public void An_occurrence_whose_event_was_not_repeated_ends_and_a_clean_capture_heals()
+    {
+        var tracker = new IntegrationHealthTracker(Configuration());
+
+        tracker.Apply(Diagnostic(RuntimeDiagnosticCode.SelectorFallback, fieldId: "notes", confidence: 0.6));
+        tracker.Apply(Diagnostic(RuntimeDiagnosticCode.EventSuppressed, triggerId: "add_item", eventType: "item_added"));
+        tracker.Apply(Diagnostic(RuntimeDiagnosticCode.EventPersisted, triggerId: "add_item", eventType: "item_added"));
+
+        Assert.Equal(IntegrationHealthState.Healthy, tracker.Current.State);
+    }
+
     [Fact]
     public void A_trigger_that_cannot_be_watched_breaks_the_integration_until_it_is_watched_again()
     {

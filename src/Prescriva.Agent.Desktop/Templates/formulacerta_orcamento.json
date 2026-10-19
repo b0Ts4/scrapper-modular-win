@@ -1,7 +1,7 @@
 {
   "id": "formulacerta_orcamento",
   "name": "FórmulaCerta – Orçamento de fórmula",
-  "description": "Lê, na tela de Orçamentos do FórmulaCerta 6, a posologia, o prescritor (conselho, UF, número do registro e nome) e os componentes da fórmula com suas quantidades, quando o botão OK é clicado. Cada item traz uma posição sugerida: use-a, teste e, se não servir, marque o campo você mesmo. Tudo pode ser renomeado, removido ou acrescentado.",
+  "description": "Lê, na tela de Orçamentos do FórmulaCerta 6, o número do orçamento e da fórmula, a posologia, a quantidade (nº de cápsulas e unidade, quantidade prescrita, potes), o prescritor (conselho, UF, número do registro e nome) e a imagem da grade de componentes, a cada fórmula gravada - quando o FórmulaCerta pergunta 'Mais Fórmula(s)?' -, um evento por fórmula. Cada item traz uma posição sugerida: use-a, teste e, se não servir, marque o campo você mesmo. Tudo pode ser renomeado, removido ou acrescentado.",
   "program": {
     "processIdentity": "FCReceitas.exe",
     "windowTitleContains": "Orçamentos",

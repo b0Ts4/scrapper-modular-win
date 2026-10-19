@@ -51,6 +51,24 @@ public sealed class WindowShownTriggerTests
         Assert.Null(await byClass);
     }
 
+    /// <summary>An item of the main program is watched in that program's process only (the session's instance).</summary>
+    [Fact]
+    public async Task Scoped_to_a_process_the_trigger_fires_for_its_questions_and_not_for_another_process()
+    {
+        using var target = TestTargetLauncher.Launch("win32-questions");
+        using var dispatcher = new AutomationDispatcher();
+        using var scoped = new UiAutomationTriggerProvider(dispatcher, Guid.NewGuid(), processId: target.Window.Current.ProcessId);
+        using var elsewhere = new UiAutomationTriggerProvider(dispatcher, Guid.NewGuid(), processId: Environment.ProcessId);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var otherCts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+
+        var inOther = FirstSignalAsync(elsewhere, Question("Orçamento "), otherCts.Token);
+        var inTarget = await FirstSignalAsync(scoped, Question("Orçamento "), cts.Token);
+
+        Assert.NotNull(inTarget);
+        Assert.Null(await inOther);
+    }
+
     private static TriggerDefinition Question(string titleStart) => new(
         "mais_formulas",
         "principal",

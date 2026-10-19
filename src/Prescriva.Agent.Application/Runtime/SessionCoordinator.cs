@@ -327,6 +327,27 @@ public sealed class SessionCoordinator
                             EventType: domainEvent.Type));
                     }
 
+                    foreach (var suppressedType in result.SuppressedEventTypes)
+                    {
+                        _log.Log(new TechnicalLogEntry(
+                            TechnicalLogLevel.Info,
+                            nameof(RuntimeDiagnosticCode.EventSuppressed),
+                            $"Event '{suppressedType}' was not sent again: its unique-by fields did not change.",
+                            now,
+                            SessionId: _session.Id,
+                            TriggerId: trigger.Id,
+                            Elapsed: elapsed.Elapsed));
+
+                        Publish(new RuntimeDiagnostic(
+                            RuntimeDiagnosticCode.EventSuppressed,
+                            RuntimeDiagnosticSeverity.Info,
+                            _session.Id,
+                            now,
+                            elapsed.Elapsed,
+                            TriggerId: trigger.Id,
+                            EventType: suppressedType));
+                    }
+
                     break;
 
                 case SessionTransitionStatus.Rejected:

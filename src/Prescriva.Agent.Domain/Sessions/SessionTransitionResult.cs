@@ -33,4 +33,9 @@ public sealed record SessionTransitionResult(
     CaptureSession Session,
     ImmutableArray<DomainEvent> Events,
     ImmutableArray<SessionFailure> Failures,
-    SessionTransitionStatus Status);
+    SessionTransitionStatus Status,
+    ImmutableArray<string> SuppressedEventTypes = default)
+{
+    /// <summary>Event types not emitted because their unique-by fields kept the values of the last such event (plan 17).</summary>
+    public ImmutableArray<string> SuppressedEventTypes { get; init; } = SuppressedEventTypes.IsDefault ? [] : SuppressedEventTypes;
+}

@@ -37,6 +37,7 @@ public sealed class IntegrationTestRunner
     private readonly ICaptureProvider _captureProvider;
     private readonly ITriggerProvider _triggerProvider;
     private readonly TimeSpan _triggerTimeout;
+    private readonly TimeSpan? _windowShownTimeout;
     private readonly Func<DateTimeOffset> _clock;
 
     public IntegrationTestRunner(
@@ -44,8 +45,10 @@ public sealed class IntegrationTestRunner
         ICaptureProvider captureProvider,
         ITriggerProvider triggerProvider,
         TimeSpan? triggerTimeout = null,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        TimeSpan? windowShownTimeout = null)
     {
+        _windowShownTimeout = windowShownTimeout;
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(captureProvider);
         ArgumentNullException.ThrowIfNull(triggerProvider);
@@ -147,7 +150,10 @@ public sealed class IntegrationTestRunner
     private async Task<bool> WaitForTriggerAsync(TriggerDefinition trigger, CancellationToken cancellationToken)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(_triggerTimeout);
+        // A question window (plan 17) comes only after the person goes through the program's steps.
+        timeoutCts.CancelAfter(trigger.ObservedEvent == TriggerEvents.WindowShown && _windowShownTimeout is { } windowWait
+            ? windowWait
+            : _triggerTimeout);
 
         try
         {

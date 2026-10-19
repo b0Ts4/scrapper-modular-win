@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Prescriva.Agent.Application.Capture;
@@ -679,6 +679,38 @@ public sealed class SessionCoordinatorTests
         Assert.True(condition(), "Timed out waiting for the expected condition.");
     }
 
+    /// <summary>An event not sent again because its unique-by fields did not change (plan 17) is reported, never silent.</summary>
+    [Fact]
+    public async Task An_event_not_sent_again_for_the_same_unique_values_is_reported()
+    {
+        var outbox = new FakeEventOutbox();
+        var log = new FakeTechnicalLog();
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [NameFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+            [NoteFieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [NameFieldId] = Captured("Dipirona", NameFieldId),
+            [NoteFieldId] = Captured("Take with water", NoteFieldId),
+        });
+        var triggerProvider = new FakeTriggerProvider(new()
+        {
+            [AddTriggerId] = [new TriggerSignal(SessionId, AddTriggerId, Now), new TriggerSignal(SessionId, AddTriggerId, Now.AddSeconds(30))],
+        });
+        var diagnostics = new ConcurrentQueue<RuntimeDiagnostic>();
+        var coordinator = CreateCoordinator(triggerProvider, resolver, captureProvider, outbox, log, uniqueBy: [NameFieldId]);
+        coordinator.DiagnosticPublished += (_, diagnostic) => diagnostics.Enqueue(diagnostic);
+
+        await coordinator.RunAsync(CancellationToken.None);
+
+        Assert.Single(outbox.Appended);
+        var suppressed = Assert.Single(diagnostics, diagnostic => diagnostic.Code == RuntimeDiagnosticCode.EventSuppressed);
+        Assert.Equal("item_added", suppressed.EventType);
+        Assert.Equal(AddTriggerId, suppressed.TriggerId);
+    }
+
     private static SessionCoordinator CreateCoordinator(
         FakeTriggerProvider triggerProvider,
         ISelectorResolver resolver,
@@ -688,9 +720,10 @@ public sealed class SessionCoordinatorTests
         bool requireName = true,
         bool requireNote = true,
         TimeSpan? triggerRetryDelay = null,
-        CaptureRetryPolicy? captureRetry = null)
+        CaptureRetryPolicy? captureRetry = null,
+        ImmutableArray<string>? uniqueBy = null)
     {
-        var configuration = BuildConfiguration(requireName, requireNote);
+        var configuration = BuildConfiguration(requireName, requireNote, uniqueBy);
         var eventIds = new Queue<Guid>(Enumerable.Range(0, 8).Select(_ => Guid.NewGuid()));
         return new SessionCoordinator(
             SessionId,
@@ -707,7 +740,7 @@ public sealed class SessionCoordinatorTests
             captureRetry: captureRetry ?? new CaptureRetryPolicy(CaptureRetryPolicy.Default.MaxAttempts, [TimeSpan.Zero, TimeSpan.Zero]));
     }
 
-    private static IntegrationConfiguration BuildConfiguration(bool requireName, bool requireNote) => new(
+    private static IntegrationConfiguration BuildConfiguration(bool requireName, bool requireNote, ImmutableArray<string>? uniqueBy = null) => new(
         IntegrationConfiguration.CurrentSchemaVersion,
         "config-1",
         "Test configuration",
@@ -725,7 +758,7 @@ public sealed class SessionCoordinatorTests
                 StageId,
                 Fingerprint("AddButton"),
                 "Invoke",
-                [new CaptureFieldsAction([NameFieldId, NoteFieldId]), new EmitEventAction("item_added")]),
+                [new CaptureFieldsAction([NameFieldId, NoteFieldId]), new EmitEventAction("item_added", uniqueBy)]),
             new TriggerDefinition(
                 FinishTriggerId,
                 StageId,

@@ -205,6 +205,12 @@ public sealed class TemplateGuideViewModel
         ArgumentNullException.ThrowIfNull(selector);
         var item = Item(id);
         var configuration = RequireConfiguration();
+        if (item.Observe == TemplateTriggerEvent.WindowShown && item.Suggested is { } question)
+        {
+            // A question is told by its window class and the start of its title, not by what was
+            // pointed at (a button in it, or the whole title with this quote's number).
+            selector = selector with { ClassName = question.ClassName, Name = question.Name, AutomationId = null, WindowPath = null };
+        }
 
         if (item.Kind == TemplateItemKind.Field)
         {
@@ -352,7 +358,7 @@ public sealed class TemplateGuideViewModel
                 item.FileSource,
                 item.Role,
                 item.Observe,
-                item.UniqueBy.IsDefaultOrEmpty ? default : item.UniqueBy.Where(fieldIds.Contains).ToImmutableArray())).ToImmutableArray(),
+                item.UniqueBy.IsDefaultOrEmpty || !item.UniqueBy.All(fieldIds.Contains) ? default : item.UniqueBy)).ToImmutableArray(),
         };
     }
 
@@ -410,18 +416,15 @@ public sealed class TemplateGuideViewModel
             return marked.Length > 0 ? [new CaptureFieldsAction([.. marked])] : [new TransitionStageAction(StageId)];
         }
 
-        var actions = TriggerActionsBuilder.Build(
+        // Not sent again while its unique-by fields keep the values of its last event - only with
+        // all of them marked: a narrower key would tell fewer events apart and silently drop some.
+        return TriggerActionsBuilder.Build(
             string.Join(",", marked),
             string.IsNullOrWhiteSpace(button.EmitEvent) ? "item_added" : button.EmitEvent,
             transitionStageId: null,
             clearState: marked.Length > 0 && button.Role != TemplateButtonRole.SendAndKeep,
-            TriggerTerminalAction.None);
-
-        // Not sent again while the marked unique-by fields keep the values of its last event.
-        var uniqueBy = button.UniqueBy.IsDefaultOrEmpty ? [] : button.UniqueBy.Where(marked.Contains).ToImmutableArray();
-        return uniqueBy.IsEmpty
-            ? actions
-            : [.. actions.Select(action => action is EmitEventAction emit ? emit with { UniqueBy = uniqueBy } : action)];
+            TriggerTerminalAction.None,
+            button.UniqueBy.IsDefaultOrEmpty || !button.UniqueBy.All(marked.Contains) ? null : button.UniqueBy);
     }
 
     private static void Record(GuideItem item, bool passed, string message)

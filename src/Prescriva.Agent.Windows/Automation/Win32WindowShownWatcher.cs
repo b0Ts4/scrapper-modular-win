@@ -10,8 +10,8 @@ namespace Prescriva.Agent.Windows.Automation;
 /// title starting with a given text (plan 17) - e.g. FórmulaCerta's "Mais Fórmula(s)?" question,
 /// a Delphi TMessageForm titled "Orçamento &lt;n&gt;", shown once a formula is saved. Listens,
 /// out of context, only to window-show events - of the program's process when known, otherwise
-/// of every process with the program's name - and reads only the class and title of top-level
-/// windows to compare them with the rule: no content, no input, nothing kept.
+/// of every process, keeping only the program's - and reads only the class and title of the
+/// program's top-level windows to compare them with the rule: no content, no input, nothing kept.
 /// </summary>
 internal sealed class Win32WindowShownWatcher : IDisposable
 {
@@ -29,7 +29,6 @@ internal sealed class Win32WindowShownWatcher : IDisposable
     private readonly Thread _thread;
     private readonly ManualResetEventSlim _started = new();
     private readonly WinEventProcedure _procedure;
-    private readonly Dictionary<uint, bool> _processMatches = [];
     private uint _threadId;
 
     public Win32WindowShownWatcher(string processIdentity, int? processId, string className, string titleStart, Action onShown)
@@ -45,6 +44,7 @@ internal sealed class Win32WindowShownWatcher : IDisposable
         _thread.Start();
         if (!_started.Wait(TimeSpan.FromSeconds(5)) || Failure is not null)
         {
+            Dispose();
             throw new InvalidOperationException(Failure ?? "The window watcher did not start.");
         }
     }
@@ -90,26 +90,32 @@ internal sealed class Win32WindowShownWatcher : IDisposable
 
     private void OnWinEvent(IntPtr hook, uint winEvent, IntPtr window, int objectId, int childId, uint thread, uint time)
     {
-        if (objectId != ObjectIdWindow || window == IntPtr.Zero || GetAncestor(window, GaRoot) != window)
+        // Called from native code: an exception escaping here would end the Agent, so a window
+        // that cannot be examined (it closed, its program ended) is simply not a match.
+        try
         {
-            return;
-        }
+            if (objectId != ObjectIdWindow || window == IntPtr.Zero || GetAncestor(window, GaRoot) != window)
+            {
+                return;
+            }
 
-        var className = new StringBuilder(256);
-        GetClassName(window, className, className.Capacity);
-        if (!string.Equals(className.ToString(), _className, StringComparison.Ordinal))
+            var className = new StringBuilder(256);
+            GetClassName(window, className, className.Capacity);
+            if (!string.Equals(className.ToString(), _className, StringComparison.Ordinal) || !IsOfProgram(window))
+            {
+                return;
+            }
+
+            var title = new StringBuilder(512);
+            GetWindowText(window, title, title.Capacity);
+            if (title.ToString().StartsWith(_titleStart, StringComparison.OrdinalIgnoreCase))
+            {
+                _onShown();
+            }
+        }
+        catch (Exception)
         {
-            return;
         }
-
-        var title = new StringBuilder(512);
-        GetWindowText(window, title, title.Capacity);
-        if (!title.ToString().StartsWith(_titleStart, StringComparison.OrdinalIgnoreCase) || !IsOfProgram(window))
-        {
-            return;
-        }
-
-        _onShown();
     }
 
     private bool IsOfProgram(IntPtr window)
@@ -120,22 +126,9 @@ internal sealed class Win32WindowShownWatcher : IDisposable
             return processId == scoped;
         }
 
-        if (!_processMatches.TryGetValue(processId, out var matches))
-        {
-            try
-            {
-                using var process = Process.GetProcessById((int)processId);
-                matches = string.Equals(process.ProcessName, _processName, StringComparison.OrdinalIgnoreCase);
-            }
-            catch (ArgumentException)
-            {
-                matches = false; // the process has already ended
-            }
-
-            _processMatches[processId] = matches;
-        }
-
-        return matches;
+        // Asked only for windows of the right class, so not cached (a process ID can be reused).
+        using var process = Process.GetProcessById((int)processId);
+        return string.Equals(process.ProcessName, _processName, StringComparison.OrdinalIgnoreCase);
     }
 
     private delegate void WinEventProcedure(IntPtr hook, uint winEvent, IntPtr window, int objectId, int childId, uint thread, uint time);

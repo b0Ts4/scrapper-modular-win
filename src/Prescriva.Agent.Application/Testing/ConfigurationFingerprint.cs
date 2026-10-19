@@ -204,7 +204,7 @@ public static class ConfigurationFingerprint
 
             case EmitEventAction emit:
                 sb.Append("EmitEvent:").Append(emit.EventType);
-                if (emit.UniqueBy is { IsDefault: false } uniqueBy)
+                if (emit.UniqueBy is { IsDefaultOrEmpty: false } uniqueBy)
                 {
                     // Only when present, so configurations without it keep their content hash.
                     sb.Append(",uniqueBy=").AppendJoin('|', uniqueBy);

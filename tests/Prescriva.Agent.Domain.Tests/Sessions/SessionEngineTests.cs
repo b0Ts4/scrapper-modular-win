@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using Prescriva.Agent.Domain.Configuration;
 using Prescriva.Agent.Domain.Selectors;
 using Prescriva.Agent.Domain.Sessions;
@@ -378,7 +378,7 @@ public sealed class SessionEngineTests
     [Fact]
     public void An_event_unique_by_fields_is_not_sent_again_while_those_values_are_the_same()
     {
-        var engine = Engine(new("formula_saved", "entry", Selector(), "WindowShown",
+        var engine = Engine(new("formula_saved", "entry", Selector(), "Invoked",
             [new CaptureFieldsAction(["name", "note"]), new EmitEventAction("receita", UniqueBy: ["name"])]));
 
         var first = engine.Apply(Start(), new("formula_saved", [FirstId]), Values("Formula 0"), Now);
@@ -389,14 +389,43 @@ public sealed class SessionEngineTests
         Assert.Single(first.Events);
         Assert.Equal(SessionTransitionStatus.Applied, repeated.Status);
         Assert.Empty(repeated.Events);
+        Assert.Equal(["receita"], repeated.SuppressedEventTypes.ToArray());
         Assert.Equal("changed", repeated.Session.Values["note"]);
         Assert.Equal("Formula 1", Assert.Single(next.Events).Payload.Fields["name"]);
     }
 
     [Fact]
+    public void An_event_whose_unique_fields_are_blank_is_always_sent()
+    {
+        var engine = Engine(new("formula_saved", "entry", Selector(), "Invoked",
+            [new CaptureFieldsAction(["name", "note"]), new EmitEventAction("receita", UniqueBy: ["note"])]));
+
+        var first = engine.Apply(Start(), new("formula_saved", [FirstId]), Values("Formula 0"), Now);
+        var second = engine.Apply(first.Session, new("formula_saved", [SecondId]), Values("Formula 1"), Now);
+
+        Assert.Single(first.Events);
+        Assert.Single(second.Events);
+        Assert.Empty(second.SuppressedEventTypes);
+    }
+
+    [Theory]
+    [InlineData(null, "Orçamento ")]
+    [InlineData("TMessageForm", null)]
+    public void A_window_trigger_must_say_the_window_class_and_the_start_of_its_title(string? className, string? titleStart)
+    {
+        var configuration = new IntegrationConfiguration(1, "question", "Question", new("erp.exe", "Budget"),
+            [new("name", "entry", "Name", false, Selector())],
+            [new("entry", "Entry")],
+            [new("question", "entry", new ElementFingerprint("erp.exe", "Budget", Name: titleStart, ClassName: className), TriggerEvents.WindowShown,
+                [new CaptureFieldsAction(["name"]), new EmitEventAction("receita")])]);
+
+        Assert.Contains(ConfigurationValidator.Validate(configuration).Errors, error => error.Code == "INVALID_WINDOW_TRIGGER");
+    }
+
+    [Fact]
     public void Clearing_the_session_forgets_the_last_unique_event()
     {
-        var engine = Engine(new("formula_saved", "entry", Selector(), "WindowShown",
+        var engine = Engine(new("formula_saved", "entry", Selector(), "Invoked",
             [new CaptureFieldsAction(["name"]), new EmitEventAction("receita", UniqueBy: ["name"])]));
 
         var first = engine.Apply(Start(), new("formula_saved", [FirstId]), Values("Formula 0"), Now);
