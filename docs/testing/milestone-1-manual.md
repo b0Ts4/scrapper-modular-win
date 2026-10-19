@@ -108,7 +108,13 @@ Not checked: reading a field filled with prescription data (no record was opened
 
 Quantity fields mapped on the same quote: *Volume* 90,00 + unit CAP (number of capsules), *Qtd.Prescrita* 90, *Qtd. Potes* 1, quote number and formula series. The operator reports that after *OK* FórmulaCerta asks whether there are more formulas and then closes the screen; *Receita completa*'s *OK* therefore sends one event per formula and keeps the prescription file (role *send and keep*).
 
-Still to confirm with a person, on a test quote: whether the formula's fields and components are still on screen (not covered by the "more formulas?" question) when *OK* is clicked, and whether a new quote already has its number then.
+**Test quote with two formulas (2026-10-18, simulated data, operator's authorization).** Quote 899119 created on the Orçamentos screen (formula 0: 60 CAP, formula 1: 30 CAP, one component each), watched by a harness using the Agent's own trigger, resolver and capture providers with the *Orçamento* template's positions. Findings:
+
+- **The Orçamentos *OK* is not detected as a click.** It never captures the mouse (no `EVENT_SYSTEM_CAPTURESTART/END`); clicking it only moves the focus to it and opens a modal question at once. `Win32ClickWatcher` therefore never fires for it (the dialog buttons and other `TFagronButton`s do capture).
+- After *OK* FórmulaCerta asks in turn: *Q.S.P.?*, *Dados corretos?*, packaging, payment conditions, surcharge/discount, pickup date, pickup of all formulas, then **"Mais Fórmula(s)?"** in a `TMessageForm` titled `Orçamento <number>`. When that question appears the formula is saved, the quote number exists (0 before), and the formula is still on screen: every template field read correctly (quantity `30,00` + `CAP`, prescribed 30, pots 1, quote number, formula series `1`, dosage, prescriber) and the grid image was complete and uncovered.
+- After the last *Não* a second `TMessageForm` with the **same title** asks "Deseja efetuar a inclusão do orçamento?" - a trigger on the title alone would fire twice for the last formula. Then the screen closes and FórmulaCerta offers to turn the quote into a requisition (cancelled in the test), after a print dialog (cancelled).
+
+Consequence: the *OK* trigger of the templates cannot work on FórmulaCerta's Orçamentos screen; a trigger "a question window of this program appears" is needed (see current state).
 
 Still open (not fixed, see [current state](../handoffs/current-state.md)):
 
