@@ -71,6 +71,8 @@ internal sealed record TriggerItem(TriggerDefinition Trigger, IReadOnlyDictionar
         var parts = Trigger.Actions.Select(action => action switch
         {
             CaptureFieldsAction capture => "lê " + string.Join(", ", capture.FieldIds.Select(id => FieldNames.TryGetValue(id, out var name) ? name : id)),
+            EmitEventAction { UniqueBy: { IsDefaultOrEmpty: false } uniqueBy } emit =>
+                $"gera '{emit.EventType}' (sem repetir para o mesmo {string.Join(" + ", uniqueBy.Select(id => FieldNames.TryGetValue(id, out var name) ? name : id))})",
             EmitEventAction emit => $"gera '{emit.EventType}'",
             TransitionStageAction transition => $"vai para a etapa '{transition.StageId}'",
             ClearStateAction => "limpa os valores",

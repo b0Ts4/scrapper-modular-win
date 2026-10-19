@@ -689,7 +689,10 @@ public partial class MainWindow : Window
         TestModeHost.Approved -= OnTestApproved;
         TestModeHost.Approved += OnTestApproved;
         TestModeHost.Visibility = Visibility.Visible;
-        SetStatus($"Teste preparado para o processo {processId}. Clique em 'Executar teste' e, na aplicação, pressione cada botão configurado, na ordem, em até 15 segundos cada.");
+        SetStatus($"Teste preparado para o processo {processId}. Clique em 'Executar teste' e, na aplicação, pressione cada botão configurado, na ordem, em até 15 segundos cada" +
+            (configuration.Triggers.Any(trigger => trigger.ObservedEvent == TriggerEvents.WindowShown)
+                ? " (uma pergunta que aparece pode levar até 3 minutos: siga os passos do programa até ela surgir)."
+                : "."));
     }
 
     private async void ActivateButton_Click(object sender, RoutedEventArgs e)
@@ -885,6 +888,7 @@ public partial class MainWindow : Window
     private static string DescribeAction(TriggerActionDefinition action) => action switch
     {
         CaptureFieldsAction capture => $"capture({string.Join(",", capture.FieldIds)})",
+        EmitEventAction { UniqueBy: { IsDefaultOrEmpty: false } uniqueBy } emit => $"emit({emit.EventType}, unique by {string.Join("+", uniqueBy)})",
         EmitEventAction emit => $"emit({emit.EventType})",
         TransitionStageAction transition => $"goto({transition.StageId})",
         ClearStateAction => "clear",
