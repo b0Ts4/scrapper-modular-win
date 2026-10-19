@@ -209,29 +209,39 @@ public sealed class TemplateGuideViewModelTests
         Assert.Equal(string.Empty, doctor.Suggested.WindowRule);
     }
 
-    /// <summary>Plan 16: the attachment lives in another program; its suggestion is aimed at that program's open window.</summary>
-    [Fact]
-    public void An_item_of_another_program_is_aimed_at_that_programs_window_and_keeps_its_file_source()
+    /// <summary>
+    /// Plan 16: the attachment lives in another program. Plan 18: its suggestion is aimed at that
+    /// program by the part of the title the template gives - version-proof, and set up even while
+    /// that window is closed (it is checked once it opens).
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void An_item_of_another_program_is_aimed_at_that_program_by_its_title_part_and_keeps_its_file_source(bool viewerOpen)
     {
-        var (guide, editor) = StartTwoPrograms();
+        var (guide, editor) = StartTwoPrograms(viewerOpen);
 
         guide.UseSuggestion("anexo");
 
         var field = editor.Configuration!.Fields.Single(candidate => candidate.Id == "anexo");
         Assert.Equal("FCMobyPharma.exe", field.Selector.ProcessIdentity);
-        Assert.Equal("Visualização de Anexos", field.Selector.WindowRule);
+        Assert.Equal("Anexos", field.Selector.WindowRule);
         Assert.Equal(FieldKind.RecentFile, field.Kind);
         Assert.Equal(new FileSource("%LOCALAPPDATA%\\Temp", "anexo_*", 120), field.FileSource);
     }
 
+    /// <summary>Plan 18: one click marks every item the template suggests - fields and triggers alike.</summary>
     [Fact]
-    public void An_item_whose_program_is_not_open_has_no_usable_suggestion()
+    public void Using_every_suggestion_marks_all_suggested_fields_and_triggers_and_names_the_rest()
     {
-        var (guide, _) = StartTwoPrograms(viewerOpen: false);
+        var (guide, editor) = StartTwoPrograms(viewerOpen: false);
+        guide.Item("posologia"); // has no suggestion in this template
 
-        var error = Assert.Throws<InvalidOperationException>(() => guide.UseSuggestion("anexo"));
-        Assert.Contains("A janela 'Anexos' não está aberta", error.Message, StringComparison.Ordinal);
-        Assert.Contains("Abra o anexo.", error.Message, StringComparison.Ordinal);
+        var left = guide.UseAllSuggestions();
+
+        Assert.Equal(["anexo"], editor.Configuration!.Fields.Select(field => field.Id).ToArray());
+        Assert.Equal(["nova_formula", "ok", "cancelar"], editor.Configuration.Triggers.Select(trigger => trigger.Id).ToArray());
+        Assert.Equal(["posologia"], left.Select(item => item.Id).ToArray());
     }
 
     [Fact]
@@ -377,9 +387,12 @@ public sealed class TemplateGuideViewModelTests
                 Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TScrollBox", WindowPath: "TPanel[0]/TScrollBox[0]"),
                 Program: viewer, FileSource: new FileSource("%LOCALAPPDATA%\\Temp", "anexo_*", 120)),
             new TemplateItem("posologia", TemplateItemKind.Field, "Posologia", "x"),
-            new TemplateItem("nova_formula", TemplateItemKind.Button, "Nova Fórmula", "x", CapturedFields: ["anexo"], Program: viewer, Role: TemplateButtonRole.CaptureOnly),
-            new TemplateItem("ok", TemplateItemKind.Button, "OK", "x", CapturedFields: ["posologia"], EmitEvent: "receita", Role: okRole),
-            new TemplateItem("cancelar", TemplateItemKind.Button, "Cancelar", "x", Role: TemplateButtonRole.Discard),
+            new TemplateItem("nova_formula", TemplateItemKind.Button, "Nova Fórmula", "x", CapturedFields: ["anexo"], Program: viewer, Role: TemplateButtonRole.CaptureOnly,
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TFagronButton", WindowPath: "TFagronPanel[0]/TFagronButton[2]")),
+            new TemplateItem("ok", TemplateItemKind.Button, "OK", "x", CapturedFields: ["posologia"], EmitEvent: "receita", Role: okRole,
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TFagronButton", WindowPath: "TFagronButton[8]")),
+            new TemplateItem("cancelar", TemplateItemKind.Button, "Cancelar", "x", Role: TemplateButtonRole.Discard,
+                Suggested: new ElementFingerprint(string.Empty, string.Empty, ClassName: "TFagronButton", WindowPath: "TFagronButton[7]")),
         ]);
         var editor = new IntegrationEditorViewModel(new FakeStore(), _resolver, _capture);
         var guide = new TemplateGuideViewModel(editor, (_, _) => Task.FromResult(_clickSeen));

@@ -10,6 +10,7 @@ using Prescriva.Agent.Application.Configuration;
 using Prescriva.Agent.Application.Inspection;
 using Prescriva.Agent.Application.Runtime;
 using Prescriva.Agent.Application.Templates;
+using Prescriva.Agent.Application.Testing;
 using Prescriva.Agent.Desktop.Configuration;
 using Prescriva.Agent.Desktop.Templates;
 using Prescriva.Agent.Domain.Configuration;
@@ -71,6 +72,7 @@ public partial class MainWindow
     {
         var selected = SelectedTemplate;
         UseTemplateButton.IsEnabled = selected is not null;
+        AutoSetupButton.IsEnabled = selected is not null || _autoSetup is not null;
         TemplateDescriptionText.Text = selected?.Template.Description ?? string.Empty;
         TemplateHowToOpenText.Text = selected is null ? string.Empty : "Antes: " + selected.Template.Program.HowToOpen;
     }
@@ -101,7 +103,9 @@ public partial class MainWindow
 
         try
         {
-            var application = new ApplicationDefinition(chosen.ProcessName + ".exe", chosen.WindowTitle);
+            // The program's window is named by the part of its title the template gives (plan 18),
+            // so a program update that changes the version in the title keeps working.
+            var application = new ApplicationDefinition(chosen.ProcessName + ".exe", template.Program.WindowTitleContains);
             var integrationId = SemanticIdGenerator.FromName(template.Id, _configurationStore.ListIds(), "integracao");
             Guide.Start(template, application, integrationId, LocateOpenWindow);
             ProcessIdentityBox.Text = application.ProcessIdentity;
@@ -117,6 +121,142 @@ public partial class MainWindow
         {
             SetStatus($"Não foi possível usar o modelo: {ex.Message}");
         }
+    }
+
+    private CancellationTokenSource? _autoSetup;
+    private static readonly TimeSpan AutoSetupRetry = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// Plug-and-play setup (plan 18): one click creates the integration with every field and
+    /// trigger the template suggests, saves it, verifies it - waiting, with plain instructions,
+    /// until the program's screens are open - then approves, activates it and turns on
+    /// "Iniciar com o Windows". Clicking again stops it.
+    /// </summary>
+    private async void AutoSetupButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_autoSetup is not null)
+        {
+            await _autoSetup.CancelAsync();
+            return;
+        }
+
+        if (SelectedTemplate is not { Template: var template })
+        {
+            SetStatus("Escolha um modelo na lista.");
+            return;
+        }
+
+        using var setup = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        _autoSetup = setup;
+        AutoSetupButton.Content = "Parar a configuração automática";
+        UseTemplateButton.IsEnabled = false;
+        try
+        {
+            if (_monitorViewModel.IsMonitoring)
+            {
+                await _monitorViewModel.StopAsync();
+            }
+
+            var application = new ApplicationDefinition(template.Program.ProcessIdentity, template.Program.WindowTitleContains);
+            Guide.Start(template, application, template.Id, LocateOpenWindow);
+            ProcessIdentityBox.Text = application.ProcessIdentity;
+            WindowRuleBox.Text = application.WindowRule;
+            IntegrationIdBox.Text = template.Id;
+            var left = Guide.UseAllSuggestions();
+            await _editorViewModel.SaveAsync();
+            RefreshSavedIntegrations();
+            RefreshGuide(selectIndex: 0);
+
+            var report = await VerifyUntilReadyAsync(template, setup.Token);
+            var configuration = _editorViewModel.Configuration!;
+            var approval = await _approvalService.RecordAsync(report);
+            var status = await _monitorViewModel.StartAsync(configuration, approval);
+            if (status != ActivationStatus.Activated)
+            {
+                ShowAutoSetup($"Configurado e conferido, mas não foi possível ativar: {_monitorViewModel.StatusText}");
+                return;
+            }
+
+            await _monitoringPreference.SetActiveConfigurationIdAsync(configuration.Id, CancellationToken.None);
+            await SetStartWithWindowsAsync(true);
+            await RefreshApprovalStateAsync();
+            WizardSteps.SelectedItem = Step5Tab;
+            ShowAutoSetup($"Pronto: '{template.Name}' configurado com {configuration.Fields.Length} campo(s) e {configuration.Triggers.Length} gatilho(s), conferido, aprovado e ativo. "
+                + "O Agent fica na bandeja e volta sozinho ao ligar o computador."
+                + (left.Count > 0 ? $" Sem posição sugerida (não incluídos): {string.Join(", ", left.Select(item => item.Name))}." : string.Empty));
+        }
+        catch (OperationCanceledException)
+        {
+            ShowAutoSetup("Configuração automática interrompida. A integração ficou salva; clique de novo para continuar.");
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or ConfigurationValidationException or IOException)
+        {
+            ShowAutoSetup($"Não foi possível configurar automaticamente: {ex.Message}");
+        }
+        finally
+        {
+            _autoSetup = null;
+            AutoSetupButton.Content = "Configurar automaticamente";
+            AutoSetupButton.IsEnabled = UseTemplateButton.IsEnabled = SelectedTemplate is not null;
+        }
+    }
+
+    /// <summary>Verifies the integration again every few seconds until every field is read and every trigger is watched.</summary>
+    private async Task<IntegrationTestReport> VerifyUntilReadyAsync(IntegrationTemplate template, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var configuration = _editorViewModel.Configuration!;
+            var running = await FindRunningProcessIdsAsync(configuration.Application);
+            if (running.Count != 1)
+            {
+                ShowAutoSetup(running.Count == 0
+                    ? $"Aguardando a tela do programa: {template.Program.HowToOpen}"
+                    : $"Há {running.Count} janelas '{configuration.Application.WindowRule}' abertas: deixe só uma.");
+                await Task.Delay(AutoSetupRetry, cancellationToken);
+                continue;
+            }
+
+            var instance = new ApplicationInstance(Guid.NewGuid(), running[0]);
+            var mainProcess = configuration.Application.ProcessIdentity;
+            var runner = new IntegrationTestRunner(
+                ProcessRouting.Resolver(mainProcess, _runtimeFactories.CreateSelectorResolver, instance),
+                _runtimeFactories.CreateCaptureProvider(instance),
+                ProcessRouting.Triggers(mainProcess, _runtimeFactories.CreateTriggerProvider, instance, Guid.NewGuid()),
+                triggerTimeout: TimeSpan.FromSeconds(10));
+            ShowAutoSetup("Conferindo campos e gatilhos...");
+            var report = await runner.VerifyAsync(configuration, cancellationToken);
+            if (report.AllPassed)
+            {
+                return report;
+            }
+
+            ShowAutoSetup("Ainda falta: " + DescribeMissing(report, configuration, template) + " Tentando de novo em alguns segundos...");
+            await Task.Delay(AutoSetupRetry, cancellationToken);
+        }
+    }
+
+    /// <summary>What still fails, in words: the screens to open (or uncover) for the items that were not found or read.</summary>
+    private static string DescribeMissing(IntegrationTestReport report, IntegrationConfiguration configuration, IntegrationTemplate template)
+    {
+        var failingFields = report.FieldResults.Where(result => result.Outcome != FieldCheckOutcome.Found).Select(result => result.FieldId);
+        var failingTriggers = report.TriggerResults.Where(result => result.Outcome is not (TriggerCheckOutcome.Ready or TriggerCheckOutcome.Detected)).Select(result => result.TriggerId);
+        var screens = failingFields.Concat(failingTriggers)
+            .Select(id => template.Items.FirstOrDefault(item => item.Id == id))
+            .Where(item => item is not null)
+            .Select(item => item!.Program ?? template.Program)
+            .Distinct()
+            .Select(program => $"a tela '{program.WindowTitleContains}' aberta e visível ({program.HowToOpen})");
+        var unreadable = report.FieldResults.Where(result => result.Outcome == FieldCheckOutcome.Unreadable).Select(result => result.FieldId).ToArray();
+        return string.Join("; ", screens) + "."
+            + (unreadable.Length > 0 ? $" Não deu para ler: {string.Join(", ", unreadable)} - não deixe outra janela por cima." : string.Empty);
+    }
+
+    private void ShowAutoSetup(string text)
+    {
+        AutoSetupStatusText.Text = text;
+        SetStatus(text);
     }
 
     /// <summary>The open window of another program a checklist item lives in (plan 16), from the last refreshed list.</summary>

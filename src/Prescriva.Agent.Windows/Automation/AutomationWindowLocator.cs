@@ -61,6 +61,8 @@ internal static class AutomationWindowLocator
     /// </param>
     public static AutomationElement? Find(string processIdentity, string windowRule, int? processId = null)
     {
+        // The window rule is the title or part of it (plan 18); a window with the exact title wins.
+        AutomationElement? partial = null;
         foreach (AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition))
         {
             string processName;
@@ -103,13 +105,28 @@ internal static class AutomationWindowLocator
                 continue;
             }
 
-            if (string.Equals(window.Current.Name, windowRule, StringComparison.OrdinalIgnoreCase))
+            string title;
+            try
+            {
+                title = window.Current.Name;
+            }
+            catch (ElementNotAvailableException)
+            {
+                continue;
+            }
+
+            if (Domain.Configuration.WindowRule.IsExact(title, windowRule))
             {
                 return window;
             }
+
+            if (partial is null && !string.IsNullOrWhiteSpace(windowRule) && Domain.Configuration.WindowRule.Matches(title, windowRule))
+            {
+                partial = window;
+            }
         }
 
-        return null;
+        return partial;
     }
 
     private static string ProcessNameOf(int processId)

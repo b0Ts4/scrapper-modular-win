@@ -55,7 +55,7 @@ public sealed class WindowsApplicationInstanceSource : IApplicationInstanceSourc
                     if (!MatchesWindowRule(process, application.WindowRule))
                     {
                         framedTitles ??= _windows.List(CancellationToken.None).ToLookup(window => window.ProcessId, window => window.WindowTitle);
-                        if (!framedTitles[process.Id].Contains(application.WindowRule, StringComparer.OrdinalIgnoreCase))
+                        if (!framedTitles[process.Id].Any(title => WindowRule.Matches(title, application.WindowRule)))
                         {
                             continue;
                         }
@@ -102,7 +102,7 @@ public sealed class WindowsApplicationInstanceSource : IApplicationInstanceSourc
 
         try
         {
-            return string.Equals(process.MainWindowTitle, windowRule, StringComparison.OrdinalIgnoreCase);
+            return WindowRule.Matches(process.MainWindowTitle, windowRule);
         }
         catch (InvalidOperationException)
         {

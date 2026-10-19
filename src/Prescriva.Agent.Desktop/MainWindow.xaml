@@ -173,8 +173,14 @@
                                            Text="Nenhum modelo disponível." />
                                 <TextBlock x:Name="TemplateDescriptionText" TextWrapping="Wrap" Margin="0,6,0,0" />
                                 <TextBlock x:Name="TemplateHowToOpenText" TextWrapping="Wrap" FontStyle="Italic" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" />
-                                <Button x:Name="UseTemplateButton" Content="Usar este modelo" Click="UseTemplateButton_Click" IsEnabled="False"
-                                        Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button x:Name="AutoSetupButton" Content="Configurar automaticamente" Click="AutoSetupButton_Click" IsEnabled="False"
+                                            Style="{StaticResource PrimaryButton}"
+                                            ToolTip="Cria a integração com todos os campos e gatilhos do modelo, confere tudo, aprova, ativa e liga 'Iniciar com o Windows'." />
+                                    <Button x:Name="UseTemplateButton" Content="Usar este modelo (passo a passo)" Click="UseTemplateButton_Click" IsEnabled="False"
+                                            Margin="8,0,0,0" />
+                                </StackPanel>
+                                <TextBlock x:Name="AutoSetupStatusText" TextWrapping="Wrap" Margin="0,6,0,0" />
                             </StackPanel>
                         </Border>
 

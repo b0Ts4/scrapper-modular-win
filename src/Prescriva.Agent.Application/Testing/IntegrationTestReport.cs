@@ -61,6 +61,12 @@ public enum TriggerCheckOutcome
 
     /// <summary>No signal for this trigger was observed before the wait window elapsed.</summary>
     TimedOut,
+
+    /// <summary>
+    /// Automatic verification (plan 18): the trigger is being watched - its button was found,
+    /// its question window hooked - although nobody clicked or showed it.
+    /// </summary>
+    Ready,
 }
 
 /// <summary>
@@ -96,10 +102,13 @@ public sealed record IntegrationTestReport(
     ImmutableArray<FieldCheckResult> FieldResults,
     ImmutableArray<TriggerCheckResult> TriggerResults)
 {
-    /// <summary>True only when every field resolved (Found) and every trigger fired (Detected).</summary>
+    /// <summary>
+    /// True only when every field resolved (Found) and every trigger fired (Detected) - or, in
+    /// an automatic verification, is being watched (Ready).
+    /// </summary>
     public bool AllPassed =>
         FieldResults.All(result => result.Outcome == FieldCheckOutcome.Found) &&
-        TriggerResults.All(trigger => trigger.Outcome == TriggerCheckOutcome.Detected);
+        TriggerResults.All(trigger => trigger.Outcome is TriggerCheckOutcome.Detected or TriggerCheckOutcome.Ready);
 
     /// <summary>
     /// Produces the <see cref="ConfigurationApproval"/> this report earns, or null when

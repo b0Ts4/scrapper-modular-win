@@ -60,9 +60,26 @@ public sealed class IntegrationTestRunner
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
     }
 
-    public async Task<IntegrationTestReport> RunAsync(
+    public Task<IntegrationTestReport> RunAsync(
         IntegrationConfiguration configuration,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        RunAsync(configuration, readinessOnly: false, cancellationToken);
+
+    /// <summary>
+    /// The automatic verification of a plug-and-play setup (plan 18): every field is found and
+    /// read, as in <see cref="RunAsync(IntegrationConfiguration, CancellationToken)"/>, and every
+    /// trigger only has to be watched (<see cref="TriggerCheckOutcome.Ready"/>) - its button found,
+    /// its question window hooked - instead of being clicked or shown by the person.
+    /// </summary>
+    public Task<IntegrationTestReport> VerifyAsync(
+        IntegrationConfiguration configuration,
+        CancellationToken cancellationToken = default) =>
+        RunAsync(configuration, readinessOnly: true, cancellationToken);
+
+    private async Task<IntegrationTestReport> RunAsync(
+        IntegrationConfiguration configuration,
+        bool readinessOnly,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -80,7 +97,7 @@ public sealed class IntegrationTestRunner
         {
             foreach (var trigger in configuration.Triggers)
             {
-                triggerResults.Add(await CheckTriggerAsync(trigger, cancellationToken).ConfigureAwait(false));
+                triggerResults.Add(await CheckTriggerAsync(trigger, readinessOnly, cancellationToken).ConfigureAwait(false));
             }
         }
 
@@ -126,8 +143,21 @@ public sealed class IntegrationTestRunner
         return new FieldCheckResult(field.Id, outcome, ProviderId: null, resolution.Confidence, failureCode, Signals: signals, Warnings: []);
     }
 
-    private async Task<TriggerCheckResult> CheckTriggerAsync(TriggerDefinition trigger, CancellationToken cancellationToken)
+    private async Task<TriggerCheckResult> CheckTriggerAsync(TriggerDefinition trigger, bool readinessOnly, CancellationToken cancellationToken)
     {
+        if (readinessOnly)
+        {
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            var ready = await WaitForWatchAsync(trigger, cancellationToken).ConfigureAwait(false);
+            return new TriggerCheckResult(
+                trigger.Id,
+                ready ? TriggerCheckOutcome.Ready : TriggerCheckOutcome.TimedOut,
+                trigger.Actions.IsDefault ? [] : trigger.Actions.OfType<TransitionStageAction>().Select(action => action.StageId).ToImmutableArray(),
+                trigger.Actions.IsDefault ? [] : trigger.Actions.OfType<EmitEventAction>().Select(action => action.EventType).ToImmutableArray(),
+                ready ? null : TriggerCheckResult.TriggerTimedOutCode,
+                started.Elapsed);
+        }
+
         var transitions = trigger.Actions.IsDefault
             ? ImmutableArray<string>.Empty
             : trigger.Actions.OfType<TransitionStageAction>().Select(action => action.StageId).ToImmutableArray();
@@ -145,6 +175,58 @@ public sealed class IntegrationTestRunner
             events,
             detected ? null : TriggerCheckResult.TriggerTimedOutCode,
             elapsed.Elapsed);
+    }
+
+    /// <summary>True once the provider reports the trigger's watch is established (or the trigger already fired).</summary>
+    private async Task<bool> WaitForWatchAsync(TriggerDefinition trigger, CancellationToken cancellationToken)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(_triggerTimeout);
+        var established = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnEstablished(object? sender, string triggerId)
+        {
+            if (triggerId == trigger.Id)
+            {
+                established.TrySetResult();
+            }
+        }
+
+        _triggerProvider.WatchEstablished += OnEstablished;
+        try
+        {
+            var watching = WaitForSignalAsync(trigger, timeoutCts.Token);
+            var first = await Task.WhenAny(established.Task, watching).ConfigureAwait(false);
+            var ready = first == established.Task || await watching.ConfigureAwait(false);
+            await timeoutCts.CancelAsync().ConfigureAwait(false);
+            await watching.ConfigureAwait(false);
+            return ready;
+        }
+        finally
+        {
+            _triggerProvider.WatchEstablished -= OnEstablished;
+        }
+    }
+
+    private async Task<bool> WaitForSignalAsync(TriggerDefinition trigger, CancellationToken token)
+    {
+        try
+        {
+            await foreach (var _ in _triggerProvider.WatchAsync(trigger, token).WithCancellation(token).ConfigureAwait(false))
+            {
+                return true;
+            }
+
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // The trigger could not be watched (e.g. its button is not on screen): not ready.
+            return false;
+        }
     }
 
     private async Task<bool> WaitForTriggerAsync(TriggerDefinition trigger, CancellationToken cancellationToken)

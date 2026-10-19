@@ -190,13 +190,27 @@ public sealed class TemplateGuideViewModel
 
         if (item.Program is { } program)
         {
-            var window = _locate(program)
-                ?? throw new InvalidOperationException($"A janela '{program.WindowTitleContains}' não está aberta. {program.HowToOpen}");
-            Mark(id, item.Suggested with { ProcessIdentity = window.ProcessIdentity, WindowRule = window.WindowRule });
+            // Aimed at the program by the part of the title the template gives (plan 18): it
+            // survives a version change in the title and is set up even while that window is closed.
+            Mark(id, item.Suggested with { ProcessIdentity = program.ProcessIdentity, WindowRule = program.WindowTitleContains });
             return;
         }
 
         Mark(id, item.Suggested);
+    }
+
+    /// <summary>
+    /// Marks every item still to do that has a suggested position - fields and triggers (plan 18:
+    /// the one-click setup). Returns the items left to do because they have no suggestion.
+    /// </summary>
+    public IReadOnlyList<GuideItem> UseAllSuggestions()
+    {
+        foreach (var item in _items.Where(item => item.Status == GuideItemStatus.ToDo && item.Suggested is not null).ToArray())
+        {
+            UseSuggestion(item.Id);
+        }
+
+        return _items.Where(item => item.Status == GuideItemStatus.ToDo).ToArray();
     }
 
     /// <summary>Marks the item with a position (marked by hand or suggested); the integration follows.</summary>

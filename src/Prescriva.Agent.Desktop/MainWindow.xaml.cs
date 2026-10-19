@@ -859,8 +859,7 @@ public partial class MainWindow : Window
         var windows = await _openWindowSource.ListAsync(CancellationToken.None);
         return windows
             .Where(window => ProcessIdentity.Matches(application.ProcessIdentity, window.ProcessName) &&
-                (string.IsNullOrWhiteSpace(application.WindowRule) ||
-                 string.Equals(window.WindowTitle, application.WindowRule, StringComparison.OrdinalIgnoreCase)))
+                WindowRule.Matches(window.WindowTitle, application.WindowRule))
             .Select(window => window.ProcessId)
             .Distinct()
             .ToList();

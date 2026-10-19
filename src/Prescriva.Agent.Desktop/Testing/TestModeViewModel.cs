@@ -268,8 +268,13 @@ public sealed class TestModeViewModel : INotifyPropertyChanged
     public static TriggerResultDisplay ToDisplay(TriggerCheckResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var passed = result.Outcome == TriggerCheckOutcome.Detected;
-        var statusText = passed ? "Detectado" : "Tempo esgotado";
+        var passed = result.Outcome is TriggerCheckOutcome.Detected or TriggerCheckOutcome.Ready;
+        var statusText = result.Outcome switch
+        {
+            TriggerCheckOutcome.Detected => "Detectado",
+            TriggerCheckOutcome.Ready => "Pronto (vigiando)",
+            _ => "Tempo esgotado",
+        };
 
         return new TriggerResultDisplay(
             result.TriggerId,

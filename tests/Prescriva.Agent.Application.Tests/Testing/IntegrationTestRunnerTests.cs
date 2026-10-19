@@ -325,6 +325,50 @@ public sealed class IntegrationTestRunnerTests
         Assert.Equal(TriggerCheckOutcome.Detected, Assert.Single((await run).TriggerResults).Outcome);
     }
 
+    /// <summary>
+    /// Plug-and-play setup (plan 18): a verification checks every field is read and every
+    /// trigger can be watched - without the person having to click or save anything - and
+    /// such a report approves the configuration.
+    /// </summary>
+    [Fact]
+    public async Task A_verification_approves_when_every_field_is_read_and_every_trigger_is_watched()
+    {
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, "Dipirona", "uia", 0.9, TimeSpan.Zero, []),
+        });
+        var runner = new IntegrationTestRunner(resolver, captureProvider, new FakeTriggerProvider(establishesWatch: true), triggerTimeout: TimeSpan.FromSeconds(5));
+
+        var report = await runner.VerifyAsync(BuildConfiguration());
+
+        Assert.Equal(TriggerCheckOutcome.Ready, Assert.Single(report.TriggerResults).Outcome);
+        Assert.True(report.AllPassed);
+        Assert.NotNull(report.ToApproval(DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public async Task A_verification_fails_when_a_trigger_cannot_be_watched()
+    {
+        var resolver = new FakeSelectorResolver(new()
+        {
+            [FieldId] = SelectorResolution.Found(FakeResolvedElementHandle.Instance, 0.95),
+        });
+        var captureProvider = new FakeCaptureProvider(new()
+        {
+            [FieldId] = new CaptureResult(CaptureOutcome.Captured, "Dipirona", "uia", 0.9, TimeSpan.Zero, []),
+        });
+        var runner = new IntegrationTestRunner(resolver, captureProvider, new FakeTriggerProvider(), triggerTimeout: TimeSpan.FromMilliseconds(100));
+
+        var report = await runner.VerifyAsync(BuildConfiguration());
+
+        Assert.Equal(TriggerCheckOutcome.TimedOut, Assert.Single(report.TriggerResults).Outcome);
+        Assert.Null(report.ToApproval(DateTimeOffset.UtcNow));
+    }
+
     [Fact]
     public void Editing_the_configuration_after_approval_invalidates_that_approval()
     {
@@ -416,9 +460,11 @@ public sealed class IntegrationTestRunnerTests
     /// and otherwise never yields - letting IntegrationTestRunner's own wait-timeout budget
     /// elapse, which is what proves the TimedOut path independent of any real clock.
     /// </summary>
-    private sealed class FakeTriggerProvider : ITriggerProvider
+    private sealed class FakeTriggerProvider(bool establishesWatch = false) : ITriggerProvider
     {
         private readonly Channel<TriggerSignal> _channel = Channel.CreateUnbounded<TriggerSignal>();
+
+        public event EventHandler<string>? WatchEstablished;
 
         public void FireOnce(string triggerId) =>
             _channel.Writer.TryWrite(new TriggerSignal(Guid.NewGuid(), triggerId, DateTimeOffset.UtcNow));
@@ -427,6 +473,12 @@ public sealed class IntegrationTestRunnerTests
             TriggerDefinition trigger,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
+            await Task.Yield();
+            if (establishesWatch)
+            {
+                WatchEstablished?.Invoke(this, trigger.Id);
+            }
+
             await foreach (var signal in _channel.Reader.ReadAllAsync(cancellationToken))
             {
                 if (signal.TriggerId == trigger.Id)
