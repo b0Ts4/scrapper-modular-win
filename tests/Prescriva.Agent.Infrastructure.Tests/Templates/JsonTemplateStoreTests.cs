@@ -65,6 +65,25 @@ public sealed class JsonTemplateStoreTests : IDisposable
         Assert.Equal(["bom"], listed.Select(entry => entry.Template.Id));
     }
 
+    /// <summary>
+    /// A property written twice ("fieldKind": "ocrText" then "screenImage") silently kept the last
+    /// one and turned an OCR item into an image (found on FórmulaCerta): such a file is refused.
+    /// </summary>
+    [Fact]
+    public async Task A_template_file_with_a_repeated_property_is_left_out()
+    {
+        var store = new JsonTemplateStore(BuiltIn, Own);
+        await store.SaveAsync(Template("bom", "Bom"), CancellationToken.None);
+        var json = await File.ReadAllTextAsync(Path.Combine(Own, "bom.json"));
+        var repeated = json.Replace("\"fieldKind\": \"ocrText\"", "\"fieldKind\": \"ocrText\", \"fieldKind\": \"screenImage\"", StringComparison.Ordinal);
+        Assert.NotEqual(json, repeated);
+        await File.WriteAllTextAsync(Path.Combine(Own, "repetido.json"), repeated.Replace("\"id\": \"bom\"", "\"id\": \"repetido\"", StringComparison.Ordinal));
+
+        var listed = await store.ListAsync(CancellationToken.None);
+
+        Assert.Equal(["bom"], listed.Select(entry => entry.Template.Id));
+    }
+
     [Fact]
     public async Task An_invalid_template_is_not_saved()
     {

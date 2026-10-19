@@ -158,7 +158,6 @@
       "name": "Componentes (texto por OCR - só conferência)",
       "help": "A mesma grade lida por OCR, uma linha por componente ('código | descrição | quantidade...'). PODE TER ERROS (dígitos, letras e vírgulas trocados): serve só para conferir o que foi lido da imagem, nunca como valor final. Pode ser removido.",
       "fieldKind": "ocrText",
-      "fieldKind": "screenImage",
       "required": false,
       "suggested": { "processIdentity": "", "windowRule": "", "className": "TwwDBGrid", "frameworkId": "Win32", "relativeBounds": { "x": 0.0084, "y": 0.6967, "width": 0.7847, "height": 0.2233 }, "windowPath": "TFagronPanel[2]/TwwDBGrid[0]" },
       "capturedFields": null,

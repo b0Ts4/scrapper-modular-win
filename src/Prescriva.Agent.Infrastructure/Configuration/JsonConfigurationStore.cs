@@ -123,6 +123,9 @@ public sealed class JsonConfigurationStore : IConfigurationStore
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
             UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+            // A property written twice would silently keep the last value (plan 18: a template's
+            // OCR item became an image this way): refuse the file instead.
+            AllowDuplicateProperties = false,
             TypeInfoResolver = resolver
         };
         options.Converters.Add(new ImmutableArrayConverterFactory());

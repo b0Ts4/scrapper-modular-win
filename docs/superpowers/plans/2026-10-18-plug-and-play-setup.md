@@ -28,7 +28,9 @@ Walkthrough on FórmulaCerta (simulated data, client 98036), as someone installi
 - Orçamentos reopened → monitoring resumed by itself ("Monitorando gatilho 'mais_formulas'");
 - Agent killed and started as at sign-in (`--background`, tray only) → monitoring resumed; quote 899123: `EventPersisted`, then `EventSuppressed` for the inclusion question, `SessionClosed` when the screen closed.
 
-Not covered: the *Receita completa* template end to end (needs an order whose *Nova Fórmula* is enabled); a real Windows restart (simulated by the Run-key command); sending events out of the PC (no backend yet).
+**Receita completa end to end (same day, operator's authorization):** *Nova Fórmula* is enabled only on an order taken by the signed-in user, so order 360281 was taken ("Atender", by PAULO). With MobyPharma, the attachment viewer and Orçamentos open, **Configurar automaticamente** with *Receita completa* → "14 campo(s) e 4 gatilho(s), conferido, aprovado e ativo". *Nova Fórmula* clicked in the viewer: the Agent copied the whole prescription file (`anexo_…pdf`, 44 KB, source File) without anything shown or opened; FórmulaCerta opened Orçamentos for the order's client; two formulas saved (quote 899124, series 0 and 1): **two `receita` events, each with the prescription file**, quote number, series, quantity (60,00 / 30,00 CAP), prescribed quantity, pots, dosage, prescriber and the grid image. From an order, after the last "Não" the screen closes without the print and inclusion questions. Found and fixed: the template's `componentes_ocr` item had `fieldKind` written twice (the last, `screenImage`, won) - JSON with a repeated property is now refused (`AllowDuplicateProperties = false`; RED observed in `JsonTemplateStoreTests.A_template_file_with_a_repeated_property_is_left_out` and in the shipped-template test).
+
+Not covered: a real Windows restart (simulated by the Run-key command); sending events out of the PC.
 
 ## Privacy
 
