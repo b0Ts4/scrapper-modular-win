@@ -37,6 +37,9 @@ public interface IPlaybookDriver
     /// <summary>Presses the dialog's button with this caption; false when there is none.</summary>
     Task<bool> PressDialogButtonAsync(OpenDialog dialog, string caption, CancellationToken cancellationToken);
 
+    /// <summary>The text of a control inside the dialog; null when there is none.</summary>
+    Task<string?> ReadDialogFieldAsync(OpenDialog dialog, string path, CancellationToken cancellationToken);
+
     /// <summary>Replaces the text of a control inside the dialog; false when there is none.</summary>
     Task<bool> SetDialogTextAsync(OpenDialog dialog, string path, string text, CancellationToken cancellationToken);
 }

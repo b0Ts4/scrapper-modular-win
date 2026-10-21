@@ -32,6 +32,20 @@ public sealed record Playbook(
 
     public IEnumerable<string> AllIgnoredWindowClasses => DefaultIgnoredWindowClasses.Concat(IgnoredWindowClasses.IsDefault ? [] : IgnoredWindowClasses);
 
+    /// <summary>The playbook with a pharmacy's dialog rules merged in (validate the result like any playbook).</summary>
+    public Playbook WithPolicy(DialogPolicy? policy)
+    {
+        if (policy is null || policy.Rules.IsDefaultOrEmpty)
+        {
+            return this;
+        }
+
+        var own = policy.Rules.ToDictionary(rule => rule.Id, StringComparer.OrdinalIgnoreCase);
+        var shipped = (Dialogs.IsDefault ? [] : Dialogs).Select(rule => own.Remove(rule.Id, out var replacement) ? replacement : rule).ToArray();
+        var added = policy.Rules.Where(rule => own.ContainsKey(rule.Id));
+        return this with { Dialogs = [.. added, .. shipped] };
+    }
+
     /// <summary>True when <paramref name="caption"/> starts with a forbidden word, ignoring accents, letter case and the '&amp;' accelerator.</summary>
     public static bool IsForbidden(string? caption, IEnumerable<string> forbidden)
     {
@@ -71,16 +85,27 @@ public enum PlaybookStepKind
 
     /// <summary>Press the button at <see cref="PlaybookStep.Target"/> (never a forbidden one).</summary>
     Click,
+
+    /// <summary>Keep the text of the control at <see cref="PlaybookStep.Target"/> as the value <see cref="PlaybookStep.CaptureAs"/>.</summary>
+    ReadField,
 }
 
-/// <summary>One action of a playbook. <see cref="Target"/> is a window path below the program's window.</summary>
+/// <summary>One action of a playbook. <see cref="Target"/> is a window path below the program's window; <see cref="OnlyWhen"/> names a data value that must say yes for the step to run (e.g. "salvar").</summary>
 public sealed record PlaybookStep(
     string Id,
     PlaybookStepKind Kind,
     string Target,
     string? Value = null,
     string? Rows = null,
-    ImmutableArray<string> Cells = default);
+    ImmutableArray<string> Cells = default,
+    string? CaptureAs = null,
+    string? OnlyWhen = null)
+{
+    /// <summary>True when the step runs with this data: always, or - with <see cref="OnlyWhen"/> - when that value says yes.</summary>
+    public bool RunsWith(PlaybookData data) =>
+        string.IsNullOrWhiteSpace(OnlyWhen) ||
+        data.Values.TryGetValue(OnlyWhen, out var answer) && Playbook.Plain(answer) is "SIM" or "S" or "TRUE" or "1" or "YES";
+}
 
 public enum DialogResponse
 {
@@ -98,7 +123,10 @@ public enum DialogResponse
 /// How to answer a dialog: it matches a top-level window of the program with class
 /// <see cref="ClassName"/>, a title starting with <see cref="TitleStartsWith"/> and, when
 /// <see cref="TextContains"/> is set, that text in the dialog (read from its image). A dialog no
-/// rule matches always stops the run.
+/// rule matches always stops the run. <see cref="Button"/> may be a template (the answer comes
+/// with the data, e.g. Q.S.P. yes or no). Before answering, the rest of the title after
+/// <see cref="TitleStartsWith"/> can be kept as <see cref="CaptureTitleAs"/> (the quote number of
+/// "Orçamento 899124") and a dialog field as <see cref="CaptureAs"/>.
 /// </summary>
 public sealed record DialogRule(
     string Id,
@@ -109,7 +137,16 @@ public sealed record DialogRule(
     string? Button = null,
     string? Field = null,
     string? Value = null,
-    string? Note = null);
+    string? Note = null,
+    string? CaptureTitleAs = null,
+    string? CaptureField = null,
+    string? CaptureAs = null);
+
+/// <summary>
+/// A pharmacy's own answers to a playbook's dialogs (plan 20), kept in its local data: a rule with
+/// the id of a playbook rule replaces it, the others are tried before the playbook's.
+/// </summary>
+public sealed record DialogPolicy(string PlaybookId, ImmutableArray<DialogRule> Rules);
 
 /// <summary>The values of one run: named values and named lists of rows (e.g. the components).</summary>
 public sealed record PlaybookData(

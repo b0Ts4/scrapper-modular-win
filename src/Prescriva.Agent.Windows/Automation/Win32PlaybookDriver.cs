@@ -173,6 +173,12 @@ public sealed class Win32PlaybookDriver : IPlaybookDriver
         return true;
     }
 
+    public Task<string?> ReadDialogFieldAsync(OpenDialog dialog, string path, CancellationToken cancellationToken)
+    {
+        var control = Win32WindowPath.Find(new IntPtr(dialog.Handle), path);
+        return Task.FromResult(control == IntPtr.Zero ? null : ReadText(control));
+    }
+
     public Task<bool> SetDialogTextAsync(OpenDialog dialog, string path, string text, CancellationToken cancellationToken)
     {
         var control = Win32WindowPath.Find(new IntPtr(dialog.Handle), path);

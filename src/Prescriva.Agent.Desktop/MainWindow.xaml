@@ -556,6 +556,47 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <!-- 6. Robot (milestone 2): what the robot types into the pharmacy system and how it answers notices -->
+            <TabItem x:Name="Step6Tab" Header="6  Robô">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,16,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource StepTitle}" Text="Robô de orçamentos" />
+                        <TextBlock Style="{StaticResource Guidance}"
+                                   Text="O robô lança fórmulas no programa da farmácia como uma atendente: digita os campos, responde os avisos que a farmácia escolheu e para em qualquer aviso que não conhece, deixando a tela como está para uma pessoa." />
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Avisos do programa" />
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Text="Cada farmácia decide o que o robô faz em cada aviso. Avisos que o robô encontrou sem saber o que fazer aparecem aqui para a farmácia escolher. Botões como Imprimir, Requisição, Finalizar ou Excluir nunca são oferecidos." />
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Roteiro: " VerticalAlignment="Center" />
+                                    <ComboBox x:Name="PlaybookCombo" DisplayMemberPath="Name" SelectionChanged="PlaybookCombo_SelectionChanged" />
+                                </DockPanel>
+                                <DataGrid x:Name="NoticesGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" MaxHeight="320">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Aviso" Binding="{Binding Title}" IsReadOnly="True" Width="2*" />
+                                        <DataGridTextColumn Header="Texto lido na tela" Binding="{Binding Text}" IsReadOnly="True" Width="2*" />
+                                        <DataGridTextColumn Header="Origem" Binding="{Binding Origin}" IsReadOnly="True" Width="*" />
+                                        <DataGridTemplateColumn Header="O que o robô faz" Width="2*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding Choice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanChange}" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button x:Name="SaveNoticesButton" Content="Salvar escolhas" Click="SaveNoticesButton_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False" />
+                                </WrapPanel>
+                                <TextBlock x:Name="NoticesStatusText" Margin="0,6,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

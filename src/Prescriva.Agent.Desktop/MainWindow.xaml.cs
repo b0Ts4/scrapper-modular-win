@@ -1268,6 +1268,10 @@ public partial class MainWindow : Window
         if (ReferenceEquals(e.OriginalSource, WizardSteps))
         {
             UpdateStepButtons();
+            if (ReferenceEquals(WizardSteps.SelectedItem, Step6Tab))
+            {
+                _ = LoadRobotTabAsync();
+            }
         }
     }
 

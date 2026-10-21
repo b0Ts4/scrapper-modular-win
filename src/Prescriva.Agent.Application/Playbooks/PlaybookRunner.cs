@@ -4,10 +4,11 @@ using Prescriva.Agent.Domain.Playbooks;
 
 namespace Prescriva.Agent.Application.Playbooks;
 
-public sealed record PlaybookRunnerOptions(TimeSpan SettleDelay, int MaxDialogsPerAction = 10)
+/// <param name="SettleDelay">Time given to the program after every action before its dialogs are looked at.</param>
+/// <param name="AttachTimeout">How long to wait for the program's window to open (Nova Fórmula opens Orçamentos a moment later).</param>
+public sealed record PlaybookRunnerOptions(TimeSpan SettleDelay, int MaxDialogsPerAction = 10, TimeSpan AttachTimeout = default)
 {
-    /// <summary>Time given to the program after every action before its dialogs are looked at.</summary>
-    public static PlaybookRunnerOptions Default { get; } = new(TimeSpan.FromMilliseconds(700));
+    public static PlaybookRunnerOptions Default { get; } = new(TimeSpan.FromMilliseconds(700), AttachTimeout: TimeSpan.FromSeconds(20));
 
     public static PlaybookRunnerOptions Immediate { get; } = new(TimeSpan.Zero);
 }
@@ -39,14 +40,24 @@ public enum PlaybookStopReason
 
 /// <summary>
 /// How a run ended. <see cref="Detail"/> names a rule, a value's name or a dialog's class and
-/// title - never a typed value, so a result can be logged.
+/// title - never a typed value, so it can be logged. <see cref="Captured"/> (values read from the
+/// program) and <see cref="Unknown"/> (what an unknown dialog showed) are business data: they go
+/// to the job's result and the pharmacy's notice list, never to technical logs.
 /// </summary>
 public sealed record PlaybookRunResult(
     PlaybookRunStatus Status,
     string? StepId = null,
     PlaybookStopReason? Reason = null,
     string? Detail = null,
-    ImmutableArray<string> AnsweredDialogs = default);
+    ImmutableArray<string> AnsweredDialogs = default,
+    ImmutableDictionary<string, string>? Captured = null,
+    UnknownDialog? Unknown = null)
+{
+    public ImmutableDictionary<string, string> Captured { get; init; } = Captured ?? ImmutableDictionary<string, string>.Empty;
+}
+
+/// <summary>A dialog the robot stopped on because no rule knows it: what it showed, for the pharmacy to decide on.</summary>
+public sealed record UnknownDialog(string ClassName, string Title, ImmutableArray<string> Buttons, string? Text);
 
 /// <summary>
 /// Types a <see cref="Playbook"/> into its program (plan 19). After every action the program is
@@ -72,18 +83,19 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
                 return run.Stop(null, PlaybookStopReason.InvalidPlaybook);
             }
 
-            if (!await driver.AttachAsync(playbook.ProcessIdentity, playbook.WindowRule, cancellationToken).ConfigureAwait(false))
+            if (!await AttachAsync(playbook, cancellationToken).ConfigureAwait(false))
             {
                 return run.Stop(null, PlaybookStopReason.WindowNotFound);
             }
 
-            foreach (var step in playbook.Steps)
+            foreach (var step in playbook.Steps.Where(step => step.RunsWith(data)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var stopped = step.Kind switch
                 {
                     PlaybookStepKind.SetField => await SetFieldAsync(run, step, cancellationToken).ConfigureAwait(false),
                     PlaybookStepKind.GridRows => await GridRowsAsync(run, step, cancellationToken).ConfigureAwait(false),
+                    PlaybookStepKind.ReadField => await ReadFieldAsync(run, step, cancellationToken).ConfigureAwait(false),
                     _ => await ClickAsync(run, step, cancellationToken).ConfigureAwait(false),
                 };
                 if (stopped is not null)
@@ -102,6 +114,35 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
         {
             return run.Stop(run.CurrentStep, PlaybookStopReason.MissingData, missing.Name);
         }
+    }
+
+    private async Task<bool> AttachAsync(Playbook playbook, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + _options.AttachTimeout;
+        while (!await driver.AttachAsync(playbook.ProcessIdentity, playbook.WindowRule, cancellationToken).ConfigureAwait(false))
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                return false;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(_options.AttachTimeout > TimeSpan.Zero ? 300 : 0), cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
+    }
+
+    private async Task<PlaybookRunResult?> ReadFieldAsync(Run run, PlaybookStep step, CancellationToken cancellationToken)
+    {
+        run.CurrentStep = step.Id;
+        var text = await driver.ReadTextAsync(step.Target, cancellationToken).ConfigureAwait(false);
+        if (text is null)
+        {
+            return run.Stop(step.Id, PlaybookStopReason.ControlNotFound);
+        }
+
+        run.Captured[step.CaptureAs!] = text.Trim();
+        return null;
     }
 
     private async Task<PlaybookRunResult?> SetFieldAsync(Run run, PlaybookStep step, CancellationToken cancellationToken)
@@ -244,10 +285,32 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
             }
 
             var dialog = dialogs[0];
-            var rule = await MatchAsync(run.Playbook, dialog, cancellationToken).ConfigureAwait(false);
+            var (rule, text) = await MatchAsync(run.Playbook, dialog, cancellationToken).ConfigureAwait(false);
             if (rule is null)
             {
-                return run.Stop(stepId, PlaybookStopReason.UnknownDialog, $"{dialog.ClassName} '{dialog.Title}'");
+                text ??= await driver.DialogTextAsync(dialog, cancellationToken).ConfigureAwait(false);
+                return run.Stop(stepId, PlaybookStopReason.UnknownDialog, $"{dialog.ClassName} '{dialog.Title}'") with
+                {
+                    Unknown = new UnknownDialog(dialog.ClassName, dialog.Title, dialog.Buttons, text),
+                };
+            }
+
+            if (!string.IsNullOrWhiteSpace(rule.CaptureTitleAs))
+            {
+                run.Captured[rule.CaptureTitleAs] = dialog.Title.Length > rule.TitleStartsWith.Length
+                    ? dialog.Title[rule.TitleStartsWith.Length..].Trim()
+                    : string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(rule.CaptureField))
+            {
+                var captured = await driver.ReadDialogFieldAsync(dialog, rule.CaptureField, cancellationToken).ConfigureAwait(false);
+                if (captured is null)
+                {
+                    return run.Stop(stepId, PlaybookStopReason.ControlNotFound, rule.Id);
+                }
+
+                run.Captured[rule.CaptureAs!] = captured.Trim();
             }
 
             switch (rule.Response)
@@ -264,7 +327,8 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
                     break;
             }
 
-            var button = dialog.Buttons.FirstOrDefault(caption => Playbook.Plain(caption) == Playbook.Plain(rule.Button));
+            var wanted = PlaybookTemplate.Resolve(rule.Button!, run.Data.Values);
+            var button = dialog.Buttons.FirstOrDefault(caption => Playbook.Plain(caption) == Playbook.Plain(wanted));
             if (button is null)
             {
                 return run.Stop(stepId, PlaybookStopReason.DialogButtonMissing, rule.Id);
@@ -284,8 +348,8 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
         }
     }
 
-    /// <summary>The first rule for the dialog's class and title whose text (when it asks for one) is in the dialog.</summary>
-    private async Task<DialogRule?> MatchAsync(Playbook playbook, OpenDialog dialog, CancellationToken cancellationToken)
+    /// <summary>The first rule for the dialog's class and title whose text (when it asks for one) is in the dialog, and the text when it was read.</summary>
+    private async Task<(DialogRule? Rule, string? Text)> MatchAsync(Playbook playbook, OpenDialog dialog, CancellationToken cancellationToken)
     {
         string? text = null;
         var textRead = false;
@@ -299,7 +363,7 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
 
             if (string.IsNullOrWhiteSpace(rule.TextContains))
             {
-                return rule;
+                return (rule, text);
             }
 
             if (!textRead)
@@ -310,11 +374,11 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
 
             if (text is not null && Playbook.Plain(text).Contains(Playbook.Plain(rule.TextContains), StringComparison.Ordinal))
             {
-                return rule;
+                return (rule, text);
             }
         }
 
-        return null;
+        return (null, text);
     }
 
     /// <summary>Equal as text (loosely) or, when both are numbers, as numbers - "60" and "60,00" are the same.</summary>
@@ -353,9 +417,11 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
 
         public List<string> Answered { get; } = [];
 
-        public PlaybookRunResult Completed() => new(PlaybookRunStatus.Completed, AnsweredDialogs: [.. Answered]);
+        public Dictionary<string, string> Captured { get; } = new(StringComparer.Ordinal);
+
+        public PlaybookRunResult Completed() => new(PlaybookRunStatus.Completed, AnsweredDialogs: [.. Answered], Captured: Captured.ToImmutableDictionary());
 
         public PlaybookRunResult Stop(string? stepId, PlaybookStopReason reason, string? detail = null) =>
-            new(PlaybookRunStatus.Stopped, stepId, reason, detail, [.. Answered]);
+            new(PlaybookRunStatus.Stopped, stepId, reason, detail, [.. Answered], Captured.ToImmutableDictionary());
     }
 }

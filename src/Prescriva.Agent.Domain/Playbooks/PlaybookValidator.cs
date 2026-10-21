@@ -97,6 +97,13 @@ public static class PlaybookValidator
                 break;
             case PlaybookStepKind.Click:
                 break;
+            case PlaybookStepKind.ReadField:
+                if (string.IsNullOrWhiteSpace(step.CaptureAs))
+                {
+                    errors.Add(new("MISSING_CAPTURE_NAME", path, "A read step needs the name to keep the value under."));
+                }
+
+                break;
             default:
                 errors.Add(new("UNKNOWN_STEP_KIND", path, "Unknown step kind."));
                 break;
@@ -121,10 +128,19 @@ public static class PlaybookValidator
             {
                 errors.Add(new("MISSING_BUTTON", path, "A rule that answers needs the button to press."));
             }
+            else if (!PlaybookTemplate.IsValid(rule.Button))
+            {
+                errors.Add(new("INVALID_TEMPLATE", path + ".button", "Placeholders are written {name}."));
+            }
             else if (Playbook.IsForbidden(rule.Button, playbook.AllForbiddenButtons))
             {
                 errors.Add(new("FORBIDDEN_BUTTON", path + ".button", "The Agent never presses this button."));
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(rule.CaptureField) && string.IsNullOrWhiteSpace(rule.CaptureAs))
+        {
+            errors.Add(new("MISSING_CAPTURE_NAME", path, "A captured dialog field needs the name to keep the value under."));
         }
 
         if (rule.Response == DialogResponse.FillAndPress)

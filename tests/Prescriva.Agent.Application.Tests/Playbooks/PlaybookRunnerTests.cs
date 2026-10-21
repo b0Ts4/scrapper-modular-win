@@ -127,6 +127,94 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task The_window_is_waited_for_when_it_opens_a_moment_later()
+    {
+        // Nova Fórmula opens Orçamentos a moment after the click.
+        var program = new FakeProgram { WindowOpensAfterAttempts = 3 };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate with { AttachTimeout = TimeSpan.FromSeconds(5) })
+            .RunAsync(Playbook(), Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+    }
+
+    [Fact]
+    public async Task An_unknown_dialog_is_reported_with_what_it_shows_so_the_pharmacy_can_decide()
+    {
+        var program = new FakeProgram();
+        program.DialogAfter($"key {Grid}=Enter", new OpenDialog(7, "TMessageForm", "Atenção!", ["Sim", "Não"]), "Interação medicamentosa encontrada");
+
+        var result = await Run(program);
+
+        Assert.NotNull(result.Unknown);
+        Assert.Equal("TMessageForm", result.Unknown!.ClassName);
+        Assert.Equal("Atenção!", result.Unknown.Title);
+        Assert.Equal(["Sim", "Não"], result.Unknown.Buttons.ToArray());
+        Assert.Equal("Interação medicamentosa encontrada", result.Unknown.Text);
+    }
+
+    [Fact]
+    public async Task The_title_of_an_answered_dialog_and_a_dialog_field_are_kept_as_values()
+    {
+        var program = new FakeProgram { DialogFields = { ["TwwDBEdit[0]"] = "42,00" } };
+        program.DialogAfter($"type {Grid}=MG", new OpenDialog(9, "TMessageForm", "Orçamento 899124", ["Sim", "Não"]), "Mais Fórmula(s)?");
+        var playbook = Playbook() with
+        {
+            Dialogs = Playbook().Dialogs.Add(new DialogRule("mais_formulas", "TMessageForm", "Orçamento ", "Mais Fórmula", DialogResponse.Press, "{mais_formulas}",
+                CaptureTitleAs: "numero_orcamento", CaptureField: "TwwDBEdit[0]", CaptureAs: "valor")),
+        };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Equal("899124", result.Captured["numero_orcamento"]);
+        Assert.Equal("42,00", result.Captured["valor"]);
+        Assert.Contains("press 9=Não", program.Actions); // the button came from the data
+    }
+
+    [Fact]
+    public async Task A_read_step_keeps_the_control_text_as_a_value()
+    {
+        var program = new FakeProgram { ReadBack = { ["TPanel[0]/TEdit[5]"] = "899124" } };
+        var playbook = Playbook() with { Steps = Playbook().Steps.Add(new PlaybookStep("numero", PlaybookStepKind.ReadField, "TPanel[0]/TEdit[5]", CaptureAs: "numero_orcamento")) };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, Data(), CancellationToken.None);
+
+        Assert.Equal("899124", result.Captured["numero_orcamento"]);
+    }
+
+    [Fact]
+    public async Task A_button_from_the_data_that_is_forbidden_is_never_pressed()
+    {
+        var program = new FakeProgram();
+        program.DialogAfter($"type {Grid}=MG", new OpenDialog(9, "TMessageForm", "Orçamento 1", ["Imprimir", "Cancelar"]), "Imprimir?");
+        var playbook = Playbook() with { Dialogs = Playbook().Dialogs.Add(new DialogRule("imprimir", "TMessageForm", "Orçamento ", null, DialogResponse.Press, "{botao}")) };
+        var data = Data() with { Values = Data().Values.Add("botao", "Imprimir") };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, data, CancellationToken.None);
+
+        Assert.Equal(PlaybookStopReason.ForbiddenButton, result.Reason);
+        Assert.DoesNotContain(program.Actions, action => action.StartsWith("press 9", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("sim", true)]
+    [InlineData("Sim", true)]
+    [InlineData("não", false)]
+    public async Task A_step_with_a_condition_runs_only_when_the_data_says_yes(string salvar, bool clicked)
+    {
+        // One playbook for both levels: assisted (stops before OK) and saving (presses OK).
+        var program = new FakeProgram { Captions = { ["TPanel[2]/TButton[0]"] = "&OK" } };
+        var playbook = Playbook() with { Steps = Playbook().Steps.Add(new PlaybookStep("ok", PlaybookStepKind.Click, "TPanel[2]/TButton[0]", OnlyWhen: "salvar")) };
+        var data = Data() with { Values = Data().Values.Add("salvar", salvar) };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, data, CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Equal(clicked, program.Actions.Contains("click TPanel[2]/TButton[0]"));
+    }
+
+    [Fact]
     public async Task Typing_interrupted_by_a_dialog_is_answered_but_never_typed_again()
     {
         // Retyping a half-taken grid cell would double the product code ("2553125531").
@@ -290,7 +378,7 @@ public sealed class PlaybookRunnerTests
             .Select(row => ImmutableDictionary<string, string>.Empty.Add("codigo", row.Item1).Add("quantidade", row.Item2).Add("unidade", row.Item3))
             .ToImmutableArray();
         return new PlaybookData(
-            ImmutableDictionary<string, string>.Empty.Add("volume", "60").Add("unidade", "CAP").Add("funcionario", "19"),
+            ImmutableDictionary<string, string>.Empty.Add("volume", "60").Add("unidade", "CAP").Add("funcionario", "19").Add("mais_formulas", "Não"),
             ImmutableDictionary<string, ImmutableArray<ImmutableDictionary<string, string>>>.Empty.Add("componentes", rows));
     }
 
@@ -304,6 +392,10 @@ public sealed class PlaybookRunnerTests
         private readonly Dictionary<long, string?> _texts = [];
 
         public bool WindowOpen { get; init; } = true;
+
+        public int WindowOpensAfterAttempts { get; set; }
+
+        public Dictionary<string, string> DialogFields { get; } = new(StringComparer.Ordinal);
 
         public bool DialogStaysAfterPress { get; init; }
 
@@ -323,7 +415,11 @@ public sealed class PlaybookRunnerTests
 
         public void InterruptOnce(string action, OpenDialog dialog, string text) => _interruptOnce[action] = (dialog, text);
 
-        public Task<bool> AttachAsync(string processIdentity, string windowRule, CancellationToken cancellationToken) => Task.FromResult(WindowOpen);
+        public Task<bool> AttachAsync(string processIdentity, string windowRule, CancellationToken cancellationToken) =>
+            Task.FromResult(WindowOpen && WindowOpensAfterAttempts-- <= 0);
+
+        public Task<string?> ReadDialogFieldAsync(OpenDialog dialog, string path, CancellationToken cancellationToken) =>
+            Task.FromResult(DialogFields.GetValueOrDefault(path));
 
         public Task<WriteOutcome> SetTextAsync(string path, string text, CancellationToken cancellationToken)
         {
