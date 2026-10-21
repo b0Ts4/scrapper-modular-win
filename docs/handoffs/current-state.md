@@ -1,5 +1,16 @@
 # Current state
 
+## Status — 2026-10-21 (milestone 2: plans 20 and 22; real save, MobyPharma and replies wait for the operator)
+
+- **Plan 20** (`docs/superpowers/plans/2026-10-21-notices-and-saving.md`):
+  - done: notices configurable per pharmacy (step 6 "Robô" → "Avisos do programa"), notices the robot met offered for a decision, captures, OK step;
+  - **not done:** saving on the real FórmulaCerta. The session's safety check refused writing to the production system, so it waits for the operator's explicit authorization or a test database.
+- **Plan 22** (`docs/superpowers/plans/2026-10-21-robot-jobs-and-connector.md`): done.
+  - Encrypted job queue, local API (127.0.0.1 + token), CRM connector, robot loop and step 6 settings, with a banner and Parar.
+  - Tested end to end on the TestTarget, by hand in the real Agent.
+  - CRM side on branch `feature/agent-bridge` of `b0Ts4/receitaAI`; its Python tests were not run, because there is no Python here.
+- **Plans 21 (attend a MobyPharma order) and 23 (reply in its chat): not started.** They need a test order, and authorization to take it and to send a message to a number the operator controls. MobyPharma shows live customer orders.
+- **Left open in FórmulaCerta:** an empty, unsaved new quote with "Dados não gravados. Confirma cancelamento?". The safety check refused the "Sim" click.
 ## Status — 2026-10-20 (milestone 2 started: plan 19, the Agent fills FórmulaCerta's Orçamentos from data)
 
 - **Design:** `docs/superpowers/specs/2026-10-20-milestone-2-automated-quotes-design.md`, approved by the operator ("pode implementar"). The Agent attends online orders in FórmulaCerta driven by the CRM (`b0Ts4/receitaAI`). There is no Fagron API, so it uses UI automation on a dedicated machine.

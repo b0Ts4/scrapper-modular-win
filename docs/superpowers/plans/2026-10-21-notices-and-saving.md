@@ -38,6 +38,22 @@ The operator said "a questão dos avisos varia para cada farmácia, então o ide
 3. Infrastructure: policy store. Desktop: view model and window.
 4. Real FórmulaCerta, test data: save a quote through the dialogs and read its number. Each saved quote goes to the operator's local log.
 
+## Result (2026-10-21, partial)
+
+Tasks 1–3 are done.
+
+**Tests:**
+- `DialogPolicyTests` (6);
+- `PlaybookRunnerTests` (+9: waiting for the window, unknown notice reported, title and field captures, data button and forbidden data button, `onlyWhen`);
+- `JsonDialogPolicyStoreTests` (7);
+- `NoticeSettingsViewModelTests` (6).
+
+The step 6 "Robô" tab shows each notice with its choices. It was checked by hand in the Agent: a notice the robot met is listed as "Visto 1 vez" with "Parar e chamar uma pessoa".
+
+**Task 4 (saving on the real FórmulaCerta) is not done.** Running the playbook with `salvar` would create a real quote in the pharmacy's production system. The session's safety check refused it, and even refused confirming "Dados não gravados → Sim" on an empty unsaved quote. It needs the operator's explicit authorization, or a FórmulaCerta test database.
+
+The playbook already has OK (`TFagronButton[8]`, only when `salvar`). The rules for the dialogs after OK are to be found by that run: each unknown one stops it and is recorded for the pharmacy.
+
 ## Privacy
 
 - Captured values are business data. They stay in memory and go to the job result only, never to technical logs.

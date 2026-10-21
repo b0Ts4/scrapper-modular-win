@@ -44,6 +44,27 @@ The CRM sends the Agent a job "launch this quote" and gets the result back witho
 3. End to end on the TestTarget quote screen: a job posted to the local API is filled by the robot and its result is read back through the API.
 4. Desktop step 6. CRM side in receitaAI.
 
+## Result (2026-10-21)
+
+Tasks 1–4 are done.
+
+**Tests:**
+- `QuoteRunsTests` (7), `JobProcessorTests` (7), `RobotLoopTests` (4);
+- `SqliteJobStoreTests` (5), `JobConnectionTests` (6), `JsonRobotConfigurationStoreTests` (2);
+- `RobotJobEndToEndTests` (2) and `PlaybookRunTests` (+1: a notice already open when the robot starts).
+
+**By hand, in the real Agent** (isolated data directory, TestTarget quote screen, test playbook in the data directory):
+1. A job posted to `http://127.0.0.1:18800/v1/jobs/launch-quote` was run by the robot while the banner "Robô trabalhando … [Parar]" was shown.
+2. The grid ended as `emp=19;rows=25531|75|MG;999|5|MG`, with the employee answered and the stock notice recognized by OCR and answered.
+3. `GET /v1/jobs/teste-agent-2` returned `completed`.
+4. After a restart the robot resumed by itself and the job list was kept.
+
+**Found by hand and fixed:**
+- The first try stopped on the TestTarget's own main window. "Funcionário Recepção" had opened before the robot started, when the Agent's window took the focus, and the TestTarget disabled only the quote form behind a modal.
+- It now disables every window of the program, as Delphi's `ShowModal` does. New test: `A_notice_already_open_when_the_robot_starts_…`.
+
+**CRM side:** branch `feature/agent-bridge` of `b0Ts4/receitaAI`, with `agent_bridge.py`, `test_agent_bridge.py` and `AGENT_BRIDGE.md`. **Its tests have not been run:** this machine has no Python.
+
 ## Privacy
 
 - Job requests and results hold patient and prescription data: encrypted at rest, never in technical logs (only job id, state and reason codes).

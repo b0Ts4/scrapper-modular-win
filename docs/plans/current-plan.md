@@ -23,6 +23,6 @@ Plan 7 — `docs/superpowers/plans/2026-10-05-spec-gap-closure-and-startup.md` (
 
 Plan 8 — `docs/superpowers/plans/2026-10-05-ocr-text-fields.md` (OCR text fields), plus the pending items closed in the same session (x86 hang root cause, dispatcher recovery, weights version on approvals, case-insensitive IDs, typed not-found) — see handoff.
 
-Milestone 2 — automated attendance and quotes in FórmulaCerta (`docs/superpowers/specs/2026-10-20-milestone-2-automated-quotes-design.md`). Plan 19 — `docs/superpowers/plans/2026-10-20-playbook-write-actions.md` (write actions, playbooks, assisted launch) — done 2026-10-20, proven on the real FórmulaCerta with test data. Next: plan 20 (save and read back).
+Milestone 2 — automated attendance and quotes in FórmulaCerta (`docs/superpowers/specs/2026-10-20-milestone-2-automated-quotes-design.md`). Plan 19 — `docs/superpowers/plans/2026-10-20-playbook-write-actions.md` (write actions, playbooks, assisted launch) — done 2026-10-20, proven on the real FórmulaCerta with test data. Plan 20 (notices per pharmacy; saving pending authorization) and plan 22 (jobs, local API, CRM connector) — 2026-10-21. Next: the real save run, then plans 21 and 23 (see handoff).
 
 Plan 9 — `docs/superpowers/plans/2026-10-06-store-packaging.md` (Microsoft Store MSIX, packaged start with Windows) — implemented and verified on CI with an installed package; submission waits on the publisher's Partner Center identity.
