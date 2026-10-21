@@ -59,6 +59,42 @@ internal static class Win32WindowPath
         return result;
     }
 
+    /// <summary>The child window at <paramref name="path"/> below <paramref name="root"/>; zero when there is none.</summary>
+    public static IntPtr Find(IntPtr root, string path)
+    {
+        var current = root;
+        foreach (var segment in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var open = segment.LastIndexOf('[');
+            if (open <= 0 || !segment.EndsWith(']') ||
+                !int.TryParse(segment.AsSpan(open + 1, segment.Length - open - 2), NumberStyles.None, CultureInfo.InvariantCulture, out var wanted))
+            {
+                return IntPtr.Zero;
+            }
+
+            var className = segment[..open];
+            var index = 0;
+            var found = IntPtr.Zero;
+            for (var child = GetWindow(current, GwChild); child != IntPtr.Zero; child = GetWindow(child, GwHwndNext))
+            {
+                if (string.Equals(ClassOf(child), className, StringComparison.Ordinal) && index++ == wanted)
+                {
+                    found = child;
+                    break;
+                }
+            }
+
+            if (found == IntPtr.Zero)
+            {
+                return IntPtr.Zero;
+            }
+
+            current = found;
+        }
+
+        return current == root ? IntPtr.Zero : current;
+    }
+
     public static (double X, double Y, double Width, double Height)? Bounds(IntPtr handle) =>
         GetWindowRect(handle, out var rect) ? (rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top) : null;
 

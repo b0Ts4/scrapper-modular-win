@@ -41,7 +41,10 @@ End-to-end coverage of the milestone:
 
 Integration tests running longer than 60 s are named in the output (`xunit.runner.json`), so a hang is attributable.
 
-Environment knobs used by the tests: `PRESCRIVA_AGENT_DATA` (Agent data directory), `PRESCRIVA_AGENT_OUTBOX_WARNING`/`_CRITICAL` (alert thresholds), `PRESCRIVA_TESTTARGET_EXE` and `PRESCRIVA_TESTTARGET_EXPECTED_BITNESS` (x86 pass), `PRESCRIVA_SCREENSHOT_DIR` (hover screenshots).
+- `Automation/PlaybookRunTests` — plan 19: a playbook typed into TestTarget's Delphi-like quote screen (`--layout-variant win32-quote`) by `Win32PlaybookDriver`. It answers "Funcionário Recepção" asked from inside the focus change, answers the stock notice recognized by OCR, stops on an unknown notice, never causes the save that Enter on the empty row would start, and does not take the program's other open screen for a dialog.
+- `RealApps/RealFormulaCertaPlaybookTests` — opt-in (`PRESCRIVA_FORMULACERTA_PLAYBOOK=1`), only on the pharmacy's PC: the shipped FórmulaCerta playbook fills a new quote a person has opened (test data) and stops before OK; the person cancels it.
+
+Environment knobs used by the tests: `PRESCRIVA_FORMULACERTA_PLAYBOOK` (the opt-in real FórmulaCerta run), `PRESCRIVA_AGENT_DATA` (Agent data directory), `PRESCRIVA_AGENT_OUTBOX_WARNING`/`_CRITICAL` (alert thresholds), `PRESCRIVA_TESTTARGET_EXE` and `PRESCRIVA_TESTTARGET_EXPECTED_BITNESS` (x86 pass), `PRESCRIVA_SCREENSHOT_DIR` (hover screenshots).
 
 The visual checks no automated test can make (overlay drawn in the right place, layout readable) are in the [milestone walkthrough](testing/milestone-1-manual.md).
 

@@ -173,7 +173,7 @@ internal static class FileFieldCapture
         return false;
     }
 
-    private static byte[] CapturePng(System.Windows.Rect bounds)
+    internal static byte[] CapturePng(System.Windows.Rect bounds)
     {
         const int SrcCopy = 0x00CC0020;
         const int CaptureBlt = 0x40000000;

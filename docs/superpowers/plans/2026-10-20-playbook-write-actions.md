@@ -63,6 +63,43 @@ The Agent fills a program's screen from data, following a declarative *playbook*
 - Reading the grid back. The grid shows no text to programs and OCR of it is unreliable (see `docs/integrations/formulacerta-receita.md`). In assisted mode the attendant sees the grid; in plan 20 the saved quote is checked exactly.
 - MobyPharma (plan 21), connector and Desktop robot screen (plan 22), replies (plan 23).
 
+## Result (2026-10-20)
+
+Tasks 1–5 are done.
+
+**Tests:**
+- `PlaybookValidatorTests` (12) and `PlaybookTemplateTests` (8);
+- `PlaybookRunnerTests` (21, fake program);
+- `JsonPlaybookStoreTests` (6, including the shipped playbook);
+- `PlaybookRunTests` (3, live TestTarget `win32-quote`);
+- `RealFormulaCertaPlaybookTests`, opt-in.
+
+RED was compile-time for the new API. It was observed at run time for "another screen of the program is not a dialog" (the TestTarget's main window left open: `UnknownDialog HwndWrapper[…]` before the fix).
+
+**Found on the real FórmulaCerta and fixed:**
+- *Funcionário Recepção* is `TfrPedeFuncionario`, shown when the focus leaves the components grid. Its OK is a `TFagronButton`, which answers `BM_CLICK`.
+- The driver first read values back before the program had handled the posted characters, because a sent `WM_NULL` overtakes posted messages. Characters are now sent synchronously; Tab and Enter stay posted, because Delphi only moves between fields and cells through its own message loop.
+- The Receitas screen, open next to Orçamentos, was taken for a dialog. Windows already open when the run starts are now the program's screens; when a modal dialog is already open (Delphi disables every other window), it stays a dialog.
+- The OCR of a dialog captured the wrong place on a scaled display: `GetWindowRect` is DPI-virtualized for the Agent. The dialog's bounds now come from UI Automation (physical pixels), as for image fields.
+- A click that did not move the focus sent keys to another field (seen by hand). The driver now checks that the focus is in the target before typing.
+
+**From the code review:**
+- Typing interrupted by a dialog is never typed again. A retyped grid cell would double a product code: new outcome `Interrupted`, reason `InputInterrupted`.
+- A number written with a decimal point ("0.5") stops the run (reason `AmbiguousNumber`): FórmulaCerta reads it the Brazilian way, as 5.
+
+**Real run, 2026-10-20 22:38, test data:** a new quote was opened by hand (Novo Orç. → automático) and the shipped playbook filled it in 17 s:
+- volume 60 CAP;
+- PREGABALINA 75 mg and CICLOBENZAPRINA (HCL) 5 mg;
+- "Produto abaixo do Estoque Mínimo!" recognized by OCR and answered OK;
+- "Total Componentes = 2", stopped before OK.
+
+The quote was cancelled. Every run is listed in the operator's local log.
+
+**Limits, kept for later plans:**
+- The grid's content is not read back. The program shows no text, and OCR of the grid is unreliable. In assisted mode a person sees it; plan 20 checks the saved quote exactly.
+- A focus call held by a dialog that the run then stops on completes when a person answers that dialog, so the focus then moves to the field the robot was going to type in.
+- The robot brings the program to the foreground while it types. That is one reason it runs on a dedicated machine.
+
 ## Privacy
 
 Playbooks hold selectors and rules, never business values. Data passes through memory only. Results and logs carry step ids, reason codes and dialog rule ids, never typed values or dialog text.

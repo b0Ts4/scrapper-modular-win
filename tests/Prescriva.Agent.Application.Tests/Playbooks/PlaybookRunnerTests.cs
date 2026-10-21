@@ -127,6 +127,49 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task Typing_interrupted_by_a_dialog_is_answered_but_never_typed_again()
+    {
+        // Retyping a half-taken grid cell would double the product code ("2553125531").
+        var program = new FakeProgram();
+        program.InterruptOnce($"type {Grid}=25531", new OpenDialog(8, "TMessageForm", "Atenção!", ["OK"]), "Produto abaixo do Estoque Mínimo!");
+
+        var result = await Run(program);
+
+        Assert.Equal(PlaybookStopReason.InputInterrupted, result.Reason);
+        Assert.Equal("componentes[0]", result.StepId);
+        Assert.Single(program.Actions, action => action == $"type {Grid}=25531");
+        Assert.Contains("press 8=OK", program.Actions);
+    }
+
+    [Theory]
+    [InlineData("0.5")]
+    [InlineData("1.000")]
+    public async Task A_number_written_with_a_decimal_point_stops_before_the_row_is_typed(string quantity)
+    {
+        // FórmulaCerta reads numbers the Brazilian way: "0.5" would become 5 - a wrong dose.
+        var program = new FakeProgram();
+
+        var result = await Run(program, Data(("7995", quantity, "MG")));
+
+        Assert.Equal(PlaybookStopReason.AmbiguousNumber, result.Reason);
+        Assert.Equal("componentes[1]", result.StepId);
+        Assert.DoesNotContain($"type {Grid}=7995", program.Actions);
+    }
+
+    [Fact]
+    public async Task A_field_value_written_with_a_decimal_point_stops_before_it_is_typed()
+    {
+        var program = new FakeProgram();
+        var data = Data() with { Values = Data().Values.SetItem("volume", "60.5") };
+
+        var result = await Run(program, data);
+
+        Assert.Equal(PlaybookStopReason.AmbiguousNumber, result.Reason);
+        Assert.Equal("volume", result.StepId);
+        Assert.Empty(program.Actions);
+    }
+
+    [Fact]
     public async Task A_row_with_an_empty_cell_stops_before_anything_of_that_row_is_typed()
     {
         // Enter on an empty grid row saves the quote in FórmulaCerta: it must never be sent.
@@ -257,6 +300,7 @@ public sealed class PlaybookRunnerTests
         private readonly Dictionary<string, string> _fields = new(StringComparer.Ordinal);
         private readonly Dictionary<string, (OpenDialog Dialog, string? Text)> _after = new(StringComparer.Ordinal);
         private readonly Dictionary<string, OpenDialog> _blockOnce = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (OpenDialog Dialog, string Text)> _interruptOnce = new(StringComparer.Ordinal);
         private readonly Dictionary<long, string?> _texts = [];
 
         public bool WindowOpen { get; init; } = true;
@@ -276,6 +320,8 @@ public sealed class PlaybookRunnerTests
         public void DialogAfter(string action, OpenDialog dialog, string? text = "") => _after[action] = (dialog, text);
 
         public void BlockOnce(string action, OpenDialog dialog) => _blockOnce[action] = dialog;
+
+        public void InterruptOnce(string action, OpenDialog dialog, string text) => _interruptOnce[action] = (dialog, text);
 
         public Task<bool> AttachAsync(string processIdentity, string windowRule, CancellationToken cancellationToken) => Task.FromResult(WindowOpen);
 
@@ -326,6 +372,12 @@ public sealed class PlaybookRunnerTests
             {
                 Show(blocking, string.Empty);
                 return WriteOutcome.Blocked;
+            }
+
+            if (_interruptOnce.Remove(action, out var interrupting))
+            {
+                Show(interrupting.Dialog, interrupting.Text);
+                return WriteOutcome.Interrupted;
             }
 
             if (_after.Remove(action, out var shown))

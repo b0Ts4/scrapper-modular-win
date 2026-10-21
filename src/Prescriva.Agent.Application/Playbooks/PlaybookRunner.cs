@@ -24,7 +24,9 @@ public enum PlaybookStopReason
     WindowNotFound,
     ControlNotFound,
     ControlBlocked,
+    InputInterrupted,
     MissingData,
+    AmbiguousNumber,
     EmptyCell,
     ValueMismatch,
     UnknownDialog,
@@ -54,7 +56,7 @@ public sealed record PlaybookRunResult(
 /// leaves the screen as it is for a person. It never presses OK/save by itself: a playbook ends
 /// where its steps end.
 /// </summary>
-public sealed class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions? options = null)
+public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions? options = null)
 {
     private readonly PlaybookRunnerOptions _options = options ?? PlaybookRunnerOptions.Default;
 
@@ -106,6 +108,11 @@ public sealed class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions
     {
         run.CurrentStep = step.Id;
         var value = PlaybookTemplate.Resolve(step.Value!, run.Data.Values);
+        if (PointDecimal(value))
+        {
+            return run.Stop(step.Id, PlaybookStopReason.AmbiguousNumber);
+        }
+
         var stopped = await WriteAsync(run, step.Id, () => driver.SetTextAsync(step.Target, value, cancellationToken), cancellationToken).ConfigureAwait(false);
         if (stopped is not null)
         {
@@ -142,6 +149,11 @@ public sealed class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions
             if (cells.Any(string.IsNullOrWhiteSpace))
             {
                 return run.Stop(stepId, PlaybookStopReason.EmptyCell);
+            }
+
+            if (cells.Any(PointDecimal))
+            {
+                return run.Stop(stepId, PlaybookStopReason.AmbiguousNumber);
             }
 
             foreach (var cell in cells)
@@ -196,6 +208,12 @@ public sealed class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions
             if (outcome == WriteOutcome.Done)
             {
                 return null;
+            }
+
+            if (outcome == WriteOutcome.Interrupted)
+            {
+                // Part of the input may already be in the field: typing it again could double it.
+                return run.Stop(stepId, PlaybookStopReason.InputInterrupted);
             }
 
             if (attempt > 0)
@@ -300,7 +318,7 @@ public sealed class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions
     }
 
     /// <summary>Equal as text (loosely) or, when both are numbers, as numbers - "60" and "60,00" are the same.</summary>
-    internal static bool SameValue(string typed, string shown)
+    public static bool SameValue(string typed, string shown)
     {
         if (Playbook.Plain(typed) == Playbook.Plain(shown))
         {
@@ -309,6 +327,15 @@ public sealed class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions
 
         return Number(typed) is { } left && Number(shown) is { } right && left == right;
     }
+
+    /// <summary>
+    /// A number written with a decimal point ("0.5", "1.000"): FórmulaCerta reads numbers the
+    /// Brazilian way, so it would take "0.5" as 5. Data must write decimals with a comma.
+    /// </summary>
+    private static bool PointDecimal(string value) => PointDecimalPattern().IsMatch(value.Trim());
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^[+-]?\d+\.\d+$")]
+    private static partial System.Text.RegularExpressions.Regex PointDecimalPattern();
 
     private static decimal? Number(string text)
     {

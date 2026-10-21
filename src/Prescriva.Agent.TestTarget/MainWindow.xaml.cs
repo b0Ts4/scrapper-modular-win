@@ -49,6 +49,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (string.Equals(variant, "win32-quote", StringComparison.OrdinalIgnoreCase))
+        {
+            // The main window stays open next to the quote screen, like FórmulaCerta's Receitas
+            // next to Orçamentos: another screen of the program, not a dialog (plan 19).
+            Loaded += (_, _) => Win32Quote.Show();
+            return;
+        }
+
         if (string.Equals(variant, "duplicate-controls", StringComparison.OrdinalIgnoreCase))
         {
             // Deliberately reuses the AutomationId "MedicationTextBox" so tests can

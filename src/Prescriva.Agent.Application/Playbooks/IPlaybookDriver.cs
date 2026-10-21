@@ -46,8 +46,11 @@ public enum WriteOutcome
     Done,
     ControlNotFound,
 
-    /// <summary>The program did not take the input in time - typically a dialog opened from the focus change.</summary>
+    /// <summary>Nothing was typed: the program did not take the focus in time - typically a dialog opened from the focus change.</summary>
     Blocked,
+
+    /// <summary>Part of the input may have been taken when the program stopped answering (a dialog opened while typing): it must not be typed again.</summary>
+    Interrupted,
 }
 
 public enum PlaybookKey

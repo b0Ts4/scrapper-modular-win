@@ -1,5 +1,17 @@
 # Current state
 
+## Status — 2026-10-20 (milestone 2 started: plan 19, the Agent fills FórmulaCerta's Orçamentos from data)
+
+- **Design:** `docs/superpowers/specs/2026-10-20-milestone-2-automated-quotes-design.md`, approved by the operator ("pode implementar"). The Agent attends online orders in FórmulaCerta driven by the CRM (`b0Ts4/receitaAI`). There is no Fagron API, so it uses UI automation on a dedicated machine.
+- **Operator decisions:**
+  - no robot user: employee 19 is used and everything done in FórmulaCerta is logged in `.local/registro-de-testes.md` (gitignored, holds customer data);
+  - the CRM side is built here too (plan 22);
+  - the CRM keeps its own WhatsApp for other ERPs, but with FórmulaCerta the reply goes through MobyPharma.
+- **Plan 19:** `docs/superpowers/plans/2026-10-20-playbook-write-actions.md`, done. See its Result section. The shipped playbook `formulacerta_lancar_formula` filled a real new quote (60 CAP, two components, stock notice answered by OCR rule) and stopped before OK; the quote was cancelled.
+- **For the pharmacists:** `docs/integrations/formulacerta-avisos.md` lists every FórmulaCerta notice seen, with the proposed robot behaviour, for their decision.
+- **Branch:** `feature/milestone-2-quotes`.
+- **Next:** plan 20, saving and the after-OK dialog sequence, then reading the quote back.
+
 ## Status — 2026-10-18 (plan 16: whole prescription file + one extraction across MobyPharma and Orçamentos; end-to-end event still to be seen on the operator's PC)
 
 ## Status — 2026-10-12 (first real pharmacy system test: FórmulaCerta works end to end after two fixes and plan 14; see "First test on a real pharmacy system")
