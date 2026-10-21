@@ -567,6 +567,45 @@
 
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Robô" />
+                                <CheckBox x:Name="RobotEnabledCheckBox" Content="Robô ligado (busca trabalhos e lança no programa)" Margin="0,0,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="Nível: " VerticalAlignment="Center" Margin="0,0,8,6" />
+                                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="RobotLevelCombo" Margin="0,0,0,6">
+                                        <ComboBoxItem Content="Assistido: preenche a fórmula e para antes do OK (uma pessoa confere e salva)" />
+                                        <ComboBoxItem Content="Salva o orçamento (a resposta ao cliente continua precisando de aprovação)" />
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="1" Text="Funcionário: " VerticalAlignment="Center" Margin="0,0,8,6" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="RobotEmployeeBox" Margin="0,0,0,6" ToolTip="Código que o robô informa em &quot;Funcionário Recepção&quot;." />
+                                    <TextBlock Grid.Row="2" Text="Endereço do CRM: " VerticalAlignment="Center" Margin="0,0,8,6" />
+                                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="CrmUrlBox" Margin="0,0,0,6" ToolTip="Ex.: https://crm.suafarmacia.com.br/ (vazio: só a API local)." />
+                                    <TextBlock Grid.Row="3" Text="Chave do CRM: " VerticalAlignment="Center" Margin="0,0,8,6" />
+                                    <PasswordBox Grid.Row="3" Grid.Column="1" x:Name="CrmTokenBox" Margin="0,0,0,6" />
+                                </Grid>
+                                <TextBlock x:Name="LocalApiText" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button x:Name="SaveRobotButton" Content="Salvar e aplicar" Click="SaveRobotButton_Click" Style="{StaticResource PrimaryButton}" />
+                                    <Button x:Name="CopyLocalTokenButton" Content="Copiar chave da API local" Click="CopyLocalTokenButton_Click" />
+                                    <Button x:Name="StopRobotJobButton" Content="Parar trabalho atual" Click="StopRobotJobButton_Click" IsEnabled="False" />
+                                </WrapPanel>
+                                <TextBlock x:Name="RobotStatusText" Margin="0,8,0,0" TextWrapping="Wrap" FontWeight="SemiBold" Text="Robô desligado." />
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Trabalhos" Margin="0,10,0,6" />
+                                <ListBox x:Name="RobotJobsList" Height="140" VirtualizingPanel.IsVirtualizing="False" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
                                 <TextBlock Style="{StaticResource SectionTitle}" Text="Avisos do programa" />
                                 <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
                                            Text="Cada farmácia decide o que o robô faz em cada aviso. Avisos que o robô encontrou sem saber o que fazer aparecem aqui para a farmácia escolher. Botões como Imprimir, Requisição, Finalizar ou Excluir nunca são oferecidos." />
@@ -577,7 +616,16 @@
                                 <DataGrid x:Name="NoticesGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" MaxHeight="320">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Aviso" Binding="{Binding Title}" IsReadOnly="True" Width="2*" />
-                                        <DataGridTextColumn Header="Texto lido na tela" Binding="{Binding Text}" IsReadOnly="True" Width="2*" />
+                                        <DataGridTextColumn Header="Texto lido na tela" Binding="{Binding Text}" IsReadOnly="True" Width="2*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="TextWrapping" Value="Wrap" />
+                                                    <Setter Property="MaxHeight" Value="48" />
+                                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                                    <Setter Property="ToolTip" Value="{Binding Text}" />
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
                                         <DataGridTextColumn Header="Origem" Binding="{Binding Origin}" IsReadOnly="True" Width="*" />
                                         <DataGridTemplateColumn Header="O que o robô faz" Width="2*">
                                             <DataGridTemplateColumn.CellTemplate>

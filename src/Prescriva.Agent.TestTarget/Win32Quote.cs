@@ -84,6 +84,23 @@ internal static class Win32Quote
         SetFocus(_grid);
     }
 
+    /// <summary>
+    /// The quote screen with "Funcionário Recepção" already open, as when a person clicked elsewhere
+    /// before the robot started. Shown with <c>--layout-variant win32-quote-asking</c>.
+    /// </summary>
+    public static void ShowAsking()
+    {
+        Show();
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            _employeeAsked = true;
+            ShowModal(EmployeeDialogClass, "Funcionário Recepção", null, withEdit: true, "OK", "Cancelar");
+        };
+        timer.Start();
+    }
+
     private static IntPtr GridWindowProcedure(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam)
     {
         if (handle != _grid)
@@ -172,7 +189,18 @@ internal static class Win32Quote
             Create(0, "BUTTON", buttons[index], WsChild | WsVisible | WsTabStop, 16 + index * 110, 70, 100, 28, dialog);
         }
 
-        EnableWindow(_form, false);
+        // Like Delphi's ShowModal (DisableTaskWindows): every other window of the program is disabled.
+        var disabled = new List<IntPtr>();
+        EnumThreadWindows(GetCurrentThreadId(), (window, _) =>
+        {
+            if (window != dialog && IsWindowVisible(window) && IsWindowEnabled(window))
+            {
+                EnableWindow(window, false);
+                disabled.Add(window);
+            }
+
+            return true;
+        }, IntPtr.Zero);
         SetForegroundWindow(dialog);
         while (IsWindow(dialog) && GetMessage(out var loopMessage, IntPtr.Zero, 0, 0) > 0)
         {
@@ -180,7 +208,11 @@ internal static class Win32Quote
             DispatchMessage(ref loopMessage);
         }
 
-        EnableWindow(_form, true);
+        foreach (var window in disabled)
+        {
+            EnableWindow(window, true);
+        }
+
         SetForegroundWindow(_form);
     }
 
@@ -306,6 +338,20 @@ internal static class Win32Quote
 
     [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr handle);
+
+    private delegate bool EnumWindowsProcedure(IntPtr window, IntPtr parameter);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumThreadWindows(uint threadId, EnumWindowsProcedure procedure, IntPtr parameter);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 
     [DllImport("user32.dll")]
     private static extern bool DestroyWindow(IntPtr handle);

@@ -53,6 +53,27 @@ public sealed class PlaybookRunTests
     }
 
     [Fact]
+    public async Task A_notice_already_open_when_the_robot_starts_is_answered_and_the_other_screens_are_not_notices()
+    {
+        // A person clicked elsewhere: "Funcionário Recepção" is open and, as in Delphi, every other
+        // window of the program (here also the TestTarget's main window) is disabled behind it.
+        using var target = TestTargetLauncher.Launch("win32-quote-asking");
+        var driver = await QuoteScreenAsync();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while ((await driver.DialogsAsync(Playbook.DefaultIgnoredWindowClasses, CancellationToken.None)).All(dialog => dialog.Title != "Funcionário Recepção"))
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The employee dialog did not open.");
+            await Task.Delay(200);
+            await driver.AttachAsync(Quote().ProcessIdentity, Quote().WindowRule, CancellationToken.None);
+        }
+
+        var result = await new PlaybookRunner(new Win32PlaybookDriver()).RunAsync(Quote(), Data(("25531", "75", "MG")), CancellationToken.None);
+
+        Assert.True(result.Status == PlaybookRunStatus.Completed, Describe(result));
+        Assert.Equal("funcionario", result.AnsweredDialogs[0]);
+    }
+
+    [Fact]
     public async Task The_program_window_not_being_open_stops_at_once()
     {
         var result = await new PlaybookRunner(new Win32PlaybookDriver()).RunAsync(Quote() with { WindowRule = "Janela que não existe" }, Data(("25531", "75", "MG")), CancellationToken.None);

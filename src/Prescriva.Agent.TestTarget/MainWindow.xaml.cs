@@ -49,6 +49,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (string.Equals(variant, "win32-quote-asking", StringComparison.OrdinalIgnoreCase))
+        {
+            Loaded += (_, _) => Win32Quote.ShowAsking();
+            return;
+        }
+
         if (string.Equals(variant, "win32-quote", StringComparison.OrdinalIgnoreCase))
         {
             // The main window stays open next to the quote screen, like FórmulaCerta's Receitas

@@ -147,6 +147,7 @@ public partial class MainWindow : Window
             await RefreshOpenWindowsAsync();
         };
         Closing += OnClosing;
+        _ = InitializeRobotAsync();
 
         _pointerPollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -159,6 +160,7 @@ public partial class MainWindow : Window
             // Exiting keeps the integration "left active", so starting with Windows resumes it;
             // only the Stop button clears that choice.
             await _monitorViewModel.StopAsync();
+            StopRobot();
             _trayIcon.Dispose();
             _technicalLog.Dispose();
             _pointerPollTimer.Stop();
