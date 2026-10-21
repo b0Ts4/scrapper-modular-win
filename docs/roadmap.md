@@ -4,6 +4,10 @@
 
 Configure, test, activate and capture against `Prescriva.Agent.TestTarget` with local encrypted events. Status and evidence: [current state](handoffs/current-state.md).
 
+## Milestone 2 (proposed)
+
+Automated attendance and quotes in FórmulaCerta driven by the CRM (receitaAI): write actions, playbooks, job runner, connector. Design: [2026-10-20 automated quotes](superpowers/specs/2026-10-20-milestone-2-automated-quotes-design.md) — draft awaiting the operator's approval.
+
 ## Next candidates
 
 1. ~~Persisted approvals and configuration editing~~ — shipped in the configuration lifecycle plan (`docs/superpowers/plans/2026-10-04-configuration-lifecycle.md`). Remaining configurator UX: list-based editing (select a row instead of typing IDs), editing a field's selector by re-inspection, stage reordering.
