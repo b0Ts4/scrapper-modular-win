@@ -23,6 +23,9 @@ internal static class Win32Quote
     public const string EmployeeDialogClass = "TPrescrivaPedeFuncionario";
     public const string MessageClass = "TPrescrivaMessage";
     public const string SaveDialogClass = "TPrescrivaSalvando";
+    public const string PrintDialogClass = "TPrescrivaImpressao";
+    private const string BitButtonClass = "TBitBtn";
+    private const uint BmClick = 0x00F5;
 
     private const uint WsOverlappedWindow = 0x00CF0000;
     private const uint WsPopup = 0x80000000;
@@ -49,6 +52,7 @@ internal static class Win32Quote
     // Kept in static fields: native code calls them for as long as the process runs.
     private static readonly WindowProcedure GridProcedure = GridWindowProcedure;
     private static readonly WindowProcedure DialogProcedure = DialogWindowProcedure;
+    private static readonly WindowProcedure BitButtonProcedure = BitButtonWindowProcedure;
 
     private static readonly List<string[]> Rows = [];
     private static readonly StringBuilder Cell = new();
@@ -68,6 +72,8 @@ internal static class Win32Quote
         Register(EmployeeDialogClass, Marshal.GetFunctionPointerForDelegate(DialogProcedure));
         Register(MessageClass, Marshal.GetFunctionPointerForDelegate(DialogProcedure));
         Register(SaveDialogClass, Marshal.GetFunctionPointerForDelegate(DialogProcedure));
+        Register(PrintDialogClass, Marshal.GetFunctionPointerForDelegate(DialogProcedure));
+        Register(BitButtonClass, Marshal.GetFunctionPointerForDelegate(BitButtonProcedure));
 
         _form = Create(0, FormClass, Title, WsOverlappedWindow | WsVisible, 40, 40, 520, 360, IntPtr.Zero);
         var fields = Create(0, PanelClass, string.Empty, WsChild | WsVisible, 10, 10, 490, 80, _form);
@@ -156,6 +162,11 @@ internal static class Win32Quote
             {
                 ShowModal(MessageClass, "Atenção!", "Produto abaixo do Estoque Mínimo!", withEdit: false, "OK");
             }
+            else if (row[0] == "777")
+            {
+                // Like FórmulaCerta's print setup: Delphi TBitBtn buttons, not TButton.
+                ShowModal(PrintDialogClass, "Orçamento MODELO3", "Imprimir", withEdit: false, bitButtons: true, "Ok", "Cancelar");
+            }
             else if (row[0] == "666")
             {
                 ShowModal(MessageClass, "Atenção!", "Interação medicamentosa encontrada!", withEdit: false, "OK");
@@ -175,7 +186,10 @@ internal static class Win32Quote
     }
 
     /// <summary>A modal dialog like a Delphi form's ShowModal: the form is disabled and a nested loop runs until a button closes it.</summary>
-    private static void ShowModal(string className, string title, string? text, bool withEdit, params string[] buttons)
+    private static void ShowModal(string className, string title, string? text, bool withEdit, params string[] buttons) =>
+        ShowModal(className, title, text, withEdit, bitButtons: false, buttons);
+
+    private static void ShowModal(string className, string title, string? text, bool withEdit, bool bitButtons, params string[] buttons)
     {
         var dialog = Create(WsExTopmost | WsExDlgModalFrame, className, title, WsPopup | WsCaption | WsSysMenu | WsVisible, 160, 160, 360, 150, IntPtr.Zero);
         if (text is not null)
@@ -186,7 +200,7 @@ internal static class Win32Quote
         _dialogEdit = withEdit ? Create(0, "EDIT", string.Empty, WsChild | WsVisible | WsBorder | WsTabStop, 16, 16, 100, 24, dialog) : IntPtr.Zero;
         for (var index = 0; index < buttons.Length; index++)
         {
-            Create(0, "BUTTON", buttons[index], WsChild | WsVisible | WsTabStop, 16 + index * 110, 70, 100, 28, dialog);
+            Create(0, bitButtons ? BitButtonClass : "BUTTON", buttons[index], WsChild | WsVisible | WsTabStop | WsBorder, 16 + index * 110, 70, 100, 28, dialog);
         }
 
         // Like Delphi's ShowModal (DisableTaskWindows): every other window of the program is disabled.
@@ -215,6 +229,24 @@ internal static class Win32Quote
 
         SetForegroundWindow(_form);
     }
+
+    /// <summary>A TBitBtn answers BM_CLICK by telling its dialog it was clicked, like a button.</summary>
+    private static IntPtr BitButtonWindowProcedure(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam)
+    {
+        if (message == BmClick)
+        {
+            SendMessage(GetParent(handle), WmCommand, IntPtr.Zero, handle);
+            return IntPtr.Zero;
+        }
+
+        return DefWindowProc(handle, message, wParam, lParam);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr handle);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
 
     private static IntPtr DialogWindowProcedure(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam)
     {

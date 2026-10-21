@@ -47,6 +47,12 @@ public sealed class RealFormulaCertaPlaybookTests
             await policies.RecordSeenAsync(shipped.Id, unknown, CancellationToken.None);
         }
 
+        // What the robot read back (quote number, value) goes to the operator's local log (.local/, never in Git).
+        var log = Path.Combine(RepositoryRoot(), ".local", "capturas-robo.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(log)!);
+        await File.AppendAllTextAsync(log,
+            $"{DateTime.Now:dd/MM/yyyy HH:mm:ss} salvar={save} {result.Status} {result.Reason} {string.Join(" ", result.Captured.Select(pair => pair.Key + "=" + pair.Value))}{Environment.NewLine}");
+
         Assert.True(result.Status == PlaybookRunStatus.Completed,
             $"{result.Status} at {result.StepId}: {result.Reason} {result.Detail} (answered: {string.Join(", ", result.AnsweredDialogs)})" +
             (result.Unknown is { } seen ? $"\nunknown: {seen.ClassName} '{seen.Title}' [{string.Join(", ", seen.Buttons)}] text: {seen.Text}" : string.Empty) +
@@ -60,7 +66,10 @@ public sealed class RealFormulaCertaPlaybookTests
     private static ImmutableDictionary<string, string> Row(string code, string quantity, string unit) =>
         ImmutableDictionary<string, string>.Empty.Add("codigo", code).Add("quantidade", quantity).Add("unidade", unit);
 
-    private static string ShippedPlaybook()
+    private static string ShippedPlaybook() =>
+        Path.Combine(RepositoryRoot(), "src", "Prescriva.Agent.Desktop", "Playbooks", "formulacerta_lancar_formula.json");
+
+    private static string RepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Prescriva.Agent.slnx")))
@@ -68,6 +77,6 @@ public sealed class RealFormulaCertaPlaybookTests
             directory = directory.Parent;
         }
 
-        return Path.Combine(directory!.FullName, "src", "Prescriva.Agent.Desktop", "Playbooks", "formulacerta_lancar_formula.json");
+        return directory!.FullName;
     }
 }

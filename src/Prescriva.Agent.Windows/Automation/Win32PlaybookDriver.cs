@@ -299,7 +299,9 @@ public sealed class Win32PlaybookDriver : IPlaybookDriver
 
     private static ImmutableArray<string> Buttons(IntPtr dialog) =>
         Descendants(dialog)
-            .Where(child => IsWindowVisible(child) && ClassOf(child).Contains("Button", StringComparison.OrdinalIgnoreCase))
+            // TButton, TFagronButton, BUTTON - and Delphi's TBitBtn (the print dialog's Ok/Cancelar).
+            .Where(child => IsWindowVisible(child) && ClassOf(child) is var name &&
+                (name.Contains("Button", StringComparison.OrdinalIgnoreCase) || name.EndsWith("BitBtn", StringComparison.OrdinalIgnoreCase)))
             .Select(child => ReadText(child).Replace("&", string.Empty, StringComparison.Ordinal).Trim())
             .Where(caption => caption.Length > 0)
             .ToImmutableArray();

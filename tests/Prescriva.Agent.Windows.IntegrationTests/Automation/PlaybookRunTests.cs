@@ -74,6 +74,20 @@ public sealed class PlaybookRunTests
     }
 
     [Fact]
+    public async Task A_notice_whose_buttons_are_Delphi_TBitBtn_is_answered()
+    {
+        // FórmulaCerta's print setup ("Orçamento MODELO3") has TBitBtn buttons, not TButton (2026-10-21).
+        using var target = TestTargetLauncher.Launch("win32-quote");
+        var driver = await QuoteScreenAsync();
+        var playbook = Quote() with { Dialogs = Quote().Dialogs.Add(new DialogRule("impressao", "TPrescrivaImpressao", "Orçamento", Response: DialogResponse.Press, Button: "Cancelar")) };
+
+        var result = await new PlaybookRunner(driver).RunAsync(playbook, Data(("777", "1", "MG")), CancellationToken.None);
+
+        Assert.True(result.Status == PlaybookRunStatus.Completed, Describe(result));
+        Assert.Contains("impressao", result.AnsweredDialogs);
+    }
+
+    [Fact]
     public async Task The_program_window_not_being_open_stops_at_once()
     {
         var result = await new PlaybookRunner(new Win32PlaybookDriver()).RunAsync(Quote() with { WindowRule = "Janela que não existe" }, Data(("25531", "75", "MG")), CancellationToken.None);

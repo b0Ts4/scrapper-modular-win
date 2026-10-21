@@ -1,6 +1,6 @@
 {
   "id": "formulacerta_lancar_formula",
-  "name": "FórmulaCerta 6.0 – Lançar fórmula (assistido: para antes do OK)",
+  "name": "FórmulaCerta 6.0 – Lançar fórmula (assistido: para antes do OK; salvando: grava e lê o número e o valor)",
   "processIdentity": "fcreceitas",
   "windowRule": "Orçamentos",
   "steps": [
@@ -18,7 +18,7 @@
       "field": "TwwDBEdit[1]",
       "value": "{funcionario}",
       "button": "OK",
-      "note": "Asked once per formula when the focus leaves the components grid (seen 2026-10-20)."
+      "note": "Asked when the focus leaves the components grid, or after OK (seen 2026-10-20/21)."
     },
     {
       "id": "estoque_minimo",
@@ -28,6 +28,92 @@
       "response": "press",
       "button": "OK",
       "note": "Informational; pending the pharmacists' confirmation (docs/integrations/formulacerta-avisos.md, item 3)."
+    },
+    {
+      "id": "qsp",
+      "className": "TMessageForm",
+      "titleStartsWith": "Componente",
+      "response": "press",
+      "button": "{qsp}",
+      "note": "Q. S. P. ? (Sim/Não/Cancelar) after OK; answered from the job. OCR does not read its label, the title identifies it."
+    },
+    {
+      "id": "dados_corretos",
+      "className": "TMessageForm",
+      "titleStartsWith": "Confirmação",
+      "textContains": "Dados Corretos",
+      "response": "press",
+      "button": "Sim",
+      "note": "The formula was checked by a person in the CRM."
+    },
+    {
+      "id": "embalagem",
+      "className": "TfrMostraEmbalagem",
+      "titleStartsWith": "Embalagem",
+      "response": "press",
+      "button": "Ok",
+      "note": "Accepts the packaging FórmulaCerta suggests."
+    },
+    {
+      "id": "condicoes_pagamento",
+      "className": "TfrPedeCondPag",
+      "titleStartsWith": "Condições de Pagamento",
+      "response": "press",
+      "button": "OK",
+      "note": "Leaves agreement/employee empty; the robot never takes or approves a payment."
+    },
+    {
+      "id": "acrescimo_desconto",
+      "className": "TfrPedeAcreDesc",
+      "titleStartsWith": "Acréscimo e Desconto",
+      "response": "press",
+      "button": "OK",
+      "captureField": "TFagronGroupBox[0]/TwwDBEdit[1]",
+      "captureAs": "valor",
+      "note": "No surcharge or discount; keeps 'Preço Final (a Receber)'."
+    },
+    {
+      "id": "retirada",
+      "className": "TfrPedeRetirada",
+      "titleStartsWith": "Retirada",
+      "response": "press",
+      "button": "OK",
+      "note": "Accepts the suggested pickup date and time."
+    },
+    {
+      "id": "mais_formulas",
+      "className": "TMessageForm",
+      "titleStartsWith": "Orçamento ",
+      "textContains": "Mais Fórmula",
+      "response": "press",
+      "button": "{mais_formulas}",
+      "captureTitleAs": "numero_orcamento",
+      "note": "'Orçamento <número>': the formula is saved; Sim when the job has another formula."
+    },
+    {
+      "id": "impressao",
+      "className": "TDFMsetup",
+      "titleStartsWith": "Orçamento",
+      "response": "press",
+      "button": "Cancelar",
+      "note": "Print setup (Receitas path): the robot never prints."
+    },
+    {
+      "id": "inclusao",
+      "className": "TMessageForm",
+      "titleStartsWith": "Orçamento ",
+      "textContains": "inclusão",
+      "response": "press",
+      "button": "Sim",
+      "note": "Deseja efetuar a inclusão do orçamento? (Receitas path) - saves the quote."
+    },
+    {
+      "id": "requisicao",
+      "className": "TfrPedeRqu",
+      "titleStartsWith": "Requisição",
+      "response": "press",
+      "button": "Cancelar",
+      "note": "The robot never creates a production requisition."
     }
   ]
 }
