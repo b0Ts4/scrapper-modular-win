@@ -22,6 +22,8 @@
   <ItemGroup>
     <!-- Templates shipped with the Agent (plan 15): read-only JSON next to the executable. -->
     <Content Include="Templates\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Playbooks shipped with the Agent (plan 19): what it types into a program, read-only JSON. -->
+    <Content Include="Playbooks\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

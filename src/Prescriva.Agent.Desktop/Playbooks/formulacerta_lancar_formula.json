@@ -1,0 +1,32 @@
+{
+  "id": "formulacerta_lancar_formula",
+  "name": "FórmulaCerta 6.0 – Lançar fórmula (assistido: para antes do OK)",
+  "processIdentity": "fcreceitas",
+  "windowRule": "Orçamentos",
+  "steps": [
+    { "id": "volume", "kind": "setField", "target": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]", "value": "{volume}" },
+    { "id": "volume_unidade", "kind": "setField", "target": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[2]", "value": "{volume_unidade}" },
+    { "id": "componentes", "kind": "gridRows", "target": "TFagronPanel[2]/TwwDBGrid[0]", "rows": "componentes", "cells": ["{codigo}", "{quantidade}", "{unidade}"] }
+  ],
+  "dialogs": [
+    {
+      "id": "funcionario_recepcao",
+      "className": "TfrPedeFuncionario",
+      "titleStartsWith": "Funcionário Recepção",
+      "response": "fillAndPress",
+      "field": "TwwDBEdit[1]",
+      "value": "{funcionario}",
+      "button": "OK",
+      "note": "Asked once per formula when the focus leaves the components grid (seen 2026-10-20)."
+    },
+    {
+      "id": "estoque_minimo",
+      "className": "TMessageForm",
+      "titleStartsWith": "Atenção",
+      "textContains": "Estoque Mínimo",
+      "response": "press",
+      "button": "OK",
+      "note": "Informational; pending the pharmacists' confirmation (docs/integrations/formulacerta-avisos.md, item 3)."
+    }
+  ]
+}
