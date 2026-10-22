@@ -258,6 +258,33 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task A_field_held_by_two_notices_in_a_row_is_typed_once_both_are_answered()
+    {
+        // Nova Fórmula (MobyPharma, 2026-10-21): "novo orçamento" then "Funcionário Recepção" before the first field.
+        var program = new FakeProgram();
+        program.BlockWith($"set {Volume}=60",
+            new OpenDialog(4, "TfrPedeOrc", "Requisição", ["OK", "Cancelar"]),
+            new OpenDialog(5, "TfrFuncionario", "Funcionário Recepção", ["OK", "Cancelar"]));
+        var playbook = Playbook() with { Dialogs = Playbook().Dialogs.Add(new DialogRule("novo_orcamento", "TfrPedeOrc", "Requisição", Response: DialogResponse.Press, Button: "OK")) };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Equal(["novo_orcamento", "funcionario"], result.AnsweredDialogs.ToArray());
+    }
+
+    [Fact]
+    public async Task A_field_that_stays_blocked_with_no_notice_to_answer_stops()
+    {
+        var program = new FakeProgram { AlwaysBlocked = $"set {Volume}=60" };
+
+        var result = await Run(program);
+
+        Assert.Equal(PlaybookStopReason.ControlBlocked, result.Reason);
+        Assert.Equal(2, program.Actions.Count(action => action == $"set {Volume}=60"));
+    }
+
+    [Fact]
     public async Task A_row_with_an_empty_cell_stops_before_anything_of_that_row_is_typed()
     {
         // Enter on an empty grid row saves the quote in FórmulaCerta: it must never be sent.
@@ -388,6 +415,7 @@ public sealed class PlaybookRunnerTests
         private readonly Dictionary<string, string> _fields = new(StringComparer.Ordinal);
         private readonly Dictionary<string, (OpenDialog Dialog, string? Text)> _after = new(StringComparer.Ordinal);
         private readonly Dictionary<string, OpenDialog> _blockOnce = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Queue<OpenDialog>> _blockWith = new(StringComparer.Ordinal);
         private readonly Dictionary<string, (OpenDialog Dialog, string Text)> _interruptOnce = new(StringComparer.Ordinal);
         private readonly Dictionary<long, string?> _texts = [];
 
@@ -412,6 +440,11 @@ public sealed class PlaybookRunnerTests
         public void DialogAfter(string action, OpenDialog dialog, string? text = "") => _after[action] = (dialog, text);
 
         public void BlockOnce(string action, OpenDialog dialog) => _blockOnce[action] = dialog;
+
+        /// <summary>The action is blocked once per dialog, each dialog shown in turn.</summary>
+        public void BlockWith(string action, params OpenDialog[] dialogs) => _blockWith[action] = new Queue<OpenDialog>(dialogs);
+
+        public string? AlwaysBlocked { get; init; }
 
         public void InterruptOnce(string action, OpenDialog dialog, string text) => _interruptOnce[action] = (dialog, text);
 
@@ -467,6 +500,17 @@ public sealed class PlaybookRunnerTests
             if (_blockOnce.Remove(action, out var blocking))
             {
                 Show(blocking, string.Empty);
+                return WriteOutcome.Blocked;
+            }
+
+            if (_blockWith.TryGetValue(action, out var queue) && queue.Count > 0)
+            {
+                Show(queue.Dequeue(), string.Empty);
+                return WriteOutcome.Blocked;
+            }
+
+            if (action == AlwaysBlocked)
+            {
                 return WriteOutcome.Blocked;
             }
 

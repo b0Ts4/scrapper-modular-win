@@ -11,6 +11,14 @@
   ],
   "dialogs": [
     {
+      "id": "novo_orcamento",
+      "className": "TfrPedeOrc",
+      "titleStartsWith": "Requisição",
+      "response": "press",
+      "button": "OK",
+      "note": "Opened by Nova Fórmula (MobyPharma) or Novo Orç.: automatic new quote, no source. Not the production requisition (TfrPedeRqu)."
+    },
+    {
       "id": "funcionario_recepcao",
       "className": "TfrPedeFuncionario",
       "titleStartsWith": "Funcionário Recepção",

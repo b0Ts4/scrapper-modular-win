@@ -69,6 +69,8 @@ public sealed record UnknownDialog(string ClassName, string Title, ImmutableArra
 /// </summary>
 public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunnerOptions? options = null)
 {
+    private const int MaxBlockedTries = 4;
+
     private readonly PlaybookRunnerOptions _options = options ?? PlaybookRunnerOptions.Default;
 
     public async Task<PlaybookRunResult> RunAsync(Playbook playbook, PlaybookData data, CancellationToken cancellationToken)
@@ -229,11 +231,17 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
         return await WriteAsync(run, step.Id, () => driver.ClickAsync(step.Target, cancellationToken), cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>One input, then the dialogs it caused; input held by a dialog is retried once after the dialog is answered.</summary>
+    /// <summary>
+    /// One input, then the dialogs it caused. Input held by dialogs is tried again after they are
+    /// answered - several dialogs can come one after the other (Nova Fórmula: "novo orçamento", then
+    /// "Funcionário Recepção") - but only while each blocked try got a dialog answered, and at most
+    /// <see cref="MaxBlockedTries"/> times.
+    /// </summary>
     private async Task<PlaybookRunResult?> WriteAsync(Run run, string stepId, Func<Task<WriteOutcome>> write, CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)
         {
+            var answeredBefore = run.Answered.Count;
             var outcome = await write().ConfigureAwait(false);
             if (outcome == WriteOutcome.ControlNotFound)
             {
@@ -257,7 +265,7 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
                 return run.Stop(stepId, PlaybookStopReason.InputInterrupted);
             }
 
-            if (attempt > 0)
+            if (attempt + 1 >= MaxBlockedTries || (attempt > 0 && run.Answered.Count == answeredBefore))
             {
                 return run.Stop(stepId, PlaybookStopReason.ControlBlocked);
             }
