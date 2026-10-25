@@ -51,7 +51,7 @@ public static class PlaybookValidator
             errors.Add(new("MISSING_STEP_ID", path, "A step needs an ID."));
         }
 
-        if (string.IsNullOrWhiteSpace(step.Target))
+        if (step.Kind != PlaybookStepKind.Accelerator && string.IsNullOrWhiteSpace(step.Target))
         {
             errors.Add(new("MISSING_TARGET", path, "A step needs the window path of its control."));
         }
@@ -101,6 +101,13 @@ public static class PlaybookValidator
                 if (string.IsNullOrWhiteSpace(step.CaptureAs))
                 {
                     errors.Add(new("MISSING_CAPTURE_NAME", path, "A read step needs the name to keep the value under."));
+                }
+
+                break;
+            case PlaybookStepKind.Accelerator:
+                if (step.Value is not { Length: 1 } || !char.IsLetterOrDigit(step.Value[0]))
+                {
+                    errors.Add(new("INVALID_ACCELERATOR", path, "An accelerator step needs a single letter or digit in value."));
                 }
 
                 break;

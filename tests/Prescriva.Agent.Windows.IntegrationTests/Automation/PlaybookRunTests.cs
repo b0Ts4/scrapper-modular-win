@@ -95,6 +95,27 @@ public sealed class PlaybookRunTests
         Assert.Equal(PlaybookStopReason.WindowNotFound, result.Reason);
     }
 
+    [Fact]
+    public async Task The_robot_opens_a_new_quote_with_the_accelerator()
+    {
+        // The robot presses Alt+N itself; the new-quote dialog is answered, then it fills the fresh quote.
+        using var target = TestTargetLauncher.Launch("win32-quote");
+        var driver = await QuoteScreenAsync();
+        var playbook = Quote() with
+        {
+            Steps = Quote().Steps.Insert(0, new PlaybookStep("abrir", PlaybookStepKind.Accelerator, string.Empty, "N", OnlyWhen: "abrir")),
+            Dialogs = Quote().Dialogs.Add(new DialogRule("novo_orcamento", "TPrescrivaNovoOrc", "Requisição", Response: DialogResponse.Press, Button: "OK")),
+        };
+        var basica = Data(("25531", "75", "MG"));
+        var data = basica with { Values = basica.Values.Add("abrir", "sim") };
+
+        var result = await new PlaybookRunner(driver).RunAsync(playbook, data, CancellationToken.None);
+
+        Assert.True(result.Status == PlaybookRunStatus.Completed, Describe(result));
+        Assert.Contains("novo_orcamento", result.AnsweredDialogs);
+        Assert.Equal("emp=19;rows=25531|75|MG", await driver.ReadTextAsync(Grid, CancellationToken.None));
+    }
+
     /// <summary>The TestTarget shows its quote screen once its main window has loaded: wait for it.</summary>
     private static async Task<Win32PlaybookDriver> QuoteScreenAsync()
     {

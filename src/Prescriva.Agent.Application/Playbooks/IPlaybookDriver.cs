@@ -23,6 +23,9 @@ public interface IPlaybookDriver
 
     Task<WriteOutcome> PressKeyAsync(string path, PlaybookKey key, CancellationToken cancellationToken);
 
+    /// <summary>Presses Alt+&lt;key&gt; on the program window (a menu/toolbar accelerator); no control path.</summary>
+    Task<WriteOutcome> PressAcceleratorAsync(string key, CancellationToken cancellationToken);
+
     /// <summary>A button's caption; null when the control is not there.</summary>
     Task<string?> CaptionAsync(string path, CancellationToken cancellationToken);
 

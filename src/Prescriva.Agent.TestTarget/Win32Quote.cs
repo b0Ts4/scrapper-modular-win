@@ -54,6 +54,11 @@ internal static class Win32Quote
     private static readonly WindowProcedure DialogProcedure = DialogWindowProcedure;
     private static readonly WindowProcedure BitButtonProcedure = BitButtonWindowProcedure;
 
+    public const string NewQuoteDialogClass = "TPrescrivaNovoOrc";
+    private const uint WmSysKeyDown = 0x0104;
+    private const int VkN = 0x4E;
+    private static readonly WindowProcedure FormProcedure = FormWindowProcedure;
+
     private static readonly List<string[]> Rows = [];
     private static readonly StringBuilder Cell = new();
     private static IntPtr _form;
@@ -66,8 +71,9 @@ internal static class Win32Quote
 
     public static void Show()
     {
-        Register(FormClass, IntPtr.Zero);
+        Register(FormClass, Marshal.GetFunctionPointerForDelegate(FormProcedure));
         Register(PanelClass, IntPtr.Zero);
+        Register(NewQuoteDialogClass, Marshal.GetFunctionPointerForDelegate(DialogProcedure));
         Register(GridClass, Marshal.GetFunctionPointerForDelegate(GridProcedure));
         Register(EmployeeDialogClass, Marshal.GetFunctionPointerForDelegate(DialogProcedure));
         Register(MessageClass, Marshal.GetFunctionPointerForDelegate(DialogProcedure));
@@ -107,6 +113,33 @@ internal static class Win32Quote
         timer.Start();
     }
 
+    /// <summary>The form answers Alt+N (like FórmulaCerta's "Novo Orç." accelerator) by starting a new quote.</summary>
+    private static IntPtr FormWindowProcedure(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam)
+    {
+        if (message == WmSysKeyDown && wParam.ToInt32() == VkN)
+        {
+            NovoOrcamento();
+            return IntPtr.Zero;
+        }
+
+        return DefWindowProc(handle, message, wParam, lParam);
+    }
+
+    /// <summary>Resets the screen and asks the new-quote question, as "Novo Orç." does.</summary>
+    private static void NovoOrcamento()
+    {
+        Rows.Clear();
+        Rows.Add(["", "", ""]);
+        Cell.Clear();
+        _column = 0;
+        _employeeAsked = false;
+        _employee = string.Empty;
+        _saveAttempted = false;
+        Publish();
+        ShowModal(NewQuoteDialogClass, "Requisição", null, withEdit: false, "OK", "Cancelar");
+        SetFocus(_grid);
+    }
+
     private static IntPtr GridWindowProcedure(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam)
     {
         if (handle != _grid)
@@ -116,6 +149,9 @@ internal static class Win32Quote
 
         switch (message)
         {
+            case WmSysKeyDown when wParam.ToInt32() == VkN:
+                NovoOrcamento();
+                return IntPtr.Zero;
             case WmGetDlgCode:
                 return DlgcWantAllKeys | DlgcWantChars;
             case WmLButtonDown:

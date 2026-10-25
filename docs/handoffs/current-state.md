@@ -1,5 +1,10 @@
 # Current state
 
+## Status — 2026-10-24 (demo CRM↔FórmulaCerta: o robô abre o orçamento sozinho; CRM integrado)
+
+- **Item A (robô abre o orçamento novo):** novo passo de roteiro `accelerator` (Alt+<tecla>) que aciona um comando de menu/barra como "Novo Orç."; o diálogo que ele abre é respondido por uma regra (`novo_orcamento`). `QuoteRuns` marca `abrir=sim` só na 1ª fórmula do trabalho, então o robô abre o orçamento para trabalhos vindos do CRM; no fluxo de atendimento (abrir=não) nada muda. Testado na TestTarget (`win32-quote`, variante com Alt+N → "Requisição"). **A tecla exata do "Novo Orç." no FórmulaCerta ainda não foi confirmada** (a tela não estava aberta); o roteiro usa "N" como palpite, a confirmar no ensaio. Se a tecla estiver errada, o robô não abre e para em seguida, sem gravar.
+- **CRM (repositório receitaAI, branch `feat/crm-agent-demo`):** botão "Gerar no FórmulaCerta" na Conferência; código do produto por ativo com busca no catálogo; monta o launch_quote do rascunho conferido; preenche o preço com o valor do FórmulaCerta. 50 testes do CRM + 29 da API/ponte OK. Demo em `crm/DEMO_FORMULACERTA.md`.
+- **Falta para a demo hands-off:** confirmar a tecla do "Novo Orç." (1 caractere, no roteiro) e as chaves OpenAI/wa.me/AGENTE_TOKEN (o operador configura).
 ## Status — 2026-10-21 (milestone 2: plans 20 and 22; real save, MobyPharma and replies wait for the operator)
 
 - **Plan 20** (`docs/superpowers/plans/2026-10-21-notices-and-saving.md`):

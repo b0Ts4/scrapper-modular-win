@@ -4,6 +4,7 @@
   "processIdentity": "fcreceitas",
   "windowRule": "Orçamentos",
   "steps": [
+    { "id": "abrir_orcamento", "kind": "accelerator", "target": "", "value": "N", "onlyWhen": "abrir", "note": "Novo Orç. por atalho (Alt+N). Confirmar a tecla no ambiente; abre o diálogo novo_orcamento. Só para trabalhos do CRM (abrir=sim)." },
     { "id": "volume", "kind": "setField", "target": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]", "value": "{volume}" },
     { "id": "volume_unidade", "kind": "setField", "target": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[2]", "value": "{volume_unidade}" },
     { "id": "componentes", "kind": "gridRows", "target": "TFagronPanel[2]/TwwDBGrid[0]", "rows": "componentes", "cells": ["{codigo}", "{quantidade}", "{unidade}"] },

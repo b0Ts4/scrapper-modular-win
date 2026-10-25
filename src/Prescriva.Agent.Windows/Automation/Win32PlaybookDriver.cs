@@ -31,6 +31,8 @@ public sealed class Win32PlaybookDriver : IPlaybookDriver
     private const uint WmChar = 0x0102;
     private const uint EmSetSel = 0x00B1;
     private const uint BmClick = 0x00F5;
+    private const uint WmSysKeyDown = 0x0104;
+    private const uint WmSysKeyUp = 0x0105;
     private const uint SmtoAbortIfHung = 0x0002;
     private const int VkReturn = 0x0D;
     private const int VkTab = 0x09;
@@ -98,6 +100,27 @@ public sealed class Win32PlaybookDriver : IPlaybookDriver
 
     public Task<WriteOutcome> PressKeyAsync(string path, PlaybookKey key, CancellationToken cancellationToken) =>
         Task.FromResult(Write(path, control => Key(control, key == PlaybookKey.Enter ? VkReturn : VkTab)));
+
+    public Task<WriteOutcome> PressAcceleratorAsync(string key, CancellationToken cancellationToken)
+    {
+        if (_window == IntPtr.Zero || string.IsNullOrEmpty(key))
+        {
+            return Task.FromResult(WriteOutcome.ControlNotFound);
+        }
+
+        var target = ForegroundFocus(_window);
+        if (target == IntPtr.Zero)
+        {
+            return Task.FromResult(WriteOutcome.Blocked);
+        }
+
+        // Alt+<key>: the context-code bit (29) marks Alt held, as a real accelerator keystroke does.
+        var vk = new IntPtr(char.ToUpperInvariant(key[0]));
+        Post(target, WmSysKeyDown, vk, unchecked((IntPtr)0x20000001));
+        Post(target, WmSysKeyUp, vk, unchecked((IntPtr)0xE0000001));
+        Flush(target); // the command may open a dialog; the runner answers it next
+        return Task.FromResult(WriteOutcome.Done);
+    }
 
     public Task<string?> CaptionAsync(string path, CancellationToken cancellationToken) => ReadTextAsync(path, cancellationToken);
 
@@ -252,6 +275,34 @@ public sealed class Win32PlaybookDriver : IPlaybookDriver
 
         var info = new GuiThreadInfo { Size = Marshal.SizeOf<GuiThreadInfo>() };
         return GetGUIThreadInfo(thread, ref info) && (info.Focus == control || IsChild(control, info.Focus));
+    }
+
+    /// <summary>Brings the window to the foreground and returns its focused control (or the window itself).</summary>
+    private IntPtr ForegroundFocus(IntPtr window)
+    {
+        var thread = GetWindowThreadProcessId(window, out _);
+        var worker = new Thread(() =>
+        {
+            var me = GetCurrentThreadId();
+            AttachThreadInput(me, thread, true);
+            try
+            {
+                SetForegroundWindow(window);
+            }
+            finally
+            {
+                AttachThreadInput(me, thread, false);
+            }
+        })
+        { IsBackground = true, Name = "Prescriva.Agent.PlaybookAccelerator" };
+        worker.Start();
+        if (!worker.Join(_focusTimeout))
+        {
+            return IntPtr.Zero;
+        }
+
+        var info = new GuiThreadInfo { Size = Marshal.SizeOf<GuiThreadInfo>() };
+        return GetGUIThreadInfo(thread, ref info) && info.Focus != IntPtr.Zero ? info.Focus : window;
     }
 
     /// <summary>Selects the control's whole text, so what is typed replaces it.</summary>

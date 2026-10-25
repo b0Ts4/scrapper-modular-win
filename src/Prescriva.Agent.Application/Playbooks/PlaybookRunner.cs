@@ -98,6 +98,7 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
                     PlaybookStepKind.SetField => await SetFieldAsync(run, step, cancellationToken).ConfigureAwait(false),
                     PlaybookStepKind.GridRows => await GridRowsAsync(run, step, cancellationToken).ConfigureAwait(false),
                     PlaybookStepKind.ReadField => await ReadFieldAsync(run, step, cancellationToken).ConfigureAwait(false),
+                    PlaybookStepKind.Accelerator => await AcceleratorAsync(run, step, cancellationToken).ConfigureAwait(false),
                     _ => await ClickAsync(run, step, cancellationToken).ConfigureAwait(false),
                 };
                 if (stopped is not null)
@@ -145,6 +146,13 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
 
         run.Captured[step.CaptureAs!] = text.Trim();
         return null;
+    }
+
+    private async Task<PlaybookRunResult?> AcceleratorAsync(Run run, PlaybookStep step, CancellationToken cancellationToken)
+    {
+        // Opens a menu/toolbar command (e.g. "Novo Orç."); the dialog it opens is answered by a rule.
+        run.CurrentStep = step.Id;
+        return await WriteAsync(run, step.Id, () => driver.PressAcceleratorAsync(step.Value!, cancellationToken), cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<PlaybookRunResult?> SetFieldAsync(Run run, PlaybookStep step, CancellationToken cancellationToken)

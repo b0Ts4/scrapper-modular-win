@@ -88,6 +88,9 @@ public enum PlaybookStepKind
 
     /// <summary>Keep the text of the control at <see cref="PlaybookStep.Target"/> as the value <see cref="PlaybookStep.CaptureAs"/>.</summary>
     ReadField,
+
+    /// <summary>Press Alt+&lt;<see cref="PlaybookStep.Value"/>&gt; on the program window (a menu/toolbar accelerator, e.g. "Novo Orç."). No <see cref="PlaybookStep.Target"/>.</summary>
+    Accelerator,
 }
 
 /// <summary>One action of a playbook. <see cref="Target"/> is a window path below the program's window; <see cref="OnlyWhen"/> names a data value that must say yes for the step to run (e.g. "salvar").</summary>
@@ -99,7 +102,8 @@ public sealed record PlaybookStep(
     string? Rows = null,
     ImmutableArray<string> Cells = default,
     string? CaptureAs = null,
-    string? OnlyWhen = null)
+    string? OnlyWhen = null,
+    string? Note = null)
 {
     /// <summary>True when the step runs with this data: always, or - with <see cref="OnlyWhen"/> - when that value says yes.</summary>
     public bool RunsWith(PlaybookData data) =>

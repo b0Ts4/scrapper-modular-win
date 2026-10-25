@@ -33,6 +33,8 @@ public static class QuoteRuns
                 .Add("volume_unidade", formula.VolumeUnit)
                 .Add("funcionario", settings.EmployeeCode)
                 .Add("salvar", saves ? "sim" : "não")
+                // The robot opens a new quote itself (Novo Orç.) only for the first formula of the job.
+                .Add("abrir", index == 0 ? "sim" : "não")
                 .Add("qsp", formula.Qsp == true ? "Sim" : "Não")
                 .Add("mais_formulas", index < formulas.Length - 1 ? "Sim" : "Não");
             if (!string.IsNullOrWhiteSpace(formula.Dosage))

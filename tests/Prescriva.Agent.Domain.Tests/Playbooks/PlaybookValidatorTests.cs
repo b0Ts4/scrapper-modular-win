@@ -51,6 +51,16 @@ public sealed class PlaybookValidatorTests
     }
 
     [Fact]
+    public void An_accelerator_step_needs_a_single_letter_and_no_target()
+    {
+        var valido = Valid() with { Steps = [new PlaybookStep("abrir", PlaybookStepKind.Accelerator, string.Empty, "N", OnlyWhen: "abrir")] };
+        Assert.Empty(PlaybookValidator.Validate(valido));
+
+        var semTecla = Valid() with { Steps = [new PlaybookStep("abrir", PlaybookStepKind.Accelerator, string.Empty, "NN")] };
+        Assert.Contains(PlaybookValidator.Validate(semTecla), error => error.Code == "INVALID_ACCELERATOR");
+    }
+
+    [Fact]
     public void A_template_with_an_unclosed_or_empty_placeholder_is_refused()
     {
         var playbook = Valid() with { Steps = [new PlaybookStep("volume", PlaybookStepKind.SetField, "TPanel[0]/TEdit[0]", "{volume")] };

@@ -258,6 +258,38 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task An_accelerator_step_opens_a_new_quote_and_its_dialog_is_answered()
+    {
+        // The robot opens "Novo Orç." itself; the "Requisição" dialog is answered, then it fills.
+        var program = new FakeProgram();
+        program.DialogAfter("accel N", new OpenDialog(3, "TfrPedeOrc", "Requisição", ["OK", "Cancelar"]));
+        var playbook = Playbook() with
+        {
+            Steps = Playbook().Steps.Insert(0, new PlaybookStep("abrir", PlaybookStepKind.Accelerator, string.Empty, "N", OnlyWhen: "abrir")),
+            Dialogs = Playbook().Dialogs.Add(new DialogRule("novo_orcamento", "TfrPedeOrc", "Requisição", Response: DialogResponse.Press, Button: "OK")),
+        };
+        var data = Data() with { Values = Data().Values.Add("abrir", "sim") };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, data, CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Contains("accel N", program.Actions);
+        Assert.Contains("novo_orcamento", result.AnsweredDialogs.ToArray());
+    }
+
+    [Fact]
+    public async Task The_accelerator_step_is_skipped_when_the_data_does_not_ask_to_open()
+    {
+        var program = new FakeProgram();
+        var playbook = Playbook() with { Steps = Playbook().Steps.Insert(0, new PlaybookStep("abrir", PlaybookStepKind.Accelerator, string.Empty, "N", OnlyWhen: "abrir")) };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.DoesNotContain(program.Actions, action => action.StartsWith("accel", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_field_held_by_two_notices_in_a_row_is_typed_once_both_are_answered()
     {
         // Nova Fórmula (MobyPharma, 2026-10-21): "novo orçamento" then "Funcionário Recepção" before the first field.
@@ -466,6 +498,8 @@ public sealed class PlaybookRunnerTests
         public Task<WriteOutcome> TypeAsync(string path, string text, CancellationToken cancellationToken) => Task.FromResult(Act($"type {path}={text}"));
 
         public Task<WriteOutcome> PressKeyAsync(string path, PlaybookKey key, CancellationToken cancellationToken) => Task.FromResult(Act($"key {path}={key}"));
+
+        public Task<WriteOutcome> PressAcceleratorAsync(string key, CancellationToken cancellationToken) => Task.FromResult(Act($"accel {key}"));
 
         public Task<string?> CaptionAsync(string path, CancellationToken cancellationToken) => Task.FromResult(Captions.GetValueOrDefault(path));
 
