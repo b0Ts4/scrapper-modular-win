@@ -1,5 +1,12 @@
 # Current state
 
+## Status — 2026-10-25 (atalho "Novo Orç." calibrado no FórmulaCerta real)
+
+- **Calibração confirmada ao vivo** na janela "FórmulaCerta - Receitas 6.0.1164" (processo `FCReceitas.exe`): o novo orçamento é aberto pelo botão **Incluir = Alt+I**, que abre o diálogo "Requisição" (TfrPedeOrc) — exatamente a regra `novo_orcamento` do roteiro. Testado abrindo o diálogo e cancelando (nada gravado).
+- **Roteiro atualizado** (`formulacerta_lancar_formula.json`): passo `abrir_orcamento` `value: "N" → "I"`; `windowRule: "Orçamentos" → "Receitas"` (o título real contém "Receitas", não "Orçamentos", senão o robô não acharia a janela).
+- Build Release 0 warnings; testes unitários Domain/Application/Infrastructure/Windows verdes (527 no total). As 4 falhas do IntegrationTests são ambientais (MSIX/screenshot dir/walkthrough), sem relação.
+- **CRM (receitaAI, `feat/crm-agent-demo`):** ambiente de teste no ar nesta máquina — CRM na :3000, túnel ngrok público, webhook da api-wa.me apontado, chaves OpenAI/wa.me carregadas no `.env`, `AUTO_ORCAMENTO=1`. Código do ativo agora cai no equivalente do catálogo quando não há match exato (`codigoSugerido`).
+
 ## Status — 2026-10-24 (demo CRM↔FórmulaCerta: o robô abre o orçamento sozinho; CRM integrado)
 
 - **Item A (robô abre o orçamento novo):** novo passo de roteiro `accelerator` (Alt+<tecla>) que aciona um comando de menu/barra como "Novo Orç."; o diálogo que ele abre é respondido por uma regra (`novo_orcamento`). `QuoteRuns` marca `abrir=sim` só na 1ª fórmula do trabalho, então o robô abre o orçamento para trabalhos vindos do CRM; no fluxo de atendimento (abrir=não) nada muda. Testado na TestTarget (`win32-quote`, variante com Alt+N → "Requisição"). **A tecla exata do "Novo Orç." no FórmulaCerta ainda não foi confirmada** (a tela não estava aberta); o roteiro usa "N" como palpite, a confirmar no ensaio. Se a tecla estiver errada, o robô não abre e para em seguida, sem gravar.
