@@ -2,9 +2,9 @@
   "id": "formulacerta_lancar_formula",
   "name": "FórmulaCerta 6.0 – Lançar fórmula (assistido: para antes do OK; salvando: grava e lê o número e o valor)",
   "processIdentity": "fcreceitas",
-  "windowRule": "Receitas",
+  "windowRule": "Orçamentos",
   "steps": [
-    { "id": "abrir_orcamento", "kind": "accelerator", "target": "", "value": "I", "onlyWhen": "abrir", "note": "Novo orçamento pelo botão Incluir (Alt+I) do módulo Receitas; abre o diálogo novo_orcamento (TfrPedeOrc, título 'Requisição'). Calibrado em 2026-10-25 na janela 'FórmulaCerta - Receitas 6.0.1164'. Só para trabalhos do CRM (abrir=sim)." },
+    { "id": "abrir_orcamento", "kind": "clickPoint", "target": "TCoolBar[0]/TToolBar[0]", "value": "20,23", "onlyWhen": "abrir", "note": "Novo orçamento pelo botão 'Novo Orç.' (botão 0 da barra, um TToolButton sem handle nem atalho): clique de mouse no ponto cliente 20,23 da TToolBar[0]. Abre o diálogo novo_orcamento (título 'Requisição', 'Novo Orçamento Automático'). Calibrado em 2026-10-25 na janela 'FórmulaCerta - Orçamentos 6.0.1164' (FCReceitas.exe, que deve estar com a tela de Orçamentos aberta). Só para trabalhos do CRM (abrir=sim)." },
     { "id": "volume", "kind": "setField", "target": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]", "value": "{volume}" },
     { "id": "volume_unidade", "kind": "setField", "target": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBLookupCombo[2]", "value": "{volume_unidade}" },
     { "id": "componentes", "kind": "gridRows", "target": "TFagronPanel[2]/TwwDBGrid[0]", "rows": "componentes", "cells": ["{codigo}", "{quantidade}", "{unidade}"] },

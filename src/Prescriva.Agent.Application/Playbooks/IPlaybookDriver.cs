@@ -31,6 +31,9 @@ public interface IPlaybookDriver
 
     Task<WriteOutcome> ClickAsync(string path, CancellationToken cancellationToken);
 
+    /// <summary>Clicks the control at <paramref name="path"/> at its client point (<paramref name="x"/>, <paramref name="y"/>) - for a toolbar button with no window handle.</summary>
+    Task<WriteOutcome> ClickPointAsync(string path, int x, int y, CancellationToken cancellationToken);
+
     /// <summary>The program's other visible top-level windows, except those of <paramref name="ignoredClasses"/>.</summary>
     Task<IReadOnlyList<OpenDialog>> DialogsAsync(IEnumerable<string> ignoredClasses, CancellationToken cancellationToken);
 

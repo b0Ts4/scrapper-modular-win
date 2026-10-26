@@ -33,6 +33,10 @@ public sealed class Win32PlaybookDriver : IPlaybookDriver
     private const uint BmClick = 0x00F5;
     private const uint WmSysKeyDown = 0x0104;
     private const uint WmSysKeyUp = 0x0105;
+    private const uint WmMouseMove = 0x0200;
+    private const uint WmLButtonDown = 0x0201;
+    private const uint WmLButtonUp = 0x0202;
+    private const int MkLButton = 0x0001;
     private const uint SmtoAbortIfHung = 0x0002;
     private const int VkReturn = 0x0D;
     private const int VkTab = 0x09;
@@ -133,6 +137,23 @@ public sealed class Win32PlaybookDriver : IPlaybookDriver
         }
 
         Post(control, BmClick, IntPtr.Zero, IntPtr.Zero);
+        return Task.FromResult(Flush(control) ? WriteOutcome.Done : WriteOutcome.Blocked);
+    }
+
+    public Task<WriteOutcome> ClickPointAsync(string path, int x, int y, CancellationToken cancellationToken)
+    {
+        var control = Find(path);
+        if (control == IntPtr.Zero)
+        {
+            return Task.FromResult(WriteOutcome.ControlNotFound);
+        }
+
+        // A toolbar button (FórmulaCerta's "Novo Orç.") has no window handle: it is clicked by the
+        // mouse messages its parent toolbar hit-tests. Posted (not sent): the click may open a dialog.
+        var point = new IntPtr((y << 16) | (x & 0xFFFF));
+        Post(control, WmMouseMove, IntPtr.Zero, point);
+        Post(control, WmLButtonDown, new IntPtr(MkLButton), point);
+        Post(control, WmLButtonUp, IntPtr.Zero, point);
         return Task.FromResult(Flush(control) ? WriteOutcome.Done : WriteOutcome.Blocked);
     }
 

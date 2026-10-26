@@ -99,6 +99,7 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
                     PlaybookStepKind.GridRows => await GridRowsAsync(run, step, cancellationToken).ConfigureAwait(false),
                     PlaybookStepKind.ReadField => await ReadFieldAsync(run, step, cancellationToken).ConfigureAwait(false),
                     PlaybookStepKind.Accelerator => await AcceleratorAsync(run, step, cancellationToken).ConfigureAwait(false),
+                    PlaybookStepKind.ClickPoint => await ClickPointAsync(run, step, cancellationToken).ConfigureAwait(false),
                     _ => await ClickAsync(run, step, cancellationToken).ConfigureAwait(false),
                 };
                 if (stopped is not null)
@@ -153,6 +154,14 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
         // Opens a menu/toolbar command (e.g. "Novo Orç."); the dialog it opens is answered by a rule.
         run.CurrentStep = step.Id;
         return await WriteAsync(run, step.Id, () => driver.PressAcceleratorAsync(step.Value!, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<PlaybookRunResult?> ClickPointAsync(Run run, PlaybookStep step, CancellationToken cancellationToken)
+    {
+        // Clicks a toolbar button that has no window handle (FórmulaCerta's "Novo Orç."); the dialog it opens is answered by a rule.
+        run.CurrentStep = step.Id;
+        PlaybookStep.TryParsePoint(step.Value, out var x, out var y); // the validator already refused any other value
+        return await WriteAsync(run, step.Id, () => driver.ClickPointAsync(step.Target, x, y, cancellationToken), cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<PlaybookRunResult?> SetFieldAsync(Run run, PlaybookStep step, CancellationToken cancellationToken)

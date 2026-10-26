@@ -91,6 +91,13 @@ public enum PlaybookStepKind
 
     /// <summary>Press Alt+&lt;<see cref="PlaybookStep.Value"/>&gt; on the program window (a menu/toolbar accelerator, e.g. "Novo Orç."). No <see cref="PlaybookStep.Target"/>.</summary>
     Accelerator,
+
+    /// <summary>
+    /// Click the control at <see cref="PlaybookStep.Target"/> at the client point "x,y" in
+    /// <see cref="PlaybookStep.Value"/> (a toolbar button with no window handle or accelerator, e.g.
+    /// FórmulaCerta's "Novo Orç."); the dialog it opens is answered by a rule.
+    /// </summary>
+    ClickPoint,
 }
 
 /// <summary>One action of a playbook. <see cref="Target"/> is a window path below the program's window; <see cref="OnlyWhen"/> names a data value that must say yes for the step to run (e.g. "salvar").</summary>
@@ -105,6 +112,17 @@ public sealed record PlaybookStep(
     string? OnlyWhen = null,
     string? Note = null)
 {
+    /// <summary>Reads a <see cref="ClickPoint"/> value "x,y" as two non-negative client pixels; false when it is not that.</summary>
+    public static bool TryParsePoint(string? value, out int x, out int y)
+    {
+        x = 0;
+        y = 0;
+        var parts = value?.Split(',');
+        return parts is { Length: 2 } &&
+            int.TryParse(parts[0].Trim(), System.Globalization.NumberStyles.None, CultureInfo.InvariantCulture, out x) &&
+            int.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.None, CultureInfo.InvariantCulture, out y);
+    }
+
     /// <summary>True when the step runs with this data: always, or - with <see cref="OnlyWhen"/> - when that value says yes.</summary>
     public bool RunsWith(PlaybookData data) =>
         string.IsNullOrWhiteSpace(OnlyWhen) ||

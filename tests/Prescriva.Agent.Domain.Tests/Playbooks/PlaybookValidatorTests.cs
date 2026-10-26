@@ -61,6 +61,19 @@ public sealed class PlaybookValidatorTests
     }
 
     [Fact]
+    public void A_click_point_step_needs_a_target_and_a_point()
+    {
+        var valido = Valid() with { Steps = [new PlaybookStep("abrir", PlaybookStepKind.ClickPoint, "TCoolBar[0]/TToolBar[0]", "20,23", OnlyWhen: "abrir")] };
+        Assert.Empty(PlaybookValidator.Validate(valido));
+
+        var semPonto = Valid() with { Steps = [new PlaybookStep("abrir", PlaybookStepKind.ClickPoint, "TCoolBar[0]/TToolBar[0]", "N")] };
+        Assert.Contains(PlaybookValidator.Validate(semPonto), error => error.Code == "INVALID_POINT");
+
+        var semAlvo = Valid() with { Steps = [new PlaybookStep("abrir", PlaybookStepKind.ClickPoint, string.Empty, "20,23")] };
+        Assert.Contains(PlaybookValidator.Validate(semAlvo), error => error.Code == "MISSING_TARGET");
+    }
+
+    [Fact]
     public void A_template_with_an_unclosed_or_empty_placeholder_is_refused()
     {
         var playbook = Valid() with { Steps = [new PlaybookStep("volume", PlaybookStepKind.SetField, "TPanel[0]/TEdit[0]", "{volume")] };

@@ -290,6 +290,26 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task A_click_point_step_opens_a_new_quote_and_its_dialog_is_answered()
+    {
+        // "Novo Orç." is a toolbar button with no handle nor accelerator: the robot clicks it by a point.
+        var program = new FakeProgram();
+        program.DialogAfter("clickpoint TCoolBar[0]/TToolBar[0]@20,23", new OpenDialog(3, "TfrPedeOrc", "Requisição", ["OK", "Cancelar"]));
+        var playbook = Playbook() with
+        {
+            Steps = Playbook().Steps.Insert(0, new PlaybookStep("abrir", PlaybookStepKind.ClickPoint, "TCoolBar[0]/TToolBar[0]", "20,23", OnlyWhen: "abrir")),
+            Dialogs = Playbook().Dialogs.Add(new DialogRule("novo_orcamento", "TfrPedeOrc", "Requisição", Response: DialogResponse.Press, Button: "OK")),
+        };
+        var data = Data() with { Values = Data().Values.Add("abrir", "sim") };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, data, CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Contains("clickpoint TCoolBar[0]/TToolBar[0]@20,23", program.Actions);
+        Assert.Contains("novo_orcamento", result.AnsweredDialogs.ToArray());
+    }
+
+    [Fact]
     public async Task A_field_held_by_two_notices_in_a_row_is_typed_once_both_are_answered()
     {
         // Nova Fórmula (MobyPharma, 2026-10-21): "novo orçamento" then "Funcionário Recepção" before the first field.
@@ -504,6 +524,8 @@ public sealed class PlaybookRunnerTests
         public Task<string?> CaptionAsync(string path, CancellationToken cancellationToken) => Task.FromResult(Captions.GetValueOrDefault(path));
 
         public Task<WriteOutcome> ClickAsync(string path, CancellationToken cancellationToken) => Task.FromResult(Act($"click {path}"));
+
+        public Task<WriteOutcome> ClickPointAsync(string path, int x, int y, CancellationToken cancellationToken) => Task.FromResult(Act($"clickpoint {path}@{x},{y}"));
 
         public Task<IReadOnlyList<OpenDialog>> DialogsAsync(IEnumerable<string> ignoredClasses, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<OpenDialog>>(Open.ToArray());

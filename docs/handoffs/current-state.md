@@ -1,11 +1,14 @@
 # Current state
 
-## Status — 2026-10-25 (atalho "Novo Orç." calibrado no FórmulaCerta real)
+## Status — 2026-10-25 (abertura do orçamento calibrada e validada ponta a ponta no FórmulaCerta real)
 
-- **Calibração confirmada ao vivo** na janela "FórmulaCerta - Receitas 6.0.1164" (processo `FCReceitas.exe`): o novo orçamento é aberto pelo botão **Incluir = Alt+I**, que abre o diálogo "Requisição" (TfrPedeOrc) — exatamente a regra `novo_orcamento` do roteiro. Testado abrindo o diálogo e cancelando (nada gravado).
-- **Roteiro atualizado** (`formulacerta_lancar_formula.json`): passo `abrir_orcamento` `value: "N" → "I"`; `windowRule: "Orçamentos" → "Receitas"` (o título real contém "Receitas", não "Orçamentos", senão o robô não acharia a janela).
-- Build Release 0 warnings; testes unitários Domain/Application/Infrastructure/Windows verdes (527 no total). As 4 falhas do IntegrationTests são ambientais (MSIX/screenshot dir/walkthrough), sem relação.
-- **CRM (receitaAI, `feat/crm-agent-demo`):** ambiente de teste no ar nesta máquina — CRM na :3000, túnel ngrok público, webhook da api-wa.me apontado, chaves OpenAI/wa.me carregadas no `.env`, `AUTO_ORCAMENTO=1`. Código do ativo agora cai no equivalente do catálogo quando não há match exato (`codigoSugerido`).
+- **Causa raiz do "cai na conferência":** o roteiro mirava a janela/ação errada. O alvo correto é a janela **"FórmulaCerta - Orçamentos 6.0.1164"** (processo `FCReceitas.exe`, aberta pelo botão "Orçamento"/Alt+O do módulo Receitas), e o botão **"Novo Orç." é um TToolButton da `TCoolBar[0]/TToolBar[0]` sem handle de janela nem atalho de teclado** — por isso nem BM_CLICK nem Alt funcionam. A tentativa anterior (Alt+I na janela Receitas) era o caminho de **Requisição**, errado.
+- **Novo tipo de passo `ClickPoint`** (Domain/Application/Windows): clica um controle num ponto cliente "x,y" postando WM_MOUSEMOVE/LBUTTONDOWN/LBUTTONUP (não exige foreground; sem ponteiros entre processos). `abrir_orcamento` agora é `clickPoint` em `TCoolBar[0]/TToolBar[0]` ponto `20,23` → abre "Novo Orçamento Automático" (regra `novo_orcamento` aperta OK). `windowRule` de volta para **"Orçamentos"**.
+- **Seletores de campo confirmados** por enumeração da janela real: volume `TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]`, unidade `TwwDBLookupCombo[2]`, grade `TFagronPanel[2]/TwwDBGrid[0]`, salvar `TFagronButton[8]` — todos certos.
+- **Validado ponta a ponta ao vivo:** job `launch_quote` injetado → robô abriu, preencheu, respondeu os diálogos, **gravou** e leu de volta: orçamento **899762**, valor **R$ 11,00** (`state: completed`). Um teste anterior com dosagem inválida (Pregabalina 60 MG < mínimo 75) parou com segurança no aviso `TfrAdverte` "DOSAGEM NÃO ALCANÇADA" — comportamento correto.
+- Build Release 0 warnings; unitários Domain/Application/Infrastructure/Windows verdes (529 no total, +2 testes do ClickPoint). As 4 falhas do IntegrationTests são ambientais, sem relação.
+- **Requisito de setup para a demo:** a janela **Orçamentos** (FCReceitas.exe) precisa estar **aberta** quando o robô roda; o Agent mira nela por `windowRule`/`processIdentity`.
+- **CRM (receitaAI, `feat/crm-agent-demo`):** ambiente de teste no ar nesta máquina — CRM na :3000, túnel ngrok público (`engaging-creole-unexposed.ngrok-free.dev`), webhook da api-wa.me apontado, chaves OpenAI/wa.me no `.env`, `AUTO_ORCAMENTO=1`. Código do ativo cai no equivalente do catálogo quando não há match exato (`codigoSugerido`).
 
 ## Status — 2026-10-24 (demo CRM↔FórmulaCerta: o robô abre o orçamento sozinho; CRM integrado)
 

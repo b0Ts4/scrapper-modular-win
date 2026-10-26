@@ -111,6 +111,13 @@ public static class PlaybookValidator
                 }
 
                 break;
+            case PlaybookStepKind.ClickPoint:
+                if (!PlaybookStep.TryParsePoint(step.Value, out _, out _))
+                {
+                    errors.Add(new("INVALID_POINT", path, "A click-point step needs a client point 'x,y' in value."));
+                }
+
+                break;
             default:
                 errors.Add(new("UNKNOWN_STEP_KIND", path, "Unknown step kind."));
                 break;
