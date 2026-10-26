@@ -230,14 +230,27 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
                 return run.Stop(stepId, PlaybookStopReason.AmbiguousNumber);
             }
 
-            foreach (var cell in cells)
+            for (var cell = 0; cell < cells.Length; cell++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var stopped = await WriteAsync(run, stepId, () => driver.TypeAsync(step.Target, cell, cancellationToken), cancellationToken).ConfigureAwait(false)
+                var stopped = await WriteAsync(run, stepId, () => driver.TypeAsync(step.Target, cells[cell], cancellationToken), cancellationToken).ConfigureAwait(false)
                     ?? await WriteAsync(run, stepId, () => driver.PressKeyAsync(step.Target, PlaybookKey.Enter, cancellationToken), cancellationToken).ConfigureAwait(false);
                 if (stopped is not null)
                 {
                     return stopped;
+                }
+
+                // The first cell is the product code; resolving it can raise a product advisory a
+                // little late (and more than once). Drain dialogs persistently here, so the grid's
+                // cursor settles on the next cell before the quantity is typed - otherwise the
+                // quantity lands in the wrong column and FórmulaCerta rejects the row.
+                if (cell == 0)
+                {
+                    stopped = await DrainDialogsAsync(run, stepId, cancellationToken).ConfigureAwait(false);
+                    if (stopped is not null)
+                    {
+                        return stopped;
+                    }
                 }
             }
         }
@@ -301,6 +314,27 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
                 return run.Stop(stepId, PlaybookStopReason.ControlBlocked);
             }
         }
+    }
+
+    /// <summary>
+    /// Answers dialogs until two settle windows in a row bring none - so a modal that pops a little
+    /// after the action (FórmulaCerta's product advisory after a code resolves) is still caught.
+    /// </summary>
+    private async Task<PlaybookRunResult?> DrainDialogsAsync(Run run, string stepId, CancellationToken cancellationToken)
+    {
+        for (var quiet = 0; quiet < 2;)
+        {
+            var before = run.Answered.Count;
+            var stopped = await AnswerDialogsAsync(run, stepId, cancellationToken).ConfigureAwait(false);
+            if (stopped is not null)
+            {
+                return stopped;
+            }
+
+            quiet = run.Answered.Count == before ? quiet + 1 : 0;
+        }
+
+        return null;
     }
 
     private async Task<PlaybookRunResult?> AnswerDialogsAsync(Run run, string stepId, CancellationToken cancellationToken)

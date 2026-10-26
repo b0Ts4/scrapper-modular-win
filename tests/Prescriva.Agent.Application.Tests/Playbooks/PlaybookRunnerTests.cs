@@ -82,6 +82,21 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task A_product_advisory_after_the_code_cell_is_drained_and_the_row_completes()
+    {
+        // FórmulaCerta raises a product advisory just after a code resolves (e.g. Minoxidil Base);
+        // the grid drains dialogs after the code cell, so it is answered before the quantity is typed.
+        var program = new FakeProgram();
+        program.DialogAfter($"key {Grid}=Enter", new OpenDialog(11, "TfrAlerta2", "Atenção!", ["Fechar"]));
+        var playbook = Playbook() with { Dialogs = Playbook().Dialogs.Add(new DialogRule("alerta_produto", "TfrAlerta2", "Atenção", Response: DialogResponse.Press, Button: "Fechar")) };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Contains("press 11=Fechar", program.Actions);
+    }
+
+    [Fact]
     public async Task The_same_title_with_another_text_is_not_that_rule()
     {
         var program = new FakeProgram();
