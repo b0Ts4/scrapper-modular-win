@@ -74,9 +74,10 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
     private const int MaxBlockedTries = 4;
 
     // How many times to run a formula in all before giving up: a grid row can fail at random when a
-    // product advisory interrupts the cursor, so retrying the whole quote recovers it; still bounded,
-    // so a product that is genuinely missing or blocked ends in conference instead of looping.
-    private const int MaxFormulaAttempts = 3;
+    // product advisory interrupts the cursor, so retrying the whole quote recovers it. A formula with
+    // several components has more chances to hit the race, so 5 (not 3) keeps multi-component formulas
+    // reliable; still bounded, so a product that is genuinely missing or blocked ends in conference.
+    private const int MaxFormulaAttempts = 5;
 
     private readonly PlaybookRunnerOptions _options = options ?? PlaybookRunnerOptions.Default;
 
