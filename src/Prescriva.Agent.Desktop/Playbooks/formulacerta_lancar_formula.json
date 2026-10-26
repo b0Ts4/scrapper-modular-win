@@ -4,6 +4,7 @@
   "processIdentity": "fcreceitas",
   "windowRule": "Orçamentos",
   "openWith": { "viaWindowRule": "Receitas", "accelerator": "O", "note": "A janela Orçamentos fecha após gravar cada orçamento; o robô a reabre pela janela Receitas (botão 'Orçamento' = Alt+O)." },
+  "cancelTarget": "TFagronButton[7]",
   "steps": [
     { "id": "abrir_orcamento", "kind": "clickPoint", "target": "TCoolBar[0]/TToolBar[0]", "value": "20,23", "onlyWhen": "abrir", "note": "Novo orçamento pelo botão 'Novo Orç.' (botão 0 da barra, um TToolButton sem handle nem atalho): clique de mouse no ponto cliente 20,23 da TToolBar[0]. Abre o diálogo novo_orcamento (título 'Requisição', 'Novo Orçamento Automático'). Calibrado em 2026-10-25 na janela 'FórmulaCerta - Orçamentos 6.0.1164' (FCReceitas.exe, que deve estar com a tela de Orçamentos aberta). Só para trabalhos do CRM (abrir=sim)." },
     { "id": "volume", "kind": "setField", "target": "TFagronPageControl[0]/TcxTabSheet[0]/TwwDBEdit[7]", "value": "{volume}" },

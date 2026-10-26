@@ -97,6 +97,35 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task A_grid_row_that_fails_once_is_retried_after_discarding_the_quote()
+    {
+        // A product advisory can misplace the quantity ("não existe produto"); the robot discards the
+        // quote (Cancelar, confirm) and runs the formula again, so a one-off failure still completes.
+        var program = new FakeProgram();
+        program.DialogAfter($"key {Grid}=Enter", new OpenDialog(21, "TMessageForm", "Atenção!", ["OK"]));
+        program.DialogAfter("click TFagronButton[7]", new OpenDialog(22, "TMessageForm", "Atenção", ["Sim", "Não"]));
+        var playbook = Playbook() with { CancelTarget = "TFagronButton[7]" };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Contains("click TFagronButton[7]", program.Actions); // the half-typed quote was cancelled
+        Assert.Contains("press 22=Sim", program.Actions);           // and the cancellation confirmed
+    }
+
+    [Fact]
+    public async Task A_grid_failure_with_no_cancel_target_is_not_retried()
+    {
+        var program = new FakeProgram();
+        program.DialogAfter($"key {Grid}=Enter", new OpenDialog(21, "TMessageForm", "Atenção!", ["OK"]));
+
+        var result = await Run(program); // Playbook() has no CancelTarget
+
+        Assert.Equal(PlaybookStopReason.UnknownDialog, result.Reason);
+        Assert.DoesNotContain(program.Actions, action => action.StartsWith("click", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task The_same_title_with_another_text_is_not_that_rule()
     {
         var program = new FakeProgram();

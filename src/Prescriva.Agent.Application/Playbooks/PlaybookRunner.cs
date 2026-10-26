@@ -73,20 +73,79 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
 {
     private const int MaxBlockedTries = 4;
 
+    // How many times to run a formula in all before giving up: a grid row can fail at random when a
+    // product advisory interrupts the cursor, so retrying the whole quote recovers it; still bounded,
+    // so a product that is genuinely missing or blocked ends in conference instead of looping.
+    private const int MaxFormulaAttempts = 3;
+
     private readonly PlaybookRunnerOptions _options = options ?? PlaybookRunnerOptions.Default;
 
     public async Task<PlaybookRunResult> RunAsync(Playbook playbook, PlaybookData data, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(playbook);
         ArgumentNullException.ThrowIfNull(data);
+        if (PlaybookValidator.Validate(playbook).Count > 0)
+        {
+            return new Run(playbook, data).Stop(null, PlaybookStopReason.InvalidPlaybook);
+        }
+
+        for (var attempt = 0; ; attempt++)
+        {
+            var result = await RunOnceAsync(playbook, data, cancellationToken).ConfigureAwait(false);
+
+            // A grid row can fail at random when a product's advisory interrupts FórmulaCerta's own
+            // cursor move, so the quantity lands in the wrong column ("não existe produto"). The grid
+            // is opaque to automation, so it cannot be verified in place: discard the quote and run
+            // the whole formula again, a bounded number of times, before leaving it for a person.
+            if (Recoverable(result) && playbook.CancelTarget is not null && attempt + 1 < MaxFormulaAttempts)
+            {
+                await CleanupAsync(playbook, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            return result;
+        }
+    }
+
+    private static bool Recoverable(PlaybookRunResult result) =>
+        result.Reason == PlaybookStopReason.UnknownDialog && (result.StepId?.Contains('[', StringComparison.Ordinal) ?? false);
+
+    /// <summary>Discards the half-typed quote (dismiss its dialog, press Cancelar, confirm) so the next attempt starts clean.</summary>
+    private async Task CleanupAsync(Playbook playbook, CancellationToken cancellationToken)
+    {
+        var ignored = playbook.AllIgnoredWindowClasses;
+        for (var i = 0; i < 3; i++)
+        {
+            var open = await driver.DialogsAsync(ignored, cancellationToken).ConfigureAwait(false);
+            if (open.Count == 0)
+            {
+                break;
+            }
+
+            await driver.PressDialogButtonAsync(open[0], open[0].Buttons.FirstOrDefault(b => Playbook.Plain(b) is "OK" or "FECHAR") ?? open[0].Buttons.FirstOrDefault() ?? "OK", cancellationToken).ConfigureAwait(false);
+        }
+
+        await driver.ClickAsync(playbook.CancelTarget!, cancellationToken).ConfigureAwait(false);
+
+        for (var i = 0; i < 20; i++)
+        {
+            var open = await driver.DialogsAsync(ignored, cancellationToken).ConfigureAwait(false);
+            var confirm = open.FirstOrDefault(dialog => dialog.Buttons.Any(b => Playbook.Plain(b) == "SIM"));
+            if (confirm is not null)
+            {
+                await driver.PressDialogButtonAsync(confirm, confirm.Buttons.First(b => Playbook.Plain(b) == "SIM"), cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(_options.SettleDelay > TimeSpan.Zero ? 150 : 0), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<PlaybookRunResult> RunOnceAsync(Playbook playbook, PlaybookData data, CancellationToken cancellationToken)
+    {
         var run = new Run(playbook, data);
         try
         {
-            if (PlaybookValidator.Validate(playbook).Count > 0)
-            {
-                return run.Stop(null, PlaybookStopReason.InvalidPlaybook);
-            }
-
             if (!await AttachAsync(playbook, cancellationToken).ConfigureAwait(false))
             {
                 return run.Stop(null, PlaybookStopReason.WindowNotFound);

@@ -19,7 +19,8 @@ public sealed record Playbook(
     ImmutableArray<DialogRule> Dialogs,
     ImmutableArray<string> ForbiddenButtons = default,
     ImmutableArray<string> IgnoredWindowClasses = default,
-    WindowOpener? OpenWith = null)
+    WindowOpener? OpenWith = null,
+    string? CancelTarget = null)
 {
     /// <summary>Buttons the Agent never presses, whatever a playbook says: printing, production, sales, payments, prices, deletion.</summary>
     public static readonly ImmutableArray<string> DefaultForbiddenButtons =
