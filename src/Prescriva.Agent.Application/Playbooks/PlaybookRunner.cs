@@ -8,7 +8,9 @@ namespace Prescriva.Agent.Application.Playbooks;
 /// <param name="AttachTimeout">How long to wait for the program's window to open (Nova Fórmula opens Orçamentos a moment later).</param>
 public sealed record PlaybookRunnerOptions(TimeSpan SettleDelay, int MaxDialogsPerAction = 10, TimeSpan AttachTimeout = default)
 {
-    public static PlaybookRunnerOptions Default { get; } = new(TimeSpan.FromMilliseconds(700), AttachTimeout: TimeSpan.FromSeconds(20));
+    // 20 (not 10): some products re-show a clinical advisory on each recálculo, so the save step can
+    // answer more dialogs than a plain flow; still bounded, so a dialog that loops forever still stops.
+    public static PlaybookRunnerOptions Default { get; } = new(TimeSpan.FromMilliseconds(700), MaxDialogsPerAction: 20, AttachTimeout: TimeSpan.FromSeconds(20));
 
     public static PlaybookRunnerOptions Immediate { get; } = new(TimeSpan.Zero);
 }

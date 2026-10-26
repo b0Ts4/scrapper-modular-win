@@ -40,6 +40,22 @@
       "note": "Informational; pending the pharmacists' confirmation (docs/integrations/formulacerta-avisos.md, item 3)."
     },
     {
+      "id": "alerta_produto_demo",
+      "className": "TfrAlerta2",
+      "titleStartsWith": "Atenção",
+      "response": "press",
+      "button": "Fechar",
+      "note": "DEMO 2026-10-25: fecha a advertência informativa do produto (ex.: Minoxidil 'não usar em cáps') e segue. É decisão clínica da farmácia; REMOVER após a demo (o padrão correto é parar para uma pessoa)."
+    },
+    {
+      "id": "dosagem_minima_demo",
+      "className": "TfrAdverte",
+      "titleStartsWith": "Atenção",
+      "response": "press",
+      "button": "OK",
+      "note": "DEMO 2026-10-25: reconhece 'Dosagem não alcançada' e segue. Decisão clínica; REMOVER após a demo."
+    },
+    {
       "id": "qsp",
       "className": "TMessageForm",
       "titleStartsWith": "Componente",
