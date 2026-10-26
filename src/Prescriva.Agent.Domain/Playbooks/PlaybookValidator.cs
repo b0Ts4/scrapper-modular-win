@@ -34,6 +34,12 @@ public static class PlaybookValidator
             ValidateStep(playbook, steps[index], $"steps[{index}]", errors);
         }
 
+        if (playbook.OpenWith is { } opener &&
+            (string.IsNullOrWhiteSpace(opener.ViaWindowRule) || opener.Accelerator is not { Length: 1 } || !char.IsLetterOrDigit(opener.Accelerator[0])))
+        {
+            errors.Add(new("INVALID_WINDOW_OPENER", "openWith", "A window opener needs a window rule and a single-letter accelerator."));
+        }
+
         var dialogs = playbook.Dialogs.IsDefault ? [] : playbook.Dialogs;
         Duplicates(dialogs.Select(rule => rule.Id), "DUPLICATE_DIALOG_RULE_ID", "dialogs", errors);
         for (var index = 0; index < dialogs.Length; index++)

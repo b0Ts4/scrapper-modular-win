@@ -74,6 +74,16 @@ public sealed class PlaybookValidatorTests
     }
 
     [Fact]
+    public void A_window_opener_needs_a_window_rule_and_a_single_letter_accelerator()
+    {
+        var valido = Valid() with { OpenWith = new WindowOpener("Receitas", "O") };
+        Assert.Empty(PlaybookValidator.Validate(valido));
+
+        var ruim = Valid() with { OpenWith = new WindowOpener("", "OO") };
+        Assert.Contains(PlaybookValidator.Validate(ruim), error => error.Code == "INVALID_WINDOW_OPENER");
+    }
+
+    [Fact]
     public void A_template_with_an_unclosed_or_empty_placeholder_is_refused()
     {
         var playbook = Valid() with { Steps = [new PlaybookStep("volume", PlaybookStepKind.SetField, "TPanel[0]/TEdit[0]", "{volume")] };

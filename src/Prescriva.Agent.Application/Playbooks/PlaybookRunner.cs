@@ -123,8 +123,20 @@ public sealed partial class PlaybookRunner(IPlaybookDriver driver, PlaybookRunne
     private async Task<bool> AttachAsync(Playbook playbook, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + _options.AttachTimeout;
+        var openTried = false;
         while (!await driver.AttachAsync(playbook.ProcessIdentity, playbook.WindowRule, cancellationToken).ConfigureAwait(false))
         {
+            // The window may close itself (FórmulaCerta's Orçamentos closes after each quote is saved):
+            // when it is not open, open it once from another window of the program (Receitas, Alt+O).
+            if (!openTried && playbook.OpenWith is { } opener &&
+                await driver.AttachAsync(playbook.ProcessIdentity, opener.ViaWindowRule, cancellationToken).ConfigureAwait(false))
+            {
+                openTried = true;
+                await driver.PressAcceleratorAsync(opener.Accelerator, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromMilliseconds(_options.AttachTimeout > TimeSpan.Zero ? 500 : 0), cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
             if (DateTime.UtcNow >= deadline)
             {
                 return false;

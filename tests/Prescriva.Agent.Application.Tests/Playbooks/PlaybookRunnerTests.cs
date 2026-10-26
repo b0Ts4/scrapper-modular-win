@@ -310,6 +310,30 @@ public sealed class PlaybookRunnerTests
     }
 
     [Fact]
+    public async Task A_closed_window_is_opened_from_another_window_before_the_run()
+    {
+        // FórmulaCerta's Orçamentos window closes after each quote is saved; the robot reopens it (Receitas, Alt+O).
+        var program = new FakeProgram { ClosedWindowRule = "Orçamentos", OpenAccelerator = "O" };
+        var playbook = Playbook() with { OpenWith = new WindowOpener("Receitas", "O") };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(playbook, Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Completed, result.Status);
+        Assert.Contains("accel O", program.Actions);
+    }
+
+    [Fact]
+    public async Task A_closed_window_with_no_opener_stops_as_window_not_found()
+    {
+        var program = new FakeProgram { ClosedWindowRule = "Orçamentos" };
+
+        var result = await new PlaybookRunner(program, PlaybookRunnerOptions.Immediate).RunAsync(Playbook(), Data(), CancellationToken.None);
+
+        Assert.Equal(PlaybookRunStatus.Stopped, result.Status);
+        Assert.Equal(PlaybookStopReason.WindowNotFound, result.Reason);
+    }
+
+    [Fact]
     public async Task A_field_held_by_two_notices_in_a_row_is_typed_once_both_are_answered()
     {
         // Nova Fórmula (MobyPharma, 2026-10-21): "novo orçamento" then "Funcionário Recepção" before the first field.
@@ -475,6 +499,13 @@ public sealed class PlaybookRunnerTests
 
         public int WindowOpensAfterAttempts { get; set; }
 
+        /// <summary>This window rule is closed until <see cref="OpenAccelerator"/> is pressed (FórmulaCerta's Orçamentos).</summary>
+        public string? ClosedWindowRule { get; init; }
+
+        public string? OpenAccelerator { get; init; }
+
+        private bool _openerDone;
+
         public Dictionary<string, string> DialogFields { get; } = new(StringComparer.Ordinal);
 
         public bool DialogStaysAfterPress { get; init; }
@@ -500,8 +531,15 @@ public sealed class PlaybookRunnerTests
 
         public void InterruptOnce(string action, OpenDialog dialog, string text) => _interruptOnce[action] = (dialog, text);
 
-        public Task<bool> AttachAsync(string processIdentity, string windowRule, CancellationToken cancellationToken) =>
-            Task.FromResult(WindowOpen && WindowOpensAfterAttempts-- <= 0);
+        public Task<bool> AttachAsync(string processIdentity, string windowRule, CancellationToken cancellationToken)
+        {
+            if (ClosedWindowRule is not null && string.Equals(windowRule, ClosedWindowRule, StringComparison.Ordinal))
+            {
+                return Task.FromResult(_openerDone);
+            }
+
+            return Task.FromResult(WindowOpen && WindowOpensAfterAttempts-- <= 0);
+        }
 
         public Task<string?> ReadDialogFieldAsync(OpenDialog dialog, string path, CancellationToken cancellationToken) =>
             Task.FromResult(DialogFields.GetValueOrDefault(path));
@@ -519,7 +557,15 @@ public sealed class PlaybookRunnerTests
 
         public Task<WriteOutcome> PressKeyAsync(string path, PlaybookKey key, CancellationToken cancellationToken) => Task.FromResult(Act($"key {path}={key}"));
 
-        public Task<WriteOutcome> PressAcceleratorAsync(string key, CancellationToken cancellationToken) => Task.FromResult(Act($"accel {key}"));
+        public Task<WriteOutcome> PressAcceleratorAsync(string key, CancellationToken cancellationToken)
+        {
+            if (OpenAccelerator is not null && string.Equals(key, OpenAccelerator, StringComparison.Ordinal))
+            {
+                _openerDone = true;
+            }
+
+            return Task.FromResult(Act($"accel {key}"));
+        }
 
         public Task<string?> CaptionAsync(string path, CancellationToken cancellationToken) => Task.FromResult(Captions.GetValueOrDefault(path));
 

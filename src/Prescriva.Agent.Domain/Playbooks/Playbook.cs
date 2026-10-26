@@ -18,7 +18,8 @@ public sealed record Playbook(
     ImmutableArray<PlaybookStep> Steps,
     ImmutableArray<DialogRule> Dialogs,
     ImmutableArray<string> ForbiddenButtons = default,
-    ImmutableArray<string> IgnoredWindowClasses = default)
+    ImmutableArray<string> IgnoredWindowClasses = default,
+    WindowOpener? OpenWith = null)
 {
     /// <summary>Buttons the Agent never presses, whatever a playbook says: printing, production, sales, payments, prices, deletion.</summary>
     public static readonly ImmutableArray<string> DefaultForbiddenButtons =
@@ -74,6 +75,13 @@ public sealed record Playbook(
         return builder.ToString();
     }
 }
+
+/// <summary>
+/// How to open the playbook's window when it is not already open: find another window of the same
+/// program (<see cref="ViaWindowRule"/>, e.g. FórmulaCerta's "Receitas") and press Alt+&lt;<see cref="Accelerator"/>&gt;
+/// on it (the "Orçamento" command opens the Orçamentos window, which closes again after each quote is saved).
+/// </summary>
+public sealed record WindowOpener(string ViaWindowRule, string Accelerator, string? Note = null);
 
 public enum PlaybookStepKind
 {
